@@ -151,6 +151,24 @@ try {
   );
 
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 5).join(" | "));
+
+  // Screensaver: isolated context with a virtual clock so we don't burn 45
+  // real seconds (or destabilize the rAF-timed checks above with a shared
+  // fake clock) just to prove the idle timer fires.
+  const ssContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const ssPage = await ssContext.newPage();
+  await ssPage.clock.install();
+  await ssPage.goto(BASE, { waitUntil: "networkidle" });
+  await ssPage.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
+  const screensaver = ssPage.getByRole("status", { name: /Screensaver active/i });
+  check("screensaver absent before idle threshold", !(await screensaver.isVisible().catch(() => false)));
+  await ssPage.clock.fastForward("00:46");
+  await ssPage.waitForTimeout(150);
+  check("screensaver appears after 45s idle (virtual clock)", await screensaver.isVisible().catch(() => false));
+  await ssPage.mouse.move(50, 50);
+  await ssPage.waitForTimeout(150);
+  check("screensaver dismisses on activity", !(await screensaver.isVisible().catch(() => false)));
+  await ssContext.close();
 } finally {
   await browser.close();
 }
