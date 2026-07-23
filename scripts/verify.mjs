@@ -81,19 +81,65 @@ try {
   await page.waitForTimeout(200);
   const aboutText = await page.getByRole("region", { name: /About Me/i }).innerText();
   check("About window shows bio text", aboutText.includes("saeculo"));
+  await page.getByRole("button", { name: /Close About Me/i }).click();
 
   await page.getByRole("button", { name: /start/i }).click();
   await page.getByLabel("Start menu").getByRole("button", { name: /Contact\.exe/i }).click();
   await page.waitForTimeout(200);
   const contactLinks = await page.getByRole("region", { name: /Contact/i }).getByRole("link").count();
   check("Contact window shows social links", contactLinks > 0);
+  await page.getByRole("button", { name: /Close Contact/i }).click();
 
-  // mobile viewport — back out of the open Contact window via the "desk"
-  // button (mobile's back-to-desktop control) before opening another app,
-  // since a full-screen window intentionally covers the icons underneath
-  await page.setViewportSize({ width: 390, height: 844 });
+  // Beat Maker: toggle a step, play, confirm the scheduler advances and
+  // audio actually produces sound (analyser would be overkill — check the
+  // sequencer's own step highlight instead)
+  await page.getByRole("button", { name: /Beat Maker\.exe/i }).click();
   await page.waitForTimeout(200);
-  await page.getByRole("button", { name: /Minimize Contact/i }).click();
+  const beatMakerWindow = page.getByRole("region", { name: /Beat Maker/i });
+  check("Beat Maker window opens", await beatMakerWindow.isVisible());
+  await beatMakerWindow.getByLabel("kick step 3").click();
+  check(
+    "Beat Maker step toggles on",
+    (await beatMakerWindow.getByLabel("kick step 3").getAttribute("aria-pressed")) === "true",
+  );
+  await beatMakerWindow.getByRole("button", { name: "Play sequencer" }).click();
+  await page.waitForTimeout(700);
+  const stopVisible = await beatMakerWindow.getByRole("button", { name: "Stop sequencer" }).isVisible();
+  check("Beat Maker starts playing (play → stop button)", stopVisible);
+  await beatMakerWindow.getByRole("button", { name: "Stop sequencer" }).click();
+  await page.getByRole("button", { name: /Close Beat Maker/i }).click();
+
+  // Rhythm Rush: start a run, hit a lane key, confirm score/combo respond
+  await page.getByRole("button", { name: /Rhythm Rush\.exe/i }).click();
+  await page.waitForTimeout(200);
+  const rhythmWindow = page.getByRole("region", { name: /Rhythm Rush/i });
+  check("Rhythm Rush window opens", await rhythmWindow.isVisible());
+  await rhythmWindow.getByRole("button", { name: /^▶ (start|play again)$/ }).click();
+  await page.waitForTimeout(300);
+  // mash all four lanes repeatedly so at least one lands inside a hit window
+  for (let i = 0; i < 12; i++) {
+    for (const key of ["d", "f", "j", "k"]) await rhythmWindow.getByRole("button", { name: new RegExp(`Hit lane ${key}`, "i") }).click();
+    await page.waitForTimeout(120);
+  }
+  const scoreText = await rhythmWindow.locator("span", { hasText: /^score \d+/ }).innerText();
+  check("Rhythm Rush registers a hit (score > 0)", /score [1-9]/.test(scoreText), scoreText);
+  await page.getByRole("button", { name: /Close Rhythm Rush/i }).click();
+
+  // visualizer mode cycling
+  await page.getByRole("button", { name: /My Beats\.exe/i }).click();
+  await page.waitForTimeout(200);
+  await musicWindow.getByRole("button", { name: "Play", exact: true }).click();
+  await page.waitForTimeout(200);
+  const vizButton = musicWindow.getByRole("button", { name: "Cycle visualizer style" });
+  const modeLabel1 = await vizButton.innerText();
+  await vizButton.click();
+  const modeLabel2 = await vizButton.innerText();
+  check("visualizer mode cycles on click", modeLabel1 !== modeLabel2, `${modeLabel1} -> ${modeLabel2}`);
+  await page.getByRole("button", { name: /Close saeculo player/i }).click();
+
+  // mobile viewport — all windows are closed at this point, so the desktop
+  // icons are reachable directly
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(200);
   await page.getByRole("button", { name: /My Beats\.exe/i }).click();
   await page.waitForTimeout(200);

@@ -5,7 +5,8 @@ const DEFAULT_SIZES: Record<WindowKind, { width: number; height: number }> = {
   music: { width: 460, height: 540 },
   about: { width: 440, height: 420 },
   contact: { width: 400, height: 380 },
-  guestbook: { width: 420, height: 440 },
+  beatmaker: { width: 620, height: 460 },
+  rhythm: { width: 520, height: 480 },
 };
 
 const CASCADE_STEP = 32;

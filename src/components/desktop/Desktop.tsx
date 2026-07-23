@@ -14,14 +14,16 @@ import { PROFILE } from "@/data/profile";
 import MusicPlayerApp from "@/components/apps/MusicPlayerApp/MusicPlayerApp";
 import AboutApp from "@/components/apps/AboutApp";
 import ContactApp from "@/components/apps/ContactApp";
-import GuestbookApp from "@/components/apps/GuestbookApp";
+import BeatMakerApp from "@/components/apps/BeatMakerApp/BeatMakerApp";
+import RhythmRushApp from "@/components/apps/RhythmRushApp/RhythmRushApp";
 import type { WindowKind } from "@/lib/types";
 
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   music: MusicPlayerApp,
   about: AboutApp,
   contact: ContactApp,
-  guestbook: GuestbookApp,
+  beatmaker: BeatMakerApp,
+  rhythm: RhythmRushApp,
 };
 
 export default function Desktop() {
