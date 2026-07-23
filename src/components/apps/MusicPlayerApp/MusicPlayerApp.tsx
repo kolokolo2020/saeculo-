@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TRACKS } from "@/data/tracks";
 import { formatTime } from "@/lib/audio";
-import Visualizer from "./Visualizer";
+import Visualizer, { VIZ_MODES, type VizMode } from "./Visualizer";
 import { useAudioAnalyser } from "./useAudioAnalyser";
+
+const VIZ_LABEL: Record<VizMode, string> = { bars: "eq bars", scope: "scope", tunnel: "tunnel" };
 
 export default function MusicPlayerApp() {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -14,6 +16,8 @@ export default function MusicPlayerApp() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
+  const [vizModeIndex, setVizModeIndex] = useState(0);
+  const vizMode = VIZ_MODES[vizModeIndex];
 
   const track = TRACKS[trackIndex];
 
@@ -79,7 +83,16 @@ export default function MusicPlayerApp() {
         </p>
       </div>
 
-      <Visualizer analyserRef={analyserRef} active={playing} />
+      <div className="relative">
+        <Visualizer analyserRef={analyserRef} active={playing} mode={vizMode} />
+        <button
+          onClick={() => setVizModeIndex((i) => (i + 1) % VIZ_MODES.length)}
+          aria-label="Cycle visualizer style"
+          className="bevel-out bg-chrome/90 font-pixel absolute right-1.5 bottom-1.5 px-1.5 py-1 text-[7px] text-black active:translate-y-px"
+        >
+          {VIZ_LABEL[vizMode]} ↻
+        </button>
+      </div>
 
       {/* seek */}
       <div className="flex items-center gap-2">

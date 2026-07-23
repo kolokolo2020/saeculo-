@@ -4,24 +4,29 @@ import { useState } from "react";
 import BootScreen from "./BootScreen";
 import CrtOverlay from "./CrtOverlay";
 import DesktopIcon from "./DesktopIcon";
+import ScreensaverOverlay from "./ScreensaverOverlay";
 import StartMenu from "./StartMenu";
 import Taskbar from "./Taskbar";
 import WindowFrame from "@/components/window-manager/WindowFrame";
 import { APPS, APP_BY_KIND } from "@/components/window-manager/windowRegistry";
 import { useWindowStore } from "@/components/window-manager/windowStore";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useIdleTimer } from "@/hooks/useIdleTimer";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { PROFILE } from "@/data/profile";
 import MusicPlayerApp from "@/components/apps/MusicPlayerApp/MusicPlayerApp";
 import AboutApp from "@/components/apps/AboutApp";
 import ContactApp from "@/components/apps/ContactApp";
-import GuestbookApp from "@/components/apps/GuestbookApp";
+import BeatMakerApp from "@/components/apps/BeatMakerApp/BeatMakerApp";
+import RhythmRushApp from "@/components/apps/RhythmRushApp/RhythmRushApp";
 import type { WindowKind } from "@/lib/types";
 
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   music: MusicPlayerApp,
   about: AboutApp,
   contact: ContactApp,
-  guestbook: GuestbookApp,
+  beatmaker: BeatMakerApp,
+  rhythm: RhythmRushApp,
 };
 
 export default function Desktop() {
@@ -29,6 +34,9 @@ export default function Desktop() {
   const [startOpen, setStartOpen] = useState(false);
   const windows = useWindowStore((s) => s.windows);
   const isMobile = useIsMobile();
+  const reducedMotion = usePrefersReducedMotion();
+  const idle = useIdleTimer(45_000);
+  const showScreensaver = idle && !booting && !reducedMotion;
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-[#008080]">
@@ -73,6 +81,7 @@ export default function Desktop() {
       {startOpen && <StartMenu onClose={() => setStartOpen(false)} />}
       <Taskbar onStartClick={() => setStartOpen((v) => !v)} startOpen={startOpen} />
       <CrtOverlay />
+      {showScreensaver && <ScreensaverOverlay />}
     </main>
   );
 }
