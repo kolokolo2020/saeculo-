@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-pixel: var(--font-pixel), monospace;
+  --font-body: var(--font-retro-body), monospace;
+  --color-chrome: #c0c0c0;
+}
+
+@layer components {
+  .bevel-out {
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #404040;
+  }
+  .bevel-in {
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+  }
+  .transport-btn {
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #404040;
+    background: #c0c0c0;
+    height: 2.25rem;
+    width: 2.5rem;
+    font-size: 0.875rem;
+    line-height: 1;
+    color: #000;
+  }
+  .transport-btn:active {
+    transform: translateY(1px);
+  }
+}
+
+.font-pixel {
+  font-family: var(--font-pixel);
+}
+.font-body {
+  font-family: var(--font-body);
+}
+
+/* retro range inputs */
+.retro-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+.retro-range::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #0a0a14;
+  border: 1px solid #00e5a0;
+}
+.retro-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px;
+  height: 18px;
+  width: 10px;
+  background: #c0c0c0;
+  border: 2px solid;
+  border-color: #ffffff #808080 #808080 #ffffff;
+}
+.retro-range::-moz-range-track {
+  height: 6px;
+  background: #0a0a14;
+  border: 1px solid #00e5a0;
+}
+.retro-range::-moz-range-thumb {
+  height: 14px;
+  width: 6px;
+  border-radius: 0;
+  background: #c0c0c0;
+  border: 2px solid #808080;
+}
+
+/* marquee for now-playing */
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 14s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* chunky retro scrollbars */
+*::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+*::-webkit-scrollbar-track {
+  background: repeating-conic-gradient(#c0c0c0 0% 25%, #dfdfdf 0% 50%) 0 0 / 4px 4px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border: 2px solid;
+  border-color: #ffffff #808080 #808080 #ffffff;
+}
