@@ -86,17 +86,17 @@ export function useRhythmGame() {
       canvas.height = h * dpr;
       ctx2d.scale(dpr, dpr);
     }
-    ctx2d.fillStyle = "#0a0a14";
+    ctx2d.fillStyle = "#16160f";
     ctx2d.fillRect(0, 0, w, h);
 
     const laneW = w / LANE_COUNT;
     const hitY = h - 36;
 
     for (let i = 0; i < LANE_COUNT; i++) {
-      ctx2d.fillStyle = i % 2 === 0 ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.0)";
+      ctx2d.fillStyle = i % 2 === 0 ? "rgba(241,234,217,0.03)" : "rgba(241,234,217,0.0)";
       ctx2d.fillRect(i * laneW, 0, laneW, h);
     }
-    ctx2d.strokeStyle = "#00e5a0";
+    ctx2d.strokeStyle = "#ff9a2e";
     ctx2d.lineWidth = 2;
     ctx2d.beginPath();
     ctx2d.moveTo(0, hitY);
@@ -104,7 +104,7 @@ export function useRhythmGame() {
     ctx2d.stroke();
 
     const now = (performance.now() - startRef.current) / 1000;
-    const colors = ["#ff2d78", "#ffe600", "#00e5a0", "#00b4ff"];
+    const colors = ["#ff9a2e", "#4fd6c4", "#f1ead9", "#8b8570"];
     for (const note of notesRef.current) {
       if (note.hit) continue;
       const progress = 1 - (note.time - now) / TRAVEL_S;

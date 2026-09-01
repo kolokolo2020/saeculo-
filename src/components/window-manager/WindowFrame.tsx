@@ -37,7 +37,7 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
     <section
       aria-label={title}
       style={style}
-      className={`bevel-out bg-chrome absolute flex flex-col p-1 shadow-[4px_4px_0_rgba(0,0,0,0.35)] ${
+      className={`deck-panel absolute flex flex-col p-1 shadow-[4px_4px_0_rgba(0,0,0,0.5)] ${
         isMobile ? "inset-x-0 top-0 bottom-10" : "top-0 left-0"
       } ${hidden ? "invisible pointer-events-none" : "visible"}`}
     >
@@ -45,19 +45,21 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
         onPointerDown={drag.onPointerDown}
         onPointerMove={drag.onPointerMove}
         onPointerUp={drag.onPointerUp}
-        className={`flex h-8 shrink-0 touch-none items-center gap-2 px-2 select-none ${
+        className={`font-readout flex h-8 shrink-0 touch-none items-center gap-2 border-b px-2 text-base tracking-wide select-none ${
           focused
-            ? "bg-gradient-to-r from-[#000080] to-[#1084d0] text-white"
-            : "bg-[#808080] text-[#c8c8c8]"
+            ? "border-signal/40 bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-signal)_28%,var(--color-void)),var(--color-panel))] text-ink"
+            : "border-ink/10 bg-panel-2 text-mute"
         } ${isMobile ? "" : "cursor-move"}`}
       >
-        <span aria-hidden className="text-sm leading-none">{icon}</span>
-        <h2 className="font-pixel flex-1 truncate text-[10px] tracking-wide">{title}</h2>
+        <span aria-hidden className={`rec-dot leading-none ${focused ? "text-signal" : "text-mute"}`}>
+          {icon}
+        </span>
+        <h2 className="flex-1 truncate">{title}</h2>
         {isMobile ? (
           <button
             onClick={() => toggleMinimize(kind)}
             aria-label={`Minimize ${title}`}
-            className="bevel-out bg-chrome font-pixel h-6 px-2 text-[9px] text-black active:translate-y-px"
+            className="deck-button font-readout h-6 px-2 text-sm"
           >
             ▾ desk
           </button>
@@ -65,7 +67,7 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
           <button
             onClick={() => toggleMinimize(kind)}
             aria-label={`Minimize ${title}`}
-            className="bevel-out bg-chrome h-5 w-5 text-[10px] leading-none font-bold text-black active:translate-y-px"
+            className="deck-button h-5 w-5 text-xs leading-none font-bold"
           >
             _
           </button>
@@ -73,14 +75,12 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
         <button
           onClick={() => closeWindow(kind)}
           aria-label={`Close ${title}`}
-          className="bevel-out bg-chrome h-5 w-5 text-[10px] leading-none font-bold text-black active:translate-y-px"
+          className="deck-button h-5 w-5 text-xs leading-none font-bold"
         >
           ✕
         </button>
       </header>
-      <div className="bevel-in min-h-0 flex-1 overflow-auto bg-[#f4f1e8]">
-        {children}
-      </div>
+      <div className="deck-panel-recessed min-h-0 flex-1 overflow-auto p-3">{children}</div>
     </section>
   );
 }

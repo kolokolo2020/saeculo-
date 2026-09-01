@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { PROFILE } from "@/data/profile";
 
 const BOOT_LINES = [
-  "SAECULO BIOS v2.4 — (C) saeculo sound systems",
-  "Memory check .......... 640K OK (plenty)",
+  "SAECULO OS v2.4 — dubbed from a bootleg tape",
+  "Rewinding side A ..........",
+  "Head alignment .......... OK (a little worn, in a good way)",
   "Detecting audio device .......... FOUND: imagination.dll",
   "Loading beats.sys ..........",
   "Loading nostalgia.drv ..........",
@@ -51,15 +52,15 @@ export default function BootScreen({ onDone }: { onDone: () => void }) {
     <button
       onClick={skip}
       aria-label="Skip boot sequence"
-      className="fixed inset-0 z-[9999] block w-full cursor-pointer bg-black p-6 text-left font-mono"
+      className="fixed inset-0 z-[9999] block w-full cursor-pointer bg-black p-6 text-left"
     >
-      <div className="font-body text-lg leading-relaxed text-[#33ff33] sm:text-xl">
+      <div className="font-mono text-lg leading-relaxed text-signal sm:text-xl">
         {BOOT_LINES.slice(0, visibleLines).map((line, i) => (
-          <p key={i}>{line || " "}</p>
+          <p key={i}>{line || " "}</p>
         ))}
-        <span className="inline-block h-5 w-2.5 animate-pulse bg-[#33ff33]" aria-hidden />
+        <span className="bg-signal inline-block h-5 w-2.5 animate-pulse" aria-hidden />
       </div>
-      <p className="font-pixel absolute bottom-6 left-6 text-[9px] text-[#33ff33]/60">
+      <p className="font-readout absolute bottom-6 left-6 text-sm text-signal/60">
         click anywhere to skip
       </p>
     </button>

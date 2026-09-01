@@ -2,18 +2,26 @@ import { PROFILE } from "@/data/profile";
 
 export default function AboutApp() {
   return (
-    <article className="font-body p-4 text-lg leading-relaxed text-black sm:p-5">
-      <h3 className="font-pixel mb-4 text-xs text-[#000080]">
-        {PROFILE.artistName} — {PROFILE.tagline}
-      </h3>
+    <div className="font-body flex h-full flex-col gap-3 text-base text-ink">
       {PROFILE.bio.map((paragraph, i) => (
-        <p key={i} className="mb-3">
+        <p key={i} className={i === 0 ? "text-lg font-medium text-signal" : "text-ink/85"}>
           {paragraph}
         </p>
       ))}
-      <p className="mt-5 border-t border-dashed border-[#808080] pt-3 text-base text-[#555]">
-        [placeholder bio — the real story goes here]
-      </p>
-    </article>
+      <ul className="font-readout mt-auto flex flex-wrap gap-x-4 gap-y-1 border-t border-ink/10 pt-3 text-sm">
+        {PROFILE.socials.map((social) => (
+          <li key={social.label}>
+            <a
+              href={social.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-bleed hover:text-signal"
+            >
+              {social.label} ↗
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { WindowKind, WindowState } from "@/lib/types";
 
 const DEFAULT_SIZES: Record<WindowKind, { width: number; height: number }> = {
-  music: { width: 460, height: 540 },
+  saeculo: { width: 480, height: 560 },
   about: { width: 440, height: 420 },
   contact: { width: 400, height: 380 },
   beatmaker: { width: 620, height: 460 },

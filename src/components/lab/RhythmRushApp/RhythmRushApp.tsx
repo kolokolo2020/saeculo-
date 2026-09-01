@@ -4,9 +4,9 @@ import { TRACKS } from "@/data/tracks";
 import { LANE_KEYS, useRhythmGame } from "./useRhythmGame";
 
 const JUDGEMENT_STYLE: Record<string, string> = {
-  perfect: "text-[#00e5a0]",
-  good: "text-[#ffe600]",
-  miss: "text-[#ff2d78]",
+  perfect: "text-signal",
+  good: "text-bleed",
+  miss: "text-mute",
 };
 
 export default function RhythmRushApp() {
@@ -25,42 +25,40 @@ export default function RhythmRushApp() {
   } = useRhythmGame();
 
   return (
-    <div className="flex h-full flex-col gap-2 bg-[#1a1a24] p-3">
-      <div className="bevel-in flex flex-wrap items-center gap-3 bg-[#0a0a14] px-3 py-2">
-        <span className="font-pixel text-[9px] text-[#00e5a0]">score {score}</span>
-        <span className="font-pixel text-[9px] text-[#ffe600]">combo {combo}x</span>
-        <span className="font-pixel text-[9px] text-[#9aa0b0]">best {highScore}</span>
-        <span className="font-pixel ml-auto text-[9px] text-[#9aa0b0]">
-          {gameState === "running" ? `${timeLeft}s` : "—"}
-        </span>
+    <div className="flex flex-col gap-3">
+      <div className="font-mono flex flex-wrap items-center gap-4 text-xs text-mute">
+        <span className="text-ink">score {score}</span>
+        <span>combo {combo}x</span>
+        <span>best {highScore}</span>
+        <span className="ml-auto">{gameState === "running" ? `${timeLeft}s` : "—"}</span>
       </div>
 
-      <div className="relative min-h-0 flex-1">
-        <canvas ref={canvasRef} className="bevel-in h-full w-full bg-[#0a0a14]" aria-hidden />
+      <div className="relative aspect-[4/3] w-full">
+        <canvas ref={canvasRef} className="h-full w-full rounded-md bg-panel" aria-hidden />
         {judgement && (
           <p
-            className={`font-pixel pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 text-xs ${JUDGEMENT_STYLE[judgement]}`}
+            className={`font-mono pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 text-xs tracking-widest uppercase ${JUDGEMENT_STYLE[judgement]}`}
           >
             {judgement}
           </p>
         )}
 
         {gameState !== "running" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 p-4 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-md bg-void/85 p-4 text-center">
             {gameState === "ended" && (
-              <p className="font-pixel text-xs text-[#00e5a0]">
+              <p className="font-mono text-xs text-signal">
                 run over — score {score}
                 {score >= highScore && score > 0 ? " — new best!" : ""}
               </p>
             )}
-            <label className="font-pixel text-[9px] text-white" htmlFor="rr-track">
+            <label className="font-mono text-[11px] text-mute" htmlFor="rr-track">
               synced to
             </label>
             <select
               id="rr-track"
               value={trackIndex}
               onChange={(e) => setTrackIndex(Number(e.target.value))}
-              className="bevel-in font-body bg-white px-2 py-1 text-base text-black"
+              className="font-mono rounded-md border border-mute/30 bg-panel px-2 py-1 text-xs text-ink"
             >
               {TRACKS.map((t, i) => (
                 <option key={t.id} value={i}>
@@ -70,11 +68,11 @@ export default function RhythmRushApp() {
             </select>
             <button
               onClick={start}
-              className="bevel-out bg-chrome font-pixel px-4 py-2 text-[10px] text-black active:translate-y-px"
+              className="font-mono rounded-full border border-mute/30 px-5 py-2 text-xs tracking-widest text-ink uppercase hover:border-signal hover:text-signal"
             >
               ▶ {gameState === "ended" ? "play again" : "start"}
             </button>
-            <p className="font-pixel max-w-[16rem] text-[8px] text-[#9aa0b0]">
+            <p className="font-mono max-w-[16rem] text-[11px] text-mute">
               hit {LANE_KEYS.map((k) => k.toUpperCase()).join(" / ")} as the bars cross the line
             </p>
           </div>
@@ -88,7 +86,7 @@ export default function RhythmRushApp() {
             onClick={() => hitLane(i)}
             disabled={gameState !== "running"}
             aria-label={`Hit lane ${key.toUpperCase()}`}
-            className="bevel-out bg-chrome font-pixel h-9 text-[10px] text-black active:translate-y-px disabled:opacity-40"
+            className="font-mono h-10 rounded-md border border-mute/30 text-xs tracking-widest text-ink uppercase hover:border-signal hover:text-signal disabled:opacity-30"
           >
             {key.toUpperCase()}
           </button>

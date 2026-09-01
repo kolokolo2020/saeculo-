@@ -1,106 +1,222 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-pixel: var(--font-pixel), monospace;
-  --font-body: var(--font-retro-body), monospace;
-  --color-chrome: #c0c0c0;
+  --font-display: var(--font-display), sans-serif;
+  --font-body: var(--font-body), sans-serif;
+  --font-mono: var(--font-mono), monospace;
+  --font-readout: var(--font-readout), monospace;
+
+  /* Tape shell black, warmed slightly instead of neutral/blue-black. */
+  --color-void: #0b0c09;
+  --color-panel: #16160f;
+  --color-panel-2: #1e1d14;
+  --color-ink: #f1ead9;
+  --color-mute: #8b8570;
+
+  /* Camcorder REC-light amber — the primary accent. */
+  --color-signal: #ff9a2e;
+  /* VHS dub chroma-bleed cyan — secondary, used sparingly (ghosting/glitch). */
+  --color-bleed: #4fd6c4;
+
+  /* Aged cassette-label paper, for the tracklist stickers. */
+  --color-paper: #ece3ce;
+  --color-paper-ink: #24201a;
 }
 
-@layer components {
-  .bevel-out {
-    border: 2px solid;
-    border-color: #ffffff #808080 #808080 #ffffff;
-    box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #404040;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
   }
-  .bevel-in {
-    border: 2px solid;
-    border-color: #808080 #ffffff #ffffff #808080;
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
-  .transport-btn {
-    border: 2px solid;
-    border-color: #ffffff #808080 #808080 #ffffff;
-    box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #404040;
-    background: #c0c0c0;
-    height: 2.25rem;
-    width: 2.5rem;
-    font-size: 0.875rem;
-    line-height: 1;
-    color: #000;
+
+  body {
+    background: var(--color-void);
+    color: var(--color-ink);
   }
-  .transport-btn:active {
-    transform: translateY(1px);
+
+  ::selection {
+    background: var(--color-signal);
+    color: var(--color-void);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 3px;
   }
 }
 
-.font-pixel {
-  font-family: var(--font-pixel);
-}
-.font-body {
-  font-family: var(--font-body);
-}
-
-/* retro range inputs */
-.retro-range {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 18px;
-  background: transparent;
-  cursor: pointer;
-}
-.retro-range::-webkit-slider-runnable-track {
-  height: 6px;
-  background: #0a0a14;
-  border: 1px solid #00e5a0;
-}
-.retro-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  margin-top: -6px;
-  height: 18px;
-  width: 10px;
-  background: #c0c0c0;
-  border: 2px solid;
-  border-color: #ffffff #808080 #808080 #ffffff;
-}
-.retro-range::-moz-range-track {
-  height: 6px;
-  background: #0a0a14;
-  border: 1px solid #00e5a0;
-}
-.retro-range::-moz-range-thumb {
-  height: 14px;
-  width: 6px;
-  border-radius: 0;
-  background: #c0c0c0;
-  border: 2px solid #808080;
+@keyframes rec-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
 }
 
-/* marquee for now-playing */
 @keyframes marquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
-}
-.animate-marquee {
-  display: inline-block;
-  animation: marquee 14s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .animate-marquee {
-    animation: none;
-    transform: none;
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
   }
 }
 
-/* chunky retro scrollbars */
+/* Custom component classes live in this layer so Tailwind utilities (the
+   `utilities` layer, which Tailwind orders after `components`) can still
+   override them — e.g. `text-signal` on a `.deck-button` element. */
+@layer components {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-body {
+    font-family: var(--font-body);
+  }
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+  .font-readout {
+    font-family: var(--font-readout);
+  }
+
+  /* ---- camcorder viewfinder chrome ---- */
+  .rec-dot {
+    animation: rec-blink 1.6s steps(2, jump-none) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rec-dot {
+      animation: none;
+    }
+  }
+
+  .viewfinder-bracket {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-color: color-mix(in srgb, var(--color-signal) 55%, transparent);
+    pointer-events: none;
+  }
+
+  /* Thin horizontal scan lines, always on but barely there. */
+  .crt-scanlines {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-void) 92%, transparent) 0px,
+      color-mix(in srgb, var(--color-void) 92%, transparent) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    mix-blend-mode: overlay;
+  }
+
+  /* Film grain: a tiled SVG turbulence texture, static (no per-frame cost). */
+  .crt-grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+  }
+
+  /* ---- cassette label sticker (tracklist) ---- */
+  .tape-label {
+    background: var(--color-paper);
+    color: var(--color-paper-ink);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  }
+
+  /* ---- deck chrome: the desktop OS's hardware panels ----
+     Not a Windows-95 grey/navy pastiche — this reads as the plastic and
+     brushed-metal of a cheap tape deck or camcorder: dark panel faces,
+     a thin warm highlight where light would catch a raised edge, and a
+     near-black shadow where it recedes. */
+  .deck-panel {
+    background: var(--color-panel);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, var(--color-void));
+    box-shadow:
+      inset 1px 1px 0 color-mix(in srgb, var(--color-ink) 10%, transparent),
+      inset -1px -1px 0 rgba(0, 0, 0, 0.6);
+  }
+  .deck-panel-recessed {
+    background: var(--color-void);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, var(--color-void));
+    box-shadow:
+      inset 1px 1px 0 rgba(0, 0, 0, 0.6),
+      inset -1px -1px 0 color-mix(in srgb, var(--color-ink) 8%, transparent);
+  }
+  .deck-button {
+    background: var(--color-panel-2);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 14%, var(--color-void));
+    box-shadow:
+      inset 1px 1px 0 color-mix(in srgb, var(--color-ink) 14%, transparent),
+      inset -1px -1px 0 rgba(0, 0, 0, 0.7);
+    color: var(--color-ink);
+  }
+  .deck-button:active {
+    transform: translateY(1px);
+    box-shadow: inset -1px -1px 0 color-mix(in srgb, var(--color-ink) 10%, transparent);
+  }
+
+  /* minimal range inputs, tuned to the void/signal palette */
+  .signal-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 16px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .signal-range::-webkit-slider-runnable-track {
+    height: 2px;
+    background: color-mix(in srgb, var(--color-mute) 35%, transparent);
+  }
+  .signal-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    margin-top: -6px;
+    height: 14px;
+    width: 14px;
+    border-radius: 999px;
+    background: var(--color-signal);
+  }
+  .signal-range::-moz-range-track {
+    height: 2px;
+    background: color-mix(in srgb, var(--color-mute) 35%, transparent);
+  }
+  .signal-range::-moz-range-thumb {
+    height: 14px;
+    width: 14px;
+    border: none;
+    border-radius: 999px;
+    background: var(--color-signal);
+  }
+
+  /* marquee for now-playing */
+  .animate-marquee {
+    display: inline-block;
+    animation: marquee 14s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-marquee {
+      animation: none;
+      transform: none;
+    }
+  }
+}
+
+/* slim scrollbars matching the dark canvas */
 *::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
 }
 *::-webkit-scrollbar-track {
-  background: repeating-conic-gradient(#c0c0c0 0% 25%, #dfdfdf 0% 50%) 0 0 / 4px 4px;
+  background: var(--color-void);
 }
 *::-webkit-scrollbar-thumb {
-  background: #c0c0c0;
-  border: 2px solid;
-  border-color: #ffffff #808080 #808080 #ffffff;
+  background: var(--color-panel-2);
+  border-radius: 999px;
 }

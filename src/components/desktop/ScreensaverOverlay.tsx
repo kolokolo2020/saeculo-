@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { PROFILE } from "@/data/profile";
 
-const COLORS = ["#00e5a0", "#ffe600", "#ff2d78", "#00b4ff", "#a855f7"];
+const COLORS = ["#ff9a2e", "#4fd6c4"];
 const STAR_COUNT = 60;
 
 export default function ScreensaverOverlay() {
@@ -19,9 +19,9 @@ export default function ScreensaverOverlay() {
 
     // canvas ctx.font can't resolve CSS custom properties, so read the
     // real generated font-family off a hidden DOM element wearing the
-    // same .font-pixel class instead.
-    const pixelFontFamily = window.getComputedStyle(probe).fontFamily;
-    const fontAt = (size: number) => `${size}px ${pixelFontFamily}`;
+    // same .font-readout class instead.
+    const readoutFontFamily = window.getComputedStyle(probe).fontFamily;
+    const fontAt = (size: number) => `${size}px ${readoutFontFamily}`;
 
     const dpr = window.devicePixelRatio || 1;
     let w = window.innerWidth;
@@ -40,7 +40,7 @@ export default function ScreensaverOverlay() {
     window.addEventListener("resize", onResize);
 
     const label = PROFILE.artistName;
-    const fontSize = 32;
+    const fontSize = 42;
     ctx.font = fontAt(fontSize);
     const textW = ctx.measureText(label).width;
     const textH = fontSize;
@@ -62,10 +62,10 @@ export default function ScreensaverOverlay() {
     let raf = 0;
     const draw = () => {
       raf = requestAnimationFrame(draw);
-      ctx.fillStyle = "#000";
+      ctx.fillStyle = "#0b0c09";
       ctx.fillRect(0, 0, w, h);
 
-      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.fillStyle = "rgba(241,234,217,0.5)";
       for (const s of stars) {
         s.x += s.vx;
         s.y += s.vy;
@@ -114,14 +114,14 @@ export default function ScreensaverOverlay() {
     <div
       role="status"
       aria-label="Screensaver active — move mouse or press any key to return"
-      className="fixed inset-0 z-[9990] bg-black"
+      className="fixed inset-0 z-[9990] bg-void"
     >
-      <span ref={fontProbeRef} className="font-pixel invisible absolute" aria-hidden>
+      <span ref={fontProbeRef} className="font-readout invisible absolute" aria-hidden>
         A
       </span>
       <canvas ref={canvasRef} className="h-full w-full" aria-hidden />
-      <p className="font-pixel absolute bottom-4 left-1/2 -translate-x-1/2 text-[8px] text-white/40">
-        move or press any key
+      <p className="font-readout absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-ink/40">
+        tape idle — move or press any key
       </p>
     </div>
   );

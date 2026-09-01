@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import BootScreen from "./BootScreen";
-import CrtOverlay from "./CrtOverlay";
 import DesktopIcon from "./DesktopIcon";
 import ScreensaverOverlay from "./ScreensaverOverlay";
 import StartMenu from "./StartMenu";
@@ -14,15 +13,15 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { PROFILE } from "@/data/profile";
-import MusicPlayerApp from "@/components/apps/MusicPlayerApp/MusicPlayerApp";
+import SaeculoApp from "@/components/apps/SaeculoApp/SaeculoApp";
 import AboutApp from "@/components/apps/AboutApp";
 import ContactApp from "@/components/apps/ContactApp";
-import BeatMakerApp from "@/components/apps/BeatMakerApp/BeatMakerApp";
-import RhythmRushApp from "@/components/apps/RhythmRushApp/RhythmRushApp";
+import BeatMakerApp from "@/components/lab/BeatMakerApp/BeatMakerApp";
+import RhythmRushApp from "@/components/lab/RhythmRushApp/RhythmRushApp";
 import type { WindowKind } from "@/lib/types";
 
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
-  music: MusicPlayerApp,
+  saeculo: SaeculoApp,
   about: AboutApp,
   contact: ContactApp,
   beatmaker: BeatMakerApp,
@@ -39,18 +38,20 @@ export default function Desktop() {
   const showScreensaver = idle && !booting && !reducedMotion;
 
   return (
-    <main className="relative h-dvh w-full overflow-hidden bg-[#008080]">
+    <main className="relative h-dvh w-full overflow-hidden bg-void text-ink">
       {booting && <BootScreen onDone={() => setBooting(false)} />}
 
-      {/* wallpaper branding */}
+      {/* wallpaper: grain + scanlines over the void, watermark wordmark */}
+      <div className="crt-scanlines pointer-events-none absolute inset-0" aria-hidden />
+      <div className="crt-grain pointer-events-none absolute inset-0" aria-hidden />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 flex items-center justify-center"
       >
-        <p className="font-pixel select-none text-center text-2xl leading-relaxed text-white/15 sm:text-4xl">
+        <p className="font-display text-center text-2xl leading-relaxed font-semibold text-ink/[0.06] select-none sm:text-4xl">
           {PROFILE.artistName}
           <br />
-          <span className="text-sm sm:text-lg">{PROFILE.tagline}</span>
+          <span className="font-readout text-base sm:text-xl">{PROFILE.tagline}</span>
         </p>
       </div>
 
@@ -66,13 +67,7 @@ export default function Desktop() {
         const app = APP_BY_KIND[kind];
         const Component = APP_COMPONENTS[kind];
         return (
-          <WindowFrame
-            key={kind}
-            kind={kind}
-            title={app.title}
-            icon={app.icon}
-            isMobile={isMobile}
-          >
+          <WindowFrame key={kind} kind={kind} title={app.title} icon={app.icon} isMobile={isMobile}>
             <Component />
           </WindowFrame>
         );
@@ -80,7 +75,6 @@ export default function Desktop() {
 
       {startOpen && <StartMenu onClose={() => setStartOpen(false)} />}
       <Taskbar onStartClick={() => setStartOpen((v) => !v)} startOpen={startOpen} />
-      <CrtOverlay />
       {showScreensaver && <ScreensaverOverlay />}
     </main>
   );

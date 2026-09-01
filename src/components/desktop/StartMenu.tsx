@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useWindowStore } from "@/components/window-manager/windowStore";
 import { APPS } from "@/components/window-manager/windowRegistry";
 import { PROFILE } from "@/data/profile";
@@ -7,14 +8,22 @@ import { PROFILE } from "@/data/profile";
 export default function StartMenu({ onClose }: { onClose: () => void }) {
   const openWindow = useWindowStore((s) => s.openWindow);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <>
       <div className="fixed inset-0 z-[9100]" onClick={onClose} aria-hidden />
       <nav
         aria-label="Start menu"
-        className="bevel-out bg-chrome absolute bottom-10 left-0 z-[9200] flex w-56 max-md:w-[calc(100vw-2rem)] max-md:left-2"
+        className="deck-panel absolute bottom-10 left-0 z-[9200] flex w-56 max-md:left-2 max-md:w-[calc(100vw-2rem)]"
       >
-        <div className="font-pixel flex w-8 items-end justify-center bg-gradient-to-t from-[#000080] to-[#1084d0] pb-2 text-[10px] font-bold text-white [writing-mode:vertical-rl] rotate-180">
+        <div className="font-readout flex w-8 items-end justify-center bg-[linear-gradient(to_top,color-mix(in_srgb,var(--color-signal)_30%,var(--color-void)),var(--color-panel))] pb-2 text-base text-ink [writing-mode:vertical-rl]">
           {PROFILE.artistName} OS
         </div>
         <ul className="flex-1 py-1">
@@ -25,9 +34,11 @@ export default function StartMenu({ onClose }: { onClose: () => void }) {
                   openWindow(app.kind);
                   onClose();
                 }}
-                className="font-body flex w-full items-center gap-3 px-3 py-2.5 text-left text-lg text-black hover:bg-[#000080] hover:text-white focus-visible:bg-[#000080] focus-visible:text-white focus:outline-none"
+                className="font-body flex w-full items-center gap-3 px-3 py-2.5 text-left text-lg text-ink hover:bg-signal/15 hover:text-signal focus-visible:bg-signal/15 focus-visible:text-signal focus:outline-none"
               >
-                <span aria-hidden className="w-5 text-center">{app.icon}</span>
+                <span aria-hidden className="w-5 text-center">
+                  {app.icon}
+                </span>
                 {app.desktopLabel}
               </button>
             </li>

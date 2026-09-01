@@ -10,10 +10,10 @@ const LANE_LABEL: Record<Lane, string> = {
 };
 
 const LANE_COLOR: Record<Lane, string> = {
-  kick: "bg-[#ff2d78]",
-  snare: "bg-[#ffe600]",
-  hat: "bg-[#00e5a0]",
-  bass: "bg-[#00b4ff]",
+  kick: "bg-signal",
+  snare: "bg-bleed",
+  hat: "bg-ink",
+  bass: "bg-mute",
 };
 
 export default function BeatMakerApp() {
@@ -21,24 +21,24 @@ export default function BeatMakerApp() {
     useStepSequencer();
 
   return (
-    <div className="flex h-full flex-col gap-3 bg-[#1a1a24] p-3">
-      <div className="bevel-in flex items-center gap-3 bg-[#0a0a14] px-3 py-2">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={playing ? stop : play}
           aria-label={playing ? "Stop sequencer" : "Play sequencer"}
-          className="bevel-out bg-chrome font-pixel h-8 w-16 text-[9px] text-black active:translate-y-px"
+          className="font-mono h-9 w-20 rounded-full border border-mute/30 text-xs tracking-widest text-ink uppercase hover:border-signal hover:text-signal"
         >
           {playing ? "■ stop" : "▶ play"}
         </button>
         <button
           onClick={clear}
           aria-label="Clear pattern"
-          className="bevel-out bg-chrome font-pixel h-8 px-2 text-[9px] text-black active:translate-y-px"
+          className="font-mono h-9 rounded-full border border-mute/30 px-4 text-xs tracking-widest text-mute uppercase hover:border-signal hover:text-signal"
         >
           clear
         </button>
         <div className="ml-auto flex items-center gap-2">
-          <label htmlFor="bm-bpm" className="font-pixel text-[9px] text-[#00e5a0]">
+          <label htmlFor="bm-bpm" className="font-mono text-xs text-mute">
             {bpm} bpm
           </label>
           <input
@@ -50,31 +50,35 @@ export default function BeatMakerApp() {
             value={bpm}
             onChange={(e) => setBpm(Number(e.target.value))}
             aria-label="Tempo"
-            className="retro-range w-28"
+            className="signal-range w-28"
           />
         </div>
       </div>
 
-      <div className="font-body min-h-0 flex-1 space-y-2 overflow-auto">
+      <div className="space-y-2">
         {LANES.map((lane) => (
           <div key={lane} className="flex items-center gap-2">
-            <span className="font-pixel w-11 shrink-0 text-[8px] text-[#9aa0b0]">
+            <span className="font-mono w-10 shrink-0 text-[11px] text-mute">
               {LANE_LABEL[lane]}
             </span>
-            <div className="grid flex-1 grid-cols-[repeat(16,minmax(0,1fr))] gap-1" role="group" aria-label={`${lane} steps`}>
+            <div
+              className="grid flex-1 grid-cols-[repeat(16,minmax(0,1fr))] gap-1"
+              role="group"
+              aria-label={`${lane} steps`}
+            >
               {pattern[lane].map((active, step) => (
                 <button
                   key={step}
                   onClick={() => toggleStep(lane, step)}
                   aria-pressed={active}
                   aria-label={`${lane} step ${step + 1}`}
-                  className={`aspect-square rounded-[2px] border transition-colors ${
+                  className={`aspect-square rounded-sm border transition-colors ${
                     active
-                      ? `${LANE_COLOR[lane]} border-black/30`
+                      ? `${LANE_COLOR[lane]} border-transparent`
                       : step % 4 === 0
-                        ? "border-[#333] bg-[#14141c]"
-                        : "border-[#242430] bg-[#0e0e16]"
-                  } ${displayStep === step ? "ring-2 ring-white" : ""}`}
+                        ? "border-mute/25 bg-panel-2"
+                        : "border-mute/10 bg-panel"
+                  } ${displayStep === step ? "ring-1 ring-ink" : ""}`}
                 />
               ))}
             </div>
@@ -82,17 +86,17 @@ export default function BeatMakerApp() {
         ))}
       </div>
 
-      <div className="grid grid-cols-[repeat(16,minmax(0,1fr))] gap-1 pl-[3.25rem]">
+      <div className="grid grid-cols-[repeat(16,minmax(0,1fr))] gap-1 pl-12">
         {Array.from({ length: STEP_COUNT }, (_, i) => (
           <div
             key={i}
             aria-hidden
-            className={`h-1 rounded-full ${displayStep === i ? "bg-white" : "bg-[#2a2a36]"}`}
+            className={`h-0.5 rounded-full ${displayStep === i ? "bg-ink" : "bg-mute/20"}`}
           />
         ))}
       </div>
 
-      <p className="font-pixel text-center text-[8px] text-[#555]">
+      <p className="font-mono text-center text-[11px] text-mute">
         click cells to build a beat — synced live, no samples
       </p>
     </div>
