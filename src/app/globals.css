@@ -5,6 +5,7 @@
   --font-body: var(--font-body), sans-serif;
   --font-mono: var(--font-mono), monospace;
   --font-readout: var(--font-readout), monospace;
+  --font-pixel: var(--font-pixel), monospace;
 
   /* Tape shell black, warmed slightly instead of neutral/blue-black. */
   --color-void: #0b0c09;
@@ -84,6 +85,9 @@
   }
   .font-readout {
     font-family: var(--font-readout);
+  }
+  .font-pixel {
+    font-family: var(--font-pixel);
   }
 
   /* ---- camcorder viewfinder chrome ---- */

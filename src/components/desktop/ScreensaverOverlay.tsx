@@ -19,9 +19,9 @@ export default function ScreensaverOverlay() {
 
     // canvas ctx.font can't resolve CSS custom properties, so read the
     // real generated font-family off a hidden DOM element wearing the
-    // same .font-readout class instead.
-    const readoutFontFamily = window.getComputedStyle(probe).fontFamily;
-    const fontAt = (size: number) => `${size}px ${readoutFontFamily}`;
+    // same .font-pixel class instead.
+    const pixelFontFamily = window.getComputedStyle(probe).fontFamily;
+    const fontAt = (size: number) => `${size}px ${pixelFontFamily}`;
 
     const dpr = window.devicePixelRatio || 1;
     let w = window.innerWidth;
@@ -40,7 +40,7 @@ export default function ScreensaverOverlay() {
     window.addEventListener("resize", onResize);
 
     const label = PROFILE.artistName;
-    const fontSize = 42;
+    const fontSize = 26;
     ctx.font = fontAt(fontSize);
     const textW = ctx.measureText(label).width;
     const textH = fontSize;
@@ -116,7 +116,7 @@ export default function ScreensaverOverlay() {
       aria-label="Screensaver active — move mouse or press any key to return"
       className="fixed inset-0 z-[9990] bg-void"
     >
-      <span ref={fontProbeRef} className="font-readout invisible absolute" aria-hidden>
+      <span ref={fontProbeRef} className="font-pixel invisible absolute" aria-hidden>
         A
       </span>
       <canvas ref={canvasRef} className="h-full w-full" aria-hidden />

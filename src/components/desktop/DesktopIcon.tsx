@@ -17,7 +17,7 @@ export default function DesktopIcon({ app }: { app: AppMeta }) {
       >
         {app.icon}
       </span>
-      <span className="font-readout tape-label block w-full rotate-[-1deg] px-1 text-center text-sm leading-tight [overflow-wrap:anywhere] group-hover:rotate-0 group-focus-visible:rotate-0">
+      <span className="font-pixel tape-label block w-full rotate-[-1deg] px-1 py-1 text-center text-[8px] leading-relaxed [overflow-wrap:anywhere] group-hover:rotate-0 group-focus-visible:rotate-0">
         {app.desktopLabel}
       </span>
     </button>

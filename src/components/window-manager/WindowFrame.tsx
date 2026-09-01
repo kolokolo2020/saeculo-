@@ -45,7 +45,7 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
         onPointerDown={drag.onPointerDown}
         onPointerMove={drag.onPointerMove}
         onPointerUp={drag.onPointerUp}
-        className={`font-readout flex h-8 shrink-0 touch-none items-center gap-2 border-b px-2 text-base tracking-wide select-none ${
+        className={`font-pixel flex h-8 shrink-0 touch-none items-center gap-2 border-b px-2 text-[10px] tracking-wide select-none ${
           focused
             ? "border-signal/40 bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-signal)_28%,var(--color-void)),var(--color-panel))] text-ink"
             : "border-ink/10 bg-panel-2 text-mute"
@@ -59,7 +59,7 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
           <button
             onClick={() => toggleMinimize(kind)}
             aria-label={`Minimize ${title}`}
-            className="deck-button font-readout h-6 px-2 text-sm"
+            className="deck-button font-pixel h-6 px-2 text-[9px]"
           >
             ▾ desk
           </button>

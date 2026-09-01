@@ -51,7 +51,7 @@ export default function Desktop() {
         <p className="font-display text-center text-2xl leading-relaxed font-semibold text-ink/[0.06] select-none sm:text-4xl">
           {PROFILE.artistName}
           <br />
-          <span className="font-readout text-base sm:text-xl">{PROFILE.tagline}</span>
+          <span className="font-pixel text-[10px] sm:text-sm">{PROFILE.tagline}</span>
         </p>
       </div>
 

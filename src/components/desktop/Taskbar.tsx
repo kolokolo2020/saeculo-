@@ -43,11 +43,11 @@ export default function Taskbar({
       <button
         onClick={onStartClick}
         aria-expanded={startOpen}
-        className={`deck-button font-readout flex h-7 shrink-0 items-center gap-1.5 px-2 text-sm ${
+        className={`deck-button font-pixel flex h-7 shrink-0 items-center gap-1.5 px-2 text-[9px] ${
           startOpen ? "text-signal" : "text-ink"
         }`}
       >
-        <span aria-hidden className="text-sm leading-none">
+        <span aria-hidden className="font-readout text-sm leading-none">
           ▞
         </span>
         menu
@@ -63,7 +63,7 @@ export default function Taskbar({
               <button
                 key={win.kind}
                 onClick={() => (active ? toggleMinimize(win.kind) : focusWindow(win.kind))}
-                className={`font-readout flex h-7 min-w-0 max-w-40 items-center gap-1.5 px-2 text-sm ${
+                className={`font-pixel flex h-7 min-w-0 max-w-40 items-center gap-1.5 px-2 text-[9px] ${
                   active ? "deck-panel-recessed text-signal" : "deck-button text-ink"
                 }`}
               >
