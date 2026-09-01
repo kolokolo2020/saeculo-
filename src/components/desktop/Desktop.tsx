@@ -18,6 +18,7 @@ import AboutApp from "@/components/apps/AboutApp";
 import ContactApp from "@/components/apps/ContactApp";
 import BeatMakerApp from "@/components/lab/BeatMakerApp/BeatMakerApp";
 import RhythmRushApp from "@/components/lab/RhythmRushApp/RhythmRushApp";
+import BeatBrawlApp from "@/components/apps/BeatBrawlApp/BeatBrawlApp";
 import type { WindowKind } from "@/lib/types";
 
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
@@ -26,6 +27,7 @@ const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   contact: ContactApp,
   beatmaker: BeatMakerApp,
   rhythm: RhythmRushApp,
+  brawl: BeatBrawlApp,
 };
 
 export default function Desktop() {

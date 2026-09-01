@@ -7,6 +7,7 @@ const DEFAULT_SIZES: Record<WindowKind, { width: number; height: number }> = {
   contact: { width: 400, height: 380 },
   beatmaker: { width: 620, height: 460 },
   rhythm: { width: 520, height: 480 },
+  brawl: { width: 520, height: 560 },
 };
 
 const CASCADE_STEP = 32;

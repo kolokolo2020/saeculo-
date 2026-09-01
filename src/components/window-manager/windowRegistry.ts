@@ -11,6 +11,7 @@ export const APPS: AppMeta[] = [
   { kind: "saeculo", title: "saeculo — now playing", icon: "▸", desktopLabel: "saeculo.wav" },
   { kind: "beatmaker", title: "Beat Maker", icon: "▦", desktopLabel: "beatmaker.exe" },
   { kind: "rhythm", title: "Rhythm Rush", icon: "▲", desktopLabel: "rhythmrush.exe" },
+  { kind: "brawl", title: "Beat Brawl", icon: "KO", desktopLabel: "beatbrawl.exe" },
   { kind: "about", title: "about.txt — Notepad", icon: "▤", desktopLabel: "about.txt" },
   { kind: "contact", title: "Booking & Contact", icon: "@", desktopLabel: "booking.exe" },
 ];

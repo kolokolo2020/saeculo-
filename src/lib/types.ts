@@ -1,4 +1,4 @@
-export type WindowKind = "saeculo" | "beatmaker" | "rhythm" | "about" | "contact";
+export type WindowKind = "saeculo" | "beatmaker" | "rhythm" | "brawl" | "about" | "contact";
 
 export interface WindowState {
   kind: WindowKind;

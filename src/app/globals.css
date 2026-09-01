@@ -70,6 +70,16 @@
   }
 }
 
+@keyframes brawl-tick {
+  0%,
+  100% {
+    transform: rotate(-24deg);
+  }
+  50% {
+    transform: rotate(24deg);
+  }
+}
+
 /* Custom component classes live in this layer so Tailwind utilities (the
    `utilities` layer, which Tailwind orders after `components`) can still
    override them — e.g. `text-signal` on a `.deck-button` element. */
