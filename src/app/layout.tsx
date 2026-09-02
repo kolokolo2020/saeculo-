@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Mono, Manrope, Press_Start_2P, VT323 } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
 import "./globals.css";
@@ -97,6 +98,7 @@ export default function RootLayout({
       </head>
       <body className="h-full overflow-hidden">
         {children}
+        <Analytics />
         <SpeedInsights />
       </body>
     </html>
