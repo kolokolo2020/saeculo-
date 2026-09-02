@@ -50,13 +50,16 @@ Nothing in here is real yet — swap it out before launch:
 - `src/lib/synth.ts` — shared real-time drum synthesis (kick/snare/hat/
   bass/blip) used by both BeatMaker and RhythmRush's hit sounds.
 - `scripts/generate-audio.mjs` — synthesizes the placeholder beats.
-- `scripts/verify.mjs` — a Playwright smoke test covering the boot
-  sequence, keyboard-only app access, dragging, playback, the visualizer
-  animating, Beat Maker step toggling/playback, Rhythm Rush scoring, and
-  the mobile full-screen fallback. Not part of the build; run manually
-  against a local dev server if you want to re-check things
-  (`npm i -D playwright-core` first, it's intentionally not a saved
-  dependency).
+- `scripts/verify.mjs` — `npm run verify`. A Playwright smoke test: the boot
+  sequence, every app opening from its desktop icon, keyboard-only access,
+  window dragging, playback, the visualizer animating, Beat Maker step
+  toggling and transport, Beat Brawl starting, the mobile full-screen
+  fallback, the idle screensaver (on a virtual clock, so it doesn't wait 45
+  real seconds), and a check that no console errors fired along the way.
+
+  It needs a server already running (`npm run dev` in another terminal) and a
+  browser once (`npx playwright install chromium`). CI runs it against the
+  production build on every pull request.
 
 ## Mobile
 

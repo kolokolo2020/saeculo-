@@ -12,8 +12,10 @@ v4, zustand for window state. No backend, no database, fully static.
   any visual work.
 - `npm run build` — must pass before every commit.
 - `npm run lint`
-- `npx tsc --noEmit` — typecheck. Run this; the build alone is not enough.
-- `npm run verify` — Playwright smoke test. Needs a dev server already running.
+- `npm run typecheck` — run this, not `npx tsc`, which resolves to an
+  unrelated package when devDependencies aren't installed.
+- `npm run verify` — Playwright smoke test. Needs a dev server already
+  running, and uses your installed Chrome rather than a downloaded browser.
 - `npm run gen:audio` — regenerates the synthesized placeholder instrumentals.
 
 ## Rules that keep getting broken
@@ -39,7 +41,7 @@ v4, zustand for window state. No backend, no database, fully static.
 
 ## Definition of done
 
-Not done until `npm run build` passes, `npx tsc --noEmit` is clean, and — for
+Not done until `npm run build` passes, `npm run typecheck` is clean, and — for
 any visible change — you have screenshotted the result at 1440px and 390px and
 described what you see. Show me the evidence; do not assert success.
 
