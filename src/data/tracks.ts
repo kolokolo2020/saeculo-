@@ -8,7 +8,7 @@ export const TRACKS: Track[] = [
     title: "midnight drive",
     bpm: 92,
     mood: "dark / moody",
-    src: "/audio/midnight-drive.wav",
+    src: "/audio/midnight-drive.mp3",
     streamingLinks: [
       { label: "Spotify", url: "https://open.spotify.com/" },
       { label: "YouTube", url: "https://youtube.com/" },
@@ -19,7 +19,7 @@ export const TRACKS: Track[] = [
     title: "arcade dust",
     bpm: 100,
     mood: "chiptune / nostalgic",
-    src: "/audio/arcade-dust.wav",
+    src: "/audio/arcade-dust.mp3",
     streamingLinks: [
       { label: "Spotify", url: "https://open.spotify.com/" },
       { label: "SoundCloud", url: "https://soundcloud.com/" },
@@ -30,7 +30,7 @@ export const TRACKS: Track[] = [
     title: "velvet static",
     bpm: 84,
     mood: "lo-fi / hazy",
-    src: "/audio/velvet-static.wav",
+    src: "/audio/velvet-static.mp3",
     streamingLinks: [
       { label: "SoundCloud", url: "https://soundcloud.com/" },
       { label: "YouTube", url: "https://youtube.com/" },
@@ -41,7 +41,7 @@ export const TRACKS: Track[] = [
     title: "neon rain",
     bpm: 96,
     mood: "melodic / driving",
-    src: "/audio/neon-rain.wav",
+    src: "/audio/neon-rain.mp3",
     streamingLinks: [
       { label: "Spotify", url: "https://open.spotify.com/" },
       { label: "SoundCloud", url: "https://soundcloud.com/" },

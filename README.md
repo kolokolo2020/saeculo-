@@ -21,7 +21,7 @@ Open [http://localhost:3000](http://localhost:3000).
 Nothing in here is real yet — swap it out before launch:
 
 - **Beats**: `src/data/tracks.ts` lists the tracks and their streaming
-  links. The actual audio in `public/audio/*.wav` is procedurally
+  links. The actual audio in `public/audio/*.mp3` is procedurally
   synthesized (no samples, fully original) by `scripts/generate-audio.mjs`
   — replace those files with your real instrumentals (any audio the
   `<audio>` element supports), and update `src/data/tracks.ts` to match.
