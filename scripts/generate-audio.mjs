@@ -1,8 +1,12 @@
-// Procedurally synthesizes original placeholder instrumental loops as WAV
-// files (no samples, no external deps). Run: npm run gen:audio
-import { writeFileSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+// Procedurally synthesizes original placeholder instrumental loops (no
+// samples, no external deps) and encodes them to MP3 with ffmpeg, which keeps
+// public/audio/ around 1.3 MB instead of 7.3 MB. Without ffmpeg on PATH it
+// falls back to writing WAV. Run: npm run gen:audio
+import { writeFileSync, mkdirSync, rmSync, statSync } from "node:fs";
+import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 
 const SR = 44100;
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "audio");
@@ -251,9 +255,32 @@ const TRACKS = {
 };
 
 mkdirSync(OUT_DIR, { recursive: true });
+
+const ffmpeg = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status === 0;
+if (!ffmpeg) {
+  console.warn("ffmpeg not on PATH — writing WAV. Install ffmpeg and re-run to cut these ~5x.");
+}
+
 for (const [name, cfg] of Object.entries(TRACKS)) {
   const buf = buildTrack(cfg);
-  const wav = toWav(buf);
-  writeFileSync(join(OUT_DIR, `${name}.wav`), wav);
-  console.log(`${name}.wav — ${(wav.length / 1024 / 1024).toFixed(2)} MB, ${(buf.length / SR).toFixed(1)}s`);
+  const wavPath = join(ffmpeg ? tmpdir() : OUT_DIR, `${name}.wav`);
+  writeFileSync(wavPath, toWav(buf));
+
+  let outPath = wavPath;
+  if (ffmpeg) {
+    outPath = join(OUT_DIR, `${name}.mp3`);
+    const enc = spawnSync("ffmpeg", [
+      "-hide_banner", "-loglevel", "error", "-y",
+      "-i", wavPath, "-codec:a", "libmp3lame", "-b:a", "128k", outPath,
+    ], { stdio: "inherit" });
+    rmSync(wavPath, { force: true });
+    if (enc.status !== 0) {
+      console.error(`ffmpeg failed on ${name}`);
+      process.exitCode = 1;
+      continue;
+    }
+  }
+
+  const kb = statSync(outPath).size / 1024;
+  console.log(`${basename(outPath)} — ${kb.toFixed(0)} KB, ${(buf.length / SR).toFixed(1)}s`);
 }

@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { PROFILE } from "@/data/profile";
 
 const BOOT_LINES = [
-  "SAECULO OS v2.4 — dubbed from a bootleg tape",
-  "Rewinding side A ..........",
-  "Head alignment .......... OK (a little worn, in a good way)",
+  "SAECULO OS Ultimate — activation status: bootleg",
+  "Checking system requirements .......... none, relax",
+  "Loading Aero Glass .......... FOUND: reflections.dll",
   "Detecting audio device .......... FOUND: imagination.dll",
   "Loading beats.sys ..........",
-  "Loading nostalgia.drv ..........",
+  "Indexing instrumentals .......... 0 results (they're all bangers)",
   "Mounting C:\\INSTRUMENTALS ..........",
   "",
   `Starting ${PROFILE.artistName} OS...`,
@@ -52,7 +52,7 @@ export default function BootScreen({ onDone }: { onDone: () => void }) {
     <button
       onClick={skip}
       aria-label="Skip boot sequence"
-      className="fixed inset-0 z-[9999] block w-full cursor-pointer bg-black p-6 text-left"
+      className="fixed inset-0 z-[9999] block w-full cursor-pointer bg-void p-6 text-left"
     >
       <div className="font-mono text-lg leading-relaxed text-signal sm:text-xl">
         {BOOT_LINES.slice(0, visibleLines).map((line, i) => (

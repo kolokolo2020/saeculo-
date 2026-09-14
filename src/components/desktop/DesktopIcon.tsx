@@ -13,11 +13,11 @@ export default function DesktopIcon({ app }: { app: AppMeta }) {
     >
       <span
         aria-hidden
-        className="deck-button flex h-12 w-12 items-center justify-center text-2xl text-signal group-hover:brightness-125 group-focus-visible:ring-2 group-focus-visible:ring-signal"
+        className="deck-button flex h-12 w-12 items-center justify-center rounded-2xl text-2xl text-signal group-hover:brightness-125 group-focus-visible:ring-2 group-focus-visible:ring-signal"
       >
         {app.icon}
       </span>
-      <span className="font-pixel tape-label block w-full rotate-[-1deg] px-1 py-1 text-center text-[8px] leading-relaxed [overflow-wrap:anywhere] group-hover:rotate-0 group-focus-visible:rotate-0">
+      <span className="font-chrome chip-label block w-full rounded-full px-2 py-1 text-center text-[10px] leading-relaxed [overflow-wrap:anywhere]">
         {app.desktopLabel}
       </span>
     </button>

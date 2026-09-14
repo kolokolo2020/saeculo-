@@ -43,17 +43,17 @@ export default function Desktop() {
     <main className="relative h-dvh w-full overflow-hidden bg-void text-ink">
       {booting && <BootScreen onDone={() => setBooting(false)} />}
 
-      {/* wallpaper: grain + scanlines over the void, watermark wordmark */}
-      <div className="crt-scanlines pointer-events-none absolute inset-0" aria-hidden />
-      <div className="crt-grain pointer-events-none absolute inset-0" aria-hidden />
+      {/* wallpaper: Aurora glow + glass sheen over the void, watermark wordmark */}
+      <div className="aero-glow pointer-events-none absolute inset-0" aria-hidden />
+      <div className="aero-sheen pointer-events-none absolute inset-0" aria-hidden />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 flex items-center justify-center"
       >
-        <p className="font-display text-center text-2xl leading-relaxed font-semibold text-ink/[0.06] select-none sm:text-4xl">
+        <p className="font-display text-paper/[0.08] text-center text-2xl leading-relaxed font-semibold select-none sm:text-4xl">
           {PROFILE.artistName}
           <br />
-          <span className="font-pixel text-[10px] sm:text-sm">{PROFILE.tagline}</span>
+          <span className="font-chrome text-[10px] sm:text-sm">{PROFILE.tagline}</span>
         </p>
       </div>
 

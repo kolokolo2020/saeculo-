@@ -60,10 +60,10 @@ export default function BeatBrawlApp() {
     <div className="flex flex-col gap-3">
       {/* health bars */}
       <div className="flex items-center gap-3">
-        <span className="font-pixel text-[8px] text-ink">YOU</span>
+        <span className="font-chrome text-[8px] text-ink">YOU</span>
         <HealthBar value={playerHP} max={playerMaxHP} align="left" hit={playerHit} />
         <HealthBar value={bossHP} max={bossMaxHP} align="right" hit={bossHit} />
-        <span className="font-pixel text-[8px] text-signal">{bossName.toUpperCase()}</span>
+        <span className="font-chrome text-[8px] text-signal">{bossName.toUpperCase()}</span>
       </div>
 
       <div className="font-mono flex flex-wrap items-center gap-4 text-xs text-mute">
@@ -94,7 +94,7 @@ export default function BeatBrawlApp() {
         </div>
 
         {taunt && (
-          <p className="font-pixel pointer-events-none absolute top-4 right-3 max-w-28 rounded-sm bg-ink px-2 py-1 text-right text-[8px] leading-relaxed text-void">
+          <p className="font-chrome chip-label pointer-events-none absolute top-4 right-3 max-w-28 px-2 py-1 text-right text-[8px] leading-relaxed">
             {taunt}
           </p>
         )}
@@ -110,14 +110,14 @@ export default function BeatBrawlApp() {
         {brawlState !== "running" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-md bg-void/85 p-4 text-center">
             {brawlState === "won" && (
-              <p className="font-pixel text-[10px] text-signal">
+              <p className="font-chrome text-[10px] text-signal">
                 {bossName}&apos;s pendulum stops.
                 <br />
                 you keep the beat.
               </p>
             )}
             {brawlState === "lost" && (
-              <p className="font-pixel text-[10px] text-mute">
+              <p className="font-chrome text-[10px] text-mute">
                 {bossName} wins.
                 <br />
                 the room falls silent.
@@ -140,7 +140,7 @@ export default function BeatBrawlApp() {
             </select>
             <button
               onClick={start}
-              className="deck-button font-pixel px-5 py-2 text-[9px] tracking-widest uppercase"
+              className="deck-button font-chrome px-5 py-2 text-[9px] tracking-widest uppercase"
             >
               {brawlState === "idle" ? "fight" : "rematch"}
             </button>

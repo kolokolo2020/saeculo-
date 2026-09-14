@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { PROFILE } from "@/data/profile";
 
-const COLORS = ["#ff9a2e", "#4fd6c4"];
+const COLORS = ["#2f8ceb", "#ffffff"];
 const STAR_COUNT = 60;
 
 export default function ScreensaverOverlay() {
@@ -19,9 +19,9 @@ export default function ScreensaverOverlay() {
 
     // canvas ctx.font can't resolve CSS custom properties, so read the
     // real generated font-family off a hidden DOM element wearing the
-    // same .font-pixel class instead.
-    const pixelFontFamily = window.getComputedStyle(probe).fontFamily;
-    const fontAt = (size: number) => `${size}px ${pixelFontFamily}`;
+    // same .font-chrome class instead.
+    const chromeFontFamily = window.getComputedStyle(probe).fontFamily;
+    const fontAt = (size: number) => `${size}px ${chromeFontFamily}`;
 
     const dpr = window.devicePixelRatio || 1;
     let w = window.innerWidth;
@@ -62,10 +62,10 @@ export default function ScreensaverOverlay() {
     let raf = 0;
     const draw = () => {
       raf = requestAnimationFrame(draw);
-      ctx.fillStyle = "#0b0c09";
+      ctx.fillStyle = "#050b16";
       ctx.fillRect(0, 0, w, h);
 
-      ctx.fillStyle = "rgba(241,234,217,0.5)";
+      ctx.fillStyle = "rgba(214,231,250,0.55)";
       for (const s of stars) {
         s.x += s.vx;
         s.y += s.vy;
@@ -116,12 +116,12 @@ export default function ScreensaverOverlay() {
       aria-label="Screensaver active — move mouse or press any key to return"
       className="fixed inset-0 z-[9990] bg-void"
     >
-      <span ref={fontProbeRef} className="font-pixel invisible absolute" aria-hidden>
+      <span ref={fontProbeRef} className="font-chrome invisible absolute" aria-hidden>
         A
       </span>
       <canvas ref={canvasRef} className="h-full w-full" aria-hidden />
-      <p className="font-readout absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-ink/40">
-        tape idle — move or press any key
+      <p className="font-readout absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-paper/40">
+        idle — move or press any key
       </p>
     </div>
   );
