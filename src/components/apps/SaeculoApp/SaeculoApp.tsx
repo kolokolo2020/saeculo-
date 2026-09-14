@@ -119,8 +119,8 @@ export default function SaeculoApp() {
                   className="group flex w-full items-center gap-2.5 px-2.5 py-1.5 text-left hover:bg-signal/10 focus-visible:bg-signal/10 focus:outline-none"
                 >
                   <span
-                    className={`font-readout flex h-6 w-8 shrink-0 -rotate-2 items-center justify-center rounded-[2px] text-sm transition-colors ${
-                      isPlaying ? "bg-signal text-void" : "tape-label group-hover:rotate-0"
+                    className={`font-readout flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm transition-colors ${
+                      isPlaying ? "bg-signal text-paper" : "chip-label"
                     }`}
                     aria-hidden
                   >

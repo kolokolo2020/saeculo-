@@ -4,24 +4,24 @@
   --font-display: var(--font-display), sans-serif;
   --font-body: var(--font-body), sans-serif;
   --font-mono: var(--font-mono), monospace;
-  --font-readout: var(--font-readout), monospace;
-  --font-pixel: var(--font-pixel), monospace;
+  --font-readout: var(--font-mono), monospace;
+  --font-chrome: var(--font-chrome), sans-serif;
 
-  /* Tape shell black, warmed slightly instead of neutral/blue-black. */
-  --color-void: #0b0c09;
-  --color-panel: #16160f;
-  --color-panel-2: #1e1d14;
-  --color-ink: #f1ead9;
-  --color-mute: #8b8570;
+  /* Aurora desktop: deep midnight blue behind the frosted glass chrome. */
+  --color-void: #050b16;
+  --color-panel: #eaf3fc;
+  --color-panel-2: #cfe2f5;
+  --color-ink: #13273d;
+  --color-mute: #5c7893;
 
-  /* Camcorder REC-light amber — the primary accent. */
-  --color-signal: #ff9a2e;
-  /* VHS dub chroma-bleed cyan — secondary, used sparingly (ghosting/glitch). */
-  --color-bleed: #4fd6c4;
+  /* Aero glass glow — the primary accent (focus, glossy chrome, selection). */
+  --color-signal: #2f8ceb;
+  /* Vista shield green — secondary, used sparingly for links/confirm accents. */
+  --color-bleed: #3fae56;
 
-  /* Aged cassette-label paper, for the tracklist stickers. */
-  --color-paper: #ece3ce;
-  --color-paper-ink: #24201a;
+  /* Glossy chrome-white chip, for badges and pill labels. */
+  --color-paper: #ffffff;
+  --color-paper-ink: #13273d;
 }
 
 @layer base {
@@ -42,7 +42,7 @@
 
   ::selection {
     background: var(--color-signal);
-    color: var(--color-void);
+    color: var(--color-paper);
   }
 
   :focus-visible {
@@ -51,7 +51,7 @@
   }
 }
 
-@keyframes rec-blink {
+@keyframes pulse-blink {
   0%,
   100% {
     opacity: 1;
@@ -82,7 +82,7 @@
 
 /* Custom component classes live in this layer so Tailwind utilities (the
    `utilities` layer, which Tailwind orders after `components`) can still
-   override them — e.g. `text-signal` on a `.deck-button` element. */
+   override them — e.g. `rounded-none` on a `.deck-panel` element. */
 @layer components {
   .font-display {
     font-family: var(--font-display);
@@ -95,88 +95,114 @@
   }
   .font-readout {
     font-family: var(--font-readout);
+    font-variant-numeric: tabular-nums;
   }
-  .font-pixel {
-    font-family: var(--font-pixel);
+  .font-chrome {
+    font-family: var(--font-chrome);
   }
 
-  /* ---- camcorder viewfinder chrome ---- */
-  .rec-dot {
-    animation: rec-blink 1.6s steps(2, jump-none) infinite;
+  /* ---- status pulse ---- */
+  .pulse-dot {
+    animation: pulse-blink 1.6s steps(2, jump-none) infinite;
   }
   @media (prefers-reduced-motion: reduce) {
-    .rec-dot {
+    .pulse-dot {
       animation: none;
     }
   }
 
-  .viewfinder-bracket {
-    position: absolute;
-    width: 22px;
-    height: 22px;
-    border-color: color-mix(in srgb, var(--color-signal) 55%, transparent);
-    pointer-events: none;
-  }
-
-  /* Thin horizontal scan lines, always on but barely there. */
-  .crt-scanlines {
-    background-image: repeating-linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--color-void) 92%, transparent) 0px,
-      color-mix(in srgb, var(--color-void) 92%, transparent) 1px,
-      transparent 1px,
-      transparent 3px
+  /* Soft diagonal light sheen across the whole desktop, like a reflection
+     caught on glass. Always on, barely there. */
+  .aero-sheen {
+    background: linear-gradient(
+      115deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0) 30%,
+      rgba(255, 255, 255, 0.05) 55%,
+      rgba(255, 255, 255, 0) 80%
     );
-    mix-blend-mode: overlay;
+    mix-blend-mode: screen;
   }
 
-  /* Film grain: a tiled SVG turbulence texture, static (no per-frame cost). */
-  .crt-grain {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    opacity: 0.05;
-    mix-blend-mode: overlay;
+  /* The Aurora glow behind the desktop: soft blue bloom upper-mid, a hint
+     of green lower-right. An homage to the Vista default wallpaper's mood,
+     not a reproduction of it. */
+  .aero-glow {
+    background:
+      radial-gradient(
+        55% 45% at 50% 35%,
+        color-mix(in srgb, var(--color-signal) 35%, transparent) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        45% 40% at 75% 78%,
+        color-mix(in srgb, var(--color-bleed) 20%, transparent) 0%,
+        transparent 70%
+      );
+    filter: blur(4px);
   }
 
-  /* ---- cassette label sticker (tracklist) ---- */
-  .tape-label {
-    background: var(--color-paper);
+  /* ---- glossy chip / pill badge ---- */
+  .chip-label {
+    background: color-mix(in srgb, var(--color-paper) 96%, transparent);
     color: var(--color-paper-ink);
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+    box-shadow: 0 1px 2px rgba(3, 12, 24, 0.18);
   }
 
-  /* ---- deck chrome: the desktop OS's hardware panels ----
-     Not a Windows-95 grey/navy pastiche — this reads as the plastic and
-     brushed-metal of a cheap tape deck or camcorder: dark panel faces,
-     a thin warm highlight where light would catch a raised edge, and a
-     near-black shadow where it recedes. */
+  /* ---- Aero glass chrome: the desktop OS's frosted, glossy surfaces ----
+     Light frosted-glass panels floating over a dark desktop, glossy
+     buttons with a bright top sheen, soft blurred elevation shadows
+     instead of hard offsets. */
   .deck-panel {
-    background: var(--color-panel);
-    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, var(--color-void));
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-panel) 92%, white) 0%,
+      var(--color-panel) 45%,
+      var(--color-panel-2) 100%
+    );
+    border: 1px solid color-mix(in srgb, white 45%, var(--color-ink) 18%);
+    border-radius: 10px;
     box-shadow:
-      inset 1px 1px 0 color-mix(in srgb, var(--color-ink) 10%, transparent),
-      inset -1px -1px 0 rgba(0, 0, 0, 0.6);
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.2),
+      0 14px 32px rgba(3, 12, 24, 0.4);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
   }
   .deck-panel-recessed {
-    background: var(--color-void);
-    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, var(--color-void));
+    background: color-mix(in srgb, var(--color-panel) 96%, white);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 15%, transparent);
+    border-radius: 6px;
     box-shadow:
-      inset 1px 1px 0 rgba(0, 0, 0, 0.6),
-      inset -1px -1px 0 color-mix(in srgb, var(--color-ink) 8%, transparent);
+      inset 0 2px 5px rgba(19, 39, 61, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
   .deck-button {
-    background: var(--color-panel-2);
-    border: 1px solid color-mix(in srgb, var(--color-ink) 14%, var(--color-void));
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, white 90%, var(--color-panel)) 0%,
+      var(--color-panel) 48%,
+      var(--color-panel-2) 100%
+    );
+    border: 1px solid color-mix(in srgb, var(--color-ink) 22%, transparent);
+    border-radius: 6px;
     box-shadow:
-      inset 1px 1px 0 color-mix(in srgb, var(--color-ink) 14%, transparent),
-      inset -1px -1px 0 rgba(0, 0, 0, 0.7);
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 1px 2px rgba(3, 12, 24, 0.22);
     color: var(--color-ink);
+    transition: filter 0.12s ease;
+  }
+  .deck-button:hover {
+    filter: brightness(1.06);
   }
   .deck-button:active {
     transform: translateY(1px);
-    box-shadow: inset -1px -1px 0 color-mix(in srgb, var(--color-ink) 10%, transparent);
+    background: linear-gradient(to bottom, var(--color-panel-2) 0%, var(--color-panel) 100%);
+    box-shadow: inset 0 1px 3px rgba(3, 12, 24, 0.3);
   }
 
-  /* minimal range inputs, tuned to the void/signal palette */
+  /* minimal range inputs, tuned to the glass/signal palette */
   .signal-range {
     -webkit-appearance: none;
     appearance: none;
@@ -185,28 +211,41 @@
     cursor: pointer;
   }
   .signal-range::-webkit-slider-runnable-track {
-    height: 2px;
-    background: color-mix(in srgb, var(--color-mute) 35%, transparent);
+    height: 4px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-mute) 30%, transparent);
   }
   .signal-range::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     margin-top: -6px;
-    height: 14px;
-    width: 14px;
+    height: 16px;
+    width: 16px;
     border-radius: 999px;
-    background: var(--color-signal);
+    border: 1px solid color-mix(in srgb, white 60%, var(--color-signal));
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, white 55%, var(--color-signal)),
+      var(--color-signal)
+    );
+    box-shadow: 0 1px 3px rgba(3, 12, 24, 0.35);
   }
   .signal-range::-moz-range-track {
-    height: 2px;
-    background: color-mix(in srgb, var(--color-mute) 35%, transparent);
+    height: 4px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-mute) 30%, transparent);
   }
   .signal-range::-moz-range-thumb {
-    height: 14px;
-    width: 14px;
-    border: none;
+    height: 16px;
+    width: 16px;
+    border: 1px solid color-mix(in srgb, white 60%, var(--color-signal));
     border-radius: 999px;
-    background: var(--color-signal);
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, white 55%, var(--color-signal)),
+      var(--color-signal)
+    );
+    box-shadow: 0 1px 3px rgba(3, 12, 24, 0.35);
   }
 
   /* marquee for now-playing */
@@ -222,15 +261,15 @@
   }
 }
 
-/* slim scrollbars matching the dark canvas */
+/* slim scrollbars over the light glass panels */
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 *::-webkit-scrollbar-track {
-  background: var(--color-void);
+  background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--color-panel-2);
+  background: color-mix(in srgb, var(--color-ink) 25%, transparent);
   border-radius: 999px;
 }

@@ -2,9 +2,10 @@
 
 # saeculo
 
-A promo site for the producer saeculo. The whole site is one page: a fake retro
-tape-deck OS with draggable windows. Next.js 16 App Router, React 19, Tailwind
-v4, zustand for window state. No backend, no database, fully static.
+A promo site for the producer saeculo. The whole site is one page: a fake
+Windows Vista–style Aero desktop OS with draggable windows. Next.js 16 App
+Router, React 19, Tailwind v4, zustand for window state. No backend, no
+database, fully static.
 
 ## Commands
 

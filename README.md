@@ -35,7 +35,7 @@ Nothing in here is real yet — swap it out before launch:
 - `src/components/window-manager/` — the draggable window system
   (zustand store, drag hook, window chrome, taskbar/start-menu registry).
 - `src/components/desktop/` — the desktop shell: boot sequence, icons,
-  taskbar, start menu, CRT scanline overlay.
+  taskbar, start menu, Aero glow/glass wallpaper overlay.
 - `src/components/apps/` — the actual "apps":
   - `MusicPlayerApp` — player + canvas visualizer wired to the Web Audio
     API, with three switchable modes (EQ bars, oscilloscope, neon tunnel —

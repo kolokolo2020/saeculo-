@@ -37,21 +37,23 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
     <section
       aria-label={title}
       style={style}
-      className={`deck-panel absolute flex flex-col p-1 shadow-[4px_4px_0_rgba(0,0,0,0.5)] ${
-        isMobile ? "inset-x-0 top-0 bottom-10" : "top-0 left-0"
-      } ${hidden ? "invisible pointer-events-none" : "visible"}`}
+      className={`deck-panel absolute flex flex-col overflow-hidden transition-shadow ${
+        focused ? "shadow-[0_0_0_2px_rgba(47,140,235,0.45),0_24px_55px_rgba(3,12,24,0.55)]" : ""
+      } ${isMobile ? "inset-x-0 top-0 bottom-10 rounded-none" : "top-0 left-0"} ${
+        hidden ? "invisible pointer-events-none" : "visible"
+      }`}
     >
       <header
         onPointerDown={drag.onPointerDown}
         onPointerMove={drag.onPointerMove}
         onPointerUp={drag.onPointerUp}
-        className={`font-pixel flex h-8 shrink-0 touch-none items-center gap-2 border-b px-2 text-[10px] tracking-wide select-none ${
+        className={`font-chrome flex h-9 shrink-0 touch-none items-center gap-2 border-b px-3 text-[11px] font-medium tracking-wide select-none ${
           focused
-            ? "border-signal/40 bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-signal)_28%,var(--color-void)),var(--color-panel))] text-ink"
+            ? "border-black/10 bg-[linear-gradient(to_bottom,color-mix(in_srgb,white_55%,var(--color-signal)),color-mix(in_srgb,var(--color-panel-2)_55%,var(--color-signal)))] text-paper shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
             : "border-ink/10 bg-panel-2 text-mute"
         } ${isMobile ? "" : "cursor-move"}`}
       >
-        <span aria-hidden className={`rec-dot leading-none ${focused ? "text-signal" : "text-mute"}`}>
+        <span aria-hidden className={`pulse-dot leading-none ${focused ? "text-signal" : "text-mute"}`}>
           {icon}
         </span>
         <h2 className="flex-1 truncate">{title}</h2>
@@ -59,7 +61,7 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
           <button
             onClick={() => toggleMinimize(kind)}
             aria-label={`Minimize ${title}`}
-            className="deck-button font-pixel h-6 px-2 text-[9px]"
+            className="deck-button font-chrome h-6 px-2 text-[9px]"
           >
             ▾ desk
           </button>
@@ -67,7 +69,7 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
           <button
             onClick={() => toggleMinimize(kind)}
             aria-label={`Minimize ${title}`}
-            className="deck-button h-5 w-5 text-xs leading-none font-bold"
+            className="deck-button h-6 w-6 rounded-full text-xs leading-none font-bold"
           >
             _
           </button>
@@ -75,12 +77,14 @@ export default function WindowFrame({ kind, title, icon, isMobile, children }: W
         <button
           onClick={() => closeWindow(kind)}
           aria-label={`Close ${title}`}
-          className="deck-button h-5 w-5 text-xs leading-none font-bold"
+          className="deck-button h-6 w-6 rounded-full text-xs leading-none font-bold"
         >
           ✕
         </button>
       </header>
-      <div className="deck-panel-recessed min-h-0 flex-1 overflow-auto p-3">{children}</div>
+      <div className="min-h-0 flex-1 p-1.5">
+        <div className="deck-panel-recessed h-full overflow-auto p-3">{children}</div>
+      </div>
     </section>
   );
 }

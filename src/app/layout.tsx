@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, IBM_Plex_Mono, Manrope, Press_Start_2P, VT323 } from "next/font/google";
+import { Bricolage_Grotesque, IBM_Plex_Mono, Inter, Manrope } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
@@ -21,21 +21,11 @@ const monoFont = IBM_Plex_Mono({
   variable: "--font-mono",
 });
 
-// The camcorder HUD readout — REC indicator, tape counter, timestamps —
-// gets its own genuine CRT-terminal face, used nowhere else on the page.
-const readoutFont = VT323({
-  weight: "400",
+// The OS chrome itself (window titles, icon labels, taskbar, start menu) —
+// a clean humanist UI face, the Segoe UI role in the Aero chrome.
+const chromeFont = Inter({
   subsets: ["latin"],
-  variable: "--font-readout",
-});
-
-// The OS chrome itself (window titles, icon labels, taskbar, start menu)
-// gets a chunky 8-bit face — the one deliberate throwback to the original
-// desktop build, everything else stays the tape-deck identity.
-const pixelFont = Press_Start_2P({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-pixel",
+  variable: "--font-chrome",
 });
 
 const title = "saeculo — instrumentals & beats";
@@ -79,7 +69,7 @@ const jsonLd = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0c09",
+  themeColor: "#050b16",
 };
 
 export default function RootLayout({
@@ -88,7 +78,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} ${readoutFont.variable} ${pixelFont.variable} h-full`}
+      className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} ${chromeFont.variable} h-full`}
     >
       <head>
         <script

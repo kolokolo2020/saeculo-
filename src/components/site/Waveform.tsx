@@ -82,9 +82,9 @@ export default function Waveform({
 
     const gradient = () => {
       const g = ctx.createLinearGradient(0, 0, cssWidth, 0);
-      g.addColorStop(0, "#4fd6c4");
-      g.addColorStop(0.5, "#ff9a2e");
-      g.addColorStop(1, "#4fd6c4");
+      g.addColorStop(0, "#3fae56");
+      g.addColorStop(0.5, "#2f8ceb");
+      g.addColorStop(1, "#3fae56");
       return g;
     };
 
@@ -95,7 +95,7 @@ export default function Waveform({
       ctx.lineWidth = 2;
       ctx.lineJoin = "round";
       ctx.strokeStyle = gradient();
-      ctx.shadowColor = active ? "#ff9a2e" : "#4fd6c4";
+      ctx.shadowColor = active ? "#2f8ceb" : "#3fae56";
       ctx.shadowBlur = active ? 14 : 6;
       if (active) drawActive();
       else drawIdle();
