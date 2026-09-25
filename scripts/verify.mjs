@@ -1,174 +1,257 @@
+// Browser smoke test for the desktop. Run against a local dev server:
+//   npm i --no-save playwright-core && npm run dev -- -p 3210
+//   node scripts/verify.mjs
 import { chromium } from "playwright-core";
 
-const BASE = "http://localhost:3210";
+const BASE = process.env.BASE_URL ?? "http://localhost:3210";
+const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+
 const results = [];
 function check(name, ok, extra = "") {
-  results.push({ name, ok, extra });
+  results.push({ name, ok });
   console.log(`${ok ? "PASS" : "FAIL"} — ${name}${extra ? " — " + extra : ""}`);
 }
 
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+// Sandboxed/CI environments often can't reach Vercel's analytics script;
+// that's the network, not the site.
+const isEnvNoise = (text) => /vercel-scripts|ERR_TUNNEL|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED/.test(text);
+
+const browser = await chromium.launch({ executablePath: CHROME });
 const consoleErrors = [];
 
 try {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const context = await browser.newContext({ viewport: { width: 1366, height: 800 } });
   const page = await context.newPage();
-  page.on("console", (msg) => {
-    if (msg.type() === "error") consoleErrors.push(msg.text());
-  });
+  page.on("console", (msg) => msg.type() === "error" && !isEnvNoise(msg.text()) && consoleErrors.push(msg.text()));
   page.on("pageerror", (err) => consoleErrors.push(String(err)));
+
+  const desktop = page.getByRole("navigation", { name: "Desktop" });
+  const openFromDesktop = async (label) => {
+    await desktop.getByRole("button", { name: label, exact: true }).click();
+    await page.waitForTimeout(250);
+  };
+  const openFromStart = async (label) => {
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await page.getByRole("navigation", { name: "Start menu" }).getByRole("button", { name: new RegExp(`^${label}`) }).first().click();
+    await page.waitForTimeout(250);
+  };
+  const win = (title) => page.getByRole("region", { name: title, exact: true });
+  const close = async (title) => {
+    await page.getByRole("button", { name: `Close ${title}`, exact: true }).click();
+    await page.waitForTimeout(150);
+  };
+  const audioPaused = () => page.getByTestId("player-audio").evaluate((el) => el.paused);
 
   await page.goto(BASE, { waitUntil: "networkidle" });
 
-  // boot screen present, skip it
-  const bootVisible = await page.getByLabel("Skip boot sequence").isVisible().catch(() => false);
-  check("boot screen appears", bootVisible);
-  await page.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
+  // ---- boot ----
+  check("boot screen appears", await page.getByLabel("Skip boot sequence").isVisible().catch(() => false));
+  await page.getByLabel("Skip boot sequence").click({ force: true });
   await page.waitForTimeout(300);
+  check("desktop shows 6 icons", (await desktop.getByRole("button").count()) === 6);
 
-  // keyboard-only reachability: tab to an icon and press Enter
-  await page.keyboard.press("Tab");
-  await page.getByRole("button", { name: /My Beats\.exe/i }).focus();
+  // ---- media player + global audio ----
+  await desktop.getByRole("button", { name: "Media Player", exact: true }).focus();
   await page.keyboard.press("Enter");
   await page.waitForTimeout(300);
-  const musicWindow = page.getByRole("region", { name: /saeculo player/i });
-  check("music window opens via keyboard Enter on icon", await musicWindow.isVisible());
+  const player = win("saeculo Media Player");
+  check("player opens via keyboard Enter on icon", await player.isVisible());
 
-  // drag the window by titlebar
-  const titlebar = musicWindow.locator("header");
-  const before = await musicWindow.boundingBox();
-  await titlebar.hover();
+  const before = await player.boundingBox();
+  await player.locator("header").hover({ position: { x: 120, y: 12 } });
   await page.mouse.down();
-  await page.mouse.move((before?.x ?? 0) + 120, (before?.y ?? 0) + 80, { steps: 10 });
+  await page.mouse.move((before?.x ?? 0) + 260, (before?.y ?? 0) + 90, { steps: 10 });
   await page.mouse.up();
-  const after = await musicWindow.boundingBox();
-  check(
-    "window drags via titlebar",
-    !!before && !!after && (Math.abs(before.x - after.x) > 20 || Math.abs(before.y - after.y) > 20),
-    `dx=${(after?.x ?? 0) - (before?.x ?? 0)} dy=${(after?.y ?? 0) - (before?.y ?? 0)}`,
-  );
+  const after = await player.boundingBox();
+  check("window drags by its title bar", !!before && !!after && Math.abs(after.x - before.x) > 40, `dx=${Math.round((after?.x ?? 0) - (before?.x ?? 0))}`);
 
-  // play audio
-  await page.getByRole("button", { name: "Play", exact: true }).click();
-  await page.waitForTimeout(500);
-  const paused1 = await page.locator("audio").evaluate((el) => el.paused);
-  check("audio plays after clicking Play", paused1 === false);
+  const sizeBefore = await player.boundingBox();
+  await page.mouse.move(sizeBefore.x + sizeBefore.width - 5, sizeBefore.y + sizeBefore.height - 5);
+  await page.mouse.down();
+  await page.mouse.move(sizeBefore.x + sizeBefore.width + 80, sizeBefore.y + sizeBefore.height + 40, { steps: 8 });
+  await page.mouse.up();
+  const sizeAfter = await player.boundingBox();
+  check("window resizes from the corner grip", sizeAfter.width > sizeBefore.width + 40, `w ${Math.round(sizeBefore.width)}→${Math.round(sizeAfter.width)}`);
 
-  // visualizer animates — compare two canvas frames
-  const frame1 = await page.locator("canvas").evaluate((c) => c.toDataURL());
+  await player.getByRole("button", { name: "Play", exact: true }).click();
+  await page.waitForTimeout(600);
+  check("audio plays", (await audioPaused()) === false);
+
+  const canvas = player.locator("canvas");
+  const f1 = await canvas.evaluate((c) => c.toDataURL());
   await page.waitForTimeout(400);
-  const frame2 = await page.locator("canvas").evaluate((c) => c.toDataURL());
-  check("visualizer canvas is animating", frame1 !== frame2);
+  const f2 = await canvas.evaluate((c) => c.toDataURL());
+  check("visualizer animates", f1 !== f2);
 
-  // minimize and confirm audio keeps playing
-  await page.getByRole("button", { name: /Minimize saeculo player/i }).click();
-  await page.waitForTimeout(200);
-  const pausedAfterMinimize = await page.locator("audio").evaluate((el) => el.paused);
-  check("audio keeps playing after minimize", pausedAfterMinimize === false);
+  const vizBtn = player.getByRole("button", { name: "Cycle visualizer style" });
+  const m1 = await vizBtn.innerText();
+  await vizBtn.click();
+  check("visualizer mode cycles", (await vizBtn.innerText()) !== m1);
 
-  // reopen via taskbar, then close
-  await page.getByRole("button", { name: /saeculo player/i }).first().click();
+  await page.getByRole("button", { name: "Maximize saeculo Media Player" }).click();
   await page.waitForTimeout(200);
-  check("window reopens via taskbar", await musicWindow.isVisible());
-  await page.getByRole("button", { name: /Close saeculo player/i }).click();
-  await page.waitForTimeout(200);
-  const pausedAfterClose = await page.locator("audio").count();
-  check("window closes (unmounts) via titlebar close", pausedAfterClose === 0);
+  const maxBox = await player.boundingBox();
+  check("maximize fills the screen", maxBox.width >= 1360, `w=${Math.round(maxBox.width)}`);
+  await page.getByRole("button", { name: "Restore saeculo Media Player" }).click();
 
-  // reopen via start menu, check About/Contact content
-  await page.getByRole("button", { name: /start/i }).click();
-  await page.getByLabel("Start menu").getByRole("button", { name: /About Me\.txt/i }).click();
+  await page.getByRole("button", { name: "Minimize saeculo Media Player" }).click();
   await page.waitForTimeout(200);
-  const aboutText = await page.getByRole("region", { name: /About Me/i }).innerText();
-  check("About window shows bio text", aboutText.includes("saeculo"));
-  await page.getByRole("button", { name: /Close About Me/i }).click();
+  check("audio survives minimize", (await audioPaused()) === false);
+  await page.getByRole("button", { name: "Taskbar saeculo Media Player" }).click();
+  await page.waitForTimeout(200);
+  check("taskbar button restores the window", await player.isVisible());
 
-  await page.getByRole("button", { name: /start/i }).click();
-  await page.getByLabel("Start menu").getByRole("button", { name: /Contact\.exe/i }).click();
-  await page.waitForTimeout(200);
-  const contactLinks = await page.getByRole("region", { name: /Contact/i }).getByRole("link").count();
-  check("Contact window shows social links", contactLinks > 0);
-  await page.getByRole("button", { name: /Close Contact/i }).click();
+  await close("saeculo Media Player");
+  check("window closes", (await player.count()) === 0);
+  check("music keeps playing after the player window closes", (await audioPaused()) === false);
+  check("tray shows now-playing while music plays", await page.getByRole("button", { name: /^Now playing:/ }).isVisible());
 
-  // Beat Maker: toggle a step, play, confirm the scheduler advances and
-  // audio actually produces sound (analyser would be overkill — check the
-  // sequencer's own step highlight instead)
-  await page.getByRole("button", { name: /Beat Maker\.exe/i }).click();
+  await page.getByRole("button", { name: "Gadget pause" }).click();
   await page.waitForTimeout(200);
-  const beatMakerWindow = page.getByRole("region", { name: /Beat Maker/i });
-  check("Beat Maker window opens", await beatMakerWindow.isVisible());
-  await beatMakerWindow.getByLabel("kick step 3").click();
-  check(
-    "Beat Maker step toggles on",
-    (await beatMakerWindow.getByLabel("kick step 3").getAttribute("aria-pressed")) === "true",
-  );
-  await beatMakerWindow.getByRole("button", { name: "Play sequencer" }).click();
-  await page.waitForTimeout(700);
-  const stopVisible = await beatMakerWindow.getByRole("button", { name: "Stop sequencer" }).isVisible();
-  check("Beat Maker starts playing (play → stop button)", stopVisible);
-  await beatMakerWindow.getByRole("button", { name: "Stop sequencer" }).click();
-  await page.getByRole("button", { name: /Close Beat Maker/i }).click();
+  check("sidebar gadget pauses the global player", (await audioPaused()) === true);
 
-  // Rhythm Rush: start a run, hit a lane key, confirm score/combo respond
-  await page.getByRole("button", { name: /Rhythm Rush\.exe/i }).click();
-  await page.waitForTimeout(200);
-  const rhythmWindow = page.getByRole("region", { name: /Rhythm Rush/i });
-  check("Rhythm Rush window opens", await rhythmWindow.isVisible());
-  await rhythmWindow.getByRole("button", { name: /^▶ (start|play again)$/ }).click();
+  // ---- start menu search ----
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.keyboard.type("pad");
+  await page.keyboard.press("Enter");
   await page.waitForTimeout(300);
-  // mash all four lanes repeatedly so at least one lands inside a hit window
-  for (let i = 0; i < 12; i++) {
-    for (const key of ["d", "f", "j", "k"]) await rhythmWindow.getByRole("button", { name: new RegExp(`Hit lane ${key}`, "i") }).click();
-    await page.waitForTimeout(120);
-  }
-  const scoreText = await rhythmWindow.locator("span", { hasText: /^score \d+/ }).innerText();
-  check("Rhythm Rush registers a hit (score > 0)", /score [1-9]/.test(scoreText), scoreText);
-  await page.getByRole("button", { name: /Close Rhythm Rush/i }).click();
+  const pads = win("Pad Recall");
+  check("start search + Enter launches Pad Recall", await pads.isVisible());
 
-  // visualizer mode cycling
-  await page.getByRole("button", { name: /My Beats\.exe/i }).click();
-  await page.waitForTimeout(200);
-  await musicWindow.getByRole("button", { name: "Play", exact: true }).click();
-  await page.waitForTimeout(200);
-  const vizButton = musicWindow.getByRole("button", { name: "Cycle visualizer style" });
-  const modeLabel1 = await vizButton.innerText();
-  await vizButton.click();
-  const modeLabel2 = await vizButton.innerText();
-  check("visualizer mode cycles on click", modeLabel1 !== modeLabel2, `${modeLabel1} -> ${modeLabel2}`);
-  await page.getByRole("button", { name: /Close saeculo player/i }).click();
-
-  // mobile viewport — all windows are closed at this point, so the desktop
-  // icons are reachable directly
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(200);
-  await page.getByRole("button", { name: /My Beats\.exe/i }).click();
-  await page.waitForTimeout(200);
-  const mobileMusicBox = await page.getByRole("region", { name: /saeculo player/i }).boundingBox();
-  check(
-    "mobile: opened window is full-screen",
-    !!mobileMusicBox && mobileMusicBox.width > 350,
-    `w=${mobileMusicBox?.width}`,
+  // ---- Pad Recall: actually play round 1 ----
+  await pads.getByRole("button", { name: "Start" }).click();
+  const litPad = await page.waitForFunction(
+    () => {
+      const btns = [...document.querySelectorAll('[aria-label="Drum pads"] button')];
+      const i = btns.findIndex((b) => b.style.background.includes("radial-gradient") && !b.style.background.includes("217, 65, 47"));
+      return i >= 0 ? i : false;
+    },
+    null,
+    { timeout: 3000 },
   );
+  const padIndex = await litPad.jsonValue();
+  await pads.getByText("Your turn").waitFor({ timeout: 3000 });
+  await page.keyboard.press(["q", "w", "e", "r", "a", "s", "d", "f"][padIndex]);
+  await pads.getByText("ROUND 2").waitFor({ timeout: 3000 }).catch(() => {});
+  check("Pad Recall: repeating the pattern advances to round 2", await pads.getByText("ROUND 2").isVisible());
+  await close("Pad Recall");
 
-  check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 5).join(" | "));
+  // ---- Beat Maker ----
+  await openFromDesktop("Beat Maker");
+  const bm = win("Beat Maker");
+  await bm.getByLabel("kick step 3").click();
+  check("Beat Maker step toggles on", (await bm.getByLabel("kick step 3").getAttribute("aria-pressed")) === "true");
+  await bm.getByRole("combobox", { name: "Load preset" }).selectOption("Trap");
+  check("Beat Maker preset sets the tempo", (await bm.getByText("140 bpm").count()) === 1);
+  await bm.getByRole("button", { name: "Play sequencer" }).click();
+  await page.waitForTimeout(500);
+  check("Beat Maker plays", await bm.getByRole("button", { name: "Stop sequencer" }).isVisible());
+  await bm.getByRole("button", { name: "Stop sequencer" }).click();
+  await close("Beat Maker");
 
-  // Screensaver: isolated context with a virtual clock so we don't burn 45
-  // real seconds (or destabilize the rAF-timed checks above with a shared
-  // fake clock) just to prove the idle timer fires.
+  // ---- Games Explorer → Rhythm Rush ----
+  await openFromDesktop("Games");
+  check("Games Explorer lists 3 games", (await win("Games").getByRole("list", { name: "Games" }).getByRole("button").count()) === 3);
+  await page.getByRole("button", { name: "Play Rhythm Rush" }).click();
+  await page.waitForTimeout(300);
+  const rr = win("Rhythm Rush");
+  await rr.getByRole("button", { name: "Start" }).click();
+  const sawGo = await rr
+    .getByText("GO", { exact: true })
+    .waitFor({ timeout: 6000 })
+    .then(() => true)
+    .catch(() => false);
+  check("Rhythm Rush counts in 3-2-1-GO", sawGo);
+  for (let i = 0; i < 40; i++) {
+    for (const k of ["d", "f", "j", "k"]) await page.keyboard.press(k);
+    await page.waitForTimeout(70);
+  }
+  const scoreText = await rr.getByText(/^SCORE \d+/).innerText();
+  check("Rhythm Rush registers hits on the beat grid", /SCORE [1-9]/.test(scoreText), scoreText);
+  await close("Rhythm Rush");
+  await close("Games");
+
+  // ---- Beat Brawl ----
+  await openFromStart("Beat Brawl");
+  const brawl = win("Beat Brawl");
+  await brawl.getByRole("button", { name: "Fight" }).click();
+  await page.waitForTimeout(2600);
+  for (let i = 0; i < 40; i++) {
+    for (const k of ["d", "f", "j", "k"]) await page.keyboard.press(k);
+    await page.waitForTimeout(70);
+  }
+  const bossWidth = await brawl.locator(".aero-progress-fill-red").evaluate((el) => el.style.width);
+  check("Beat Brawl: landed notes damage the boss", parseFloat(bossWidth) < 100, `boss hp ${bossWidth}`);
+  await close("Beat Brawl");
+
+  // ---- content apps ----
+  await openFromDesktop("about.txt");
+  check("Notepad shows the bio", (await win("about.txt - Notepad").innerText()).includes("saeculo"));
+  await close("about.txt - Notepad");
+
+  await openFromDesktop("Contact");
+  const mail = win("New Message - Booking");
+  check("Contact is a compose form with a Send button", await mail.getByRole("button", { name: "Send" }).isVisible());
+  await close("New Message - Booking");
+
+  await openFromDesktop("Recycle Bin");
+  const bin = win("Recycle Bin");
+  await bin.getByRole("button", { name: "Empty Recycle Bin" }).click();
+  await bin.getByRole("button", { name: "Yes", exact: true }).click();
+  check("Recycle Bin empties", await bin.getByText("This folder is empty.").isVisible());
+  await close("Recycle Bin");
+
+  // ---- lock / restart ----
+  const saver = page.getByRole("status", { name: /Screensaver active/ });
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "Lock", exact: true }).click();
+  await page.waitForTimeout(300);
+  check("Lock shows the screensaver", await saver.isVisible());
+  await page.waitForTimeout(800);
+  await page.mouse.move(300, 300);
+  await page.mouse.move(420, 360);
+  await page.waitForTimeout(200);
+  check("screensaver unlocks on activity", !(await saver.isVisible()));
+
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "Restart", exact: true }).click();
+  await page.waitForTimeout(300);
+  check("Restart replays the boot screen", await page.getByLabel("Skip boot sequence").isVisible());
+  await page.getByText("Welcome").waitFor({ timeout: 4000 }).catch(() => {});
+  check("boot hands off to the Welcome screen", await page.getByText("Welcome").isVisible());
+  await page.getByLabel("Skip boot sequence").click({ force: true });
+
+  check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
+
+  // ---- idle screensaver (virtual clock, isolated context) ----
   const ssContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const ssPage = await ssContext.newPage();
   await ssPage.clock.install();
   await ssPage.goto(BASE, { waitUntil: "networkidle" });
   await ssPage.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
-  const screensaver = ssPage.getByRole("status", { name: /Screensaver active/i });
-  check("screensaver absent before idle threshold", !(await screensaver.isVisible().catch(() => false)));
+  const idleSaver = ssPage.getByRole("status", { name: /Screensaver active/ });
+  check("screensaver absent before idle", !(await idleSaver.isVisible().catch(() => false)));
   await ssPage.clock.fastForward("00:46");
   await ssPage.waitForTimeout(150);
-  check("screensaver appears after 45s idle (virtual clock)", await screensaver.isVisible().catch(() => false));
+  check("screensaver appears after 45s idle", await idleSaver.isVisible().catch(() => false));
   await ssPage.mouse.move(50, 50);
   await ssPage.waitForTimeout(150);
-  check("screensaver dismisses on activity", !(await screensaver.isVisible().catch(() => false)));
+  check("idle screensaver dismisses on activity", !(await idleSaver.isVisible().catch(() => false)));
   await ssContext.close();
+
+  // ---- mobile ----
+  const mContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const m = await mContext.newPage();
+  await m.goto(BASE, { waitUntil: "networkidle" });
+  await m.getByLabel("Skip boot sequence").click({ force: true });
+  await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Games", exact: true }).tap();
+  await m.waitForTimeout(500); // let the 160ms open animation (scale .94→1) settle before measuring
+  const gBox = await m.getByRole("region", { name: "Games", exact: true }).boundingBox();
+  check("mobile: windows open full-screen", gBox.width >= 389, `w=${gBox?.width}`);
+  await m.getByRole("list", { name: "Games" }).getByRole("button", { name: "Pad Recall" }).tap();
+  await m.waitForTimeout(200);
+  check("mobile: a single tap opens a game", await m.getByRole("region", { name: "Pad Recall", exact: true }).isVisible());
+  await mContext.close();
 } finally {
   await browser.close();
 }

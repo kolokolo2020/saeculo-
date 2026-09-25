@@ -1,4 +1,13 @@
-export type WindowKind = "saeculo" | "beatmaker" | "rhythm" | "brawl" | "about" | "contact";
+export type WindowKind =
+  | "player"
+  | "beatmaker"
+  | "games"
+  | "rhythm"
+  | "brawl"
+  | "pads"
+  | "about"
+  | "contact"
+  | "recycle";
 
 export interface WindowState {
   kind: WindowKind;
@@ -8,6 +17,7 @@ export interface WindowState {
   height: number;
   zIndex: number;
   minimized: boolean;
+  maximized: boolean;
 }
 
 export interface Track {

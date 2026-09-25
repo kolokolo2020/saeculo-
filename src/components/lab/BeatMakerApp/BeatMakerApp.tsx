@@ -1,48 +1,63 @@
 "use client";
 
-import { LANES, STEP_COUNT, useStepSequencer, type Lane } from "./useStepSequencer";
+import { useState } from "react";
+import { LANES, PRESETS, STEP_COUNT, useStepSequencer, type Lane } from "./useStepSequencer";
+import Glyph from "@/components/ui/Glyph";
 
-const LANE_LABEL: Record<Lane, string> = {
-  kick: "kick",
-  snare: "snare",
-  hat: "hat",
-  bass: "bass",
-};
-
-const LANE_COLOR: Record<Lane, string> = {
-  kick: "bg-signal",
-  snare: "bg-bleed",
-  hat: "bg-ink",
-  bass: "bg-mute",
+const LANE_LABEL: Record<Lane, string> = { kick: "Kick", snare: "Snare", hat: "Hat", bass: "Bass" };
+const LANE_COLOR: Record<Lane, [string, string]> = {
+  kick: ["#ffc07a", "#d9660f"],
+  snare: ["#9fd3ff", "#1f6fd1"],
+  hat: ["#b8f0a7", "#25a025"],
+  bass: ["#ffb3d6", "#c42a78"],
 };
 
 export default function BeatMakerApp() {
-  const { pattern, toggleStep, bpm, setBpm, playing, play, stop, clear, displayStep } =
+  const { pattern, toggleStep, bpm, setBpm, playing, play, stop, clear, loadPreset, randomize, displayStep } =
     useStepSequencer();
+  const [preset, setPreset] = useState("");
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="flex h-full flex-col">
+      <div className="aero-toolbar-dark flex shrink-0 flex-wrap items-center gap-2 px-3 py-2">
         <button
           onClick={playing ? stop : play}
           aria-label={playing ? "Stop sequencer" : "Play sequencer"}
-          className="font-mono h-9 w-20 rounded-full border border-mute/30 text-xs tracking-widest text-ink uppercase hover:border-signal hover:text-signal"
+          className="aero-orb grid h-10 w-10 place-items-center text-white"
         >
-          {playing ? "■ stop" : "▶ play"}
+          <Glyph name={playing ? "stop" : "play"} size={16} />
         </button>
-        <button
-          onClick={clear}
-          aria-label="Clear pattern"
-          className="font-mono h-9 rounded-full border border-mute/30 px-4 text-xs tracking-widest text-mute uppercase hover:border-signal hover:text-signal"
-        >
-          clear
+        <button onClick={clear} aria-label="Clear pattern" className="aero-btn-dark px-3 py-1.5 text-[12px]">
+          Clear
         </button>
+        <button onClick={randomize} aria-label="Randomize pattern" className="aero-btn-dark flex items-center gap-1.5 px-3 py-1.5 text-[12px]">
+          <Glyph name="shuffle" size={13} />
+          Randomize
+        </button>
+        <label className="flex items-center gap-1.5 text-[12px] text-[#b7c7dc]">
+          Preset
+          <select
+            value={preset}
+            onChange={(e) => {
+              setPreset(e.target.value);
+              loadPreset(e.target.value);
+            }}
+            aria-label="Load preset"
+            className="aero-input px-1.5 py-1 text-[12px]"
+          >
+            <option value="" disabled>
+              Choose…
+            </option>
+            {Object.keys(PRESETS).map((name) => (
+              <option key={name}>{name}</option>
+            ))}
+          </select>
+        </label>
         <div className="ml-auto flex items-center gap-2">
-          <label htmlFor="bm-bpm" className="font-mono text-xs text-mute">
+          <span className="w-16 rounded-[3px] border border-black bg-[#03070f] px-1.5 py-0.5 text-right font-mono text-[13px] text-[#7fe0ff] shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)]">
             {bpm} bpm
-          </label>
+          </span>
           <input
-            id="bm-bpm"
             type="range"
             min={60}
             max={160}
@@ -50,54 +65,64 @@ export default function BeatMakerApp() {
             value={bpm}
             onChange={(e) => setBpm(Number(e.target.value))}
             aria-label="Tempo"
-            className="signal-range w-28"
+            className="aero-range w-28"
           />
         </div>
       </div>
 
-      <div className="space-y-2">
-        {LANES.map((lane) => (
-          <div key={lane} className="flex items-center gap-2">
-            <span className="font-mono w-10 shrink-0 text-[11px] text-mute">
-              {LANE_LABEL[lane]}
-            </span>
-            <div
-              className="grid flex-1 grid-cols-[repeat(16,minmax(0,1fr))] gap-1"
-              role="group"
-              aria-label={`${lane} steps`}
-            >
-              {pattern[lane].map((active, step) => (
-                <button
-                  key={step}
-                  onClick={() => toggleStep(lane, step)}
-                  aria-pressed={active}
-                  aria-label={`${lane} step ${step + 1}`}
-                  className={`aspect-square rounded-sm border transition-colors ${
-                    active
-                      ? `${LANE_COLOR[lane]} border-transparent`
-                      : step % 4 === 0
-                        ? "border-mute/25 bg-panel-2"
-                        : "border-mute/10 bg-panel"
-                  } ${displayStep === step ? "ring-1 ring-ink" : ""}`}
-                />
-              ))}
+      <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-auto p-3">
+        {LANES.map((lane) => {
+          const [hi, lo] = LANE_COLOR[lane];
+          return (
+            <div key={lane} className="flex items-center gap-2">
+              <span className="w-11 shrink-0 text-[12px] text-[#b7c7dc]">{LANE_LABEL[lane]}</span>
+              <div className="grid flex-1 grid-cols-[repeat(16,minmax(0,1fr))] gap-1" role="group" aria-label={`${lane} steps`}>
+                {pattern[lane].map((active, step) => {
+                  const current = displayStep === step;
+                  return (
+                    <button
+                      key={step}
+                      onClick={() => toggleStep(lane, step)}
+                      aria-pressed={active}
+                      aria-label={`${lane} step ${step + 1}`}
+                      className={`aspect-square rounded-[4px] border border-black transition-[filter] ${
+                        step % 4 === 0 ? "" : "opacity-95"
+                      } ${current ? "brightness-150" : ""}`}
+                      style={{
+                        background: active
+                          ? `linear-gradient(to bottom, #fff 0%, ${hi} 30%, ${lo} 100%)`
+                          : step % 4 === 0
+                            ? "linear-gradient(to bottom, #3b4452, #1d232c)"
+                            : "linear-gradient(to bottom, #2b323d, #151a21)",
+                        boxShadow: active
+                          ? `0 0 ${current ? 12 : 6}px ${hi}, inset 0 1px 0 rgba(255,255,255,0.5)`
+                          : "inset 0 1px 0 rgba(255,255,255,0.12)",
+                      }}
+                    />
+                  );
+                })}
+              </div>
             </div>
+          );
+        })}
+
+        <div className="flex gap-2">
+          <span className="w-11 shrink-0" />
+          <div className="grid flex-1 grid-cols-[repeat(16,minmax(0,1fr))] gap-1" aria-hidden>
+            {Array.from({ length: STEP_COUNT }, (_, i) => (
+              <span
+                key={i}
+                className={`mx-auto h-1.5 w-1.5 rounded-full ${
+                  displayStep === i ? "bg-[#ff5c3c] shadow-[0_0_6px_#ff5c3c]" : i % 4 === 0 ? "bg-[#4a5566]" : "bg-[#2b323d]"
+                }`}
+              />
+            ))}
           </div>
-        ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(16,minmax(0,1fr))] gap-1 pl-12">
-        {Array.from({ length: STEP_COUNT }, (_, i) => (
-          <div
-            key={i}
-            aria-hidden
-            className={`h-0.5 rounded-full ${displayStep === i ? "bg-ink" : "bg-mute/20"}`}
-          />
-        ))}
-      </div>
-
-      <p className="font-mono text-center text-[11px] text-mute">
-        click cells to build a beat — synced live, no samples
+      <p className="shrink-0 border-t border-black/60 px-3 py-1.5 text-[11px] text-[#7f93ad]">
+        Click cells to build a loop — every sound is synthesized live, no samples.
       </p>
     </div>
   );

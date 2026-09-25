@@ -1,63 +1,106 @@
 @import "tailwindcss";
 
+/* next/font exposes the loaded faces as --nf-* variables on <html>; the
+   theme tokens below put the real Vista face (Segoe UI) first, so Windows
+   visitors get the genuine article and everyone else gets the closest
+   humanist match. */
 @theme inline {
-  --font-display: var(--font-display), sans-serif;
-  --font-body: var(--font-body), sans-serif;
-  --font-mono: var(--font-mono), monospace;
-  --font-readout: var(--font-readout), monospace;
-  --font-pixel: var(--font-pixel), monospace;
+  --font-ui: "Segoe UI", "Segoe UI Web (West European)", var(--nf-ui), Tahoma, sans-serif;
+  --font-mono: Consolas, "Lucida Console", var(--nf-mono), monospace;
+  --font-pixel: var(--nf-pixel), monospace;
 
-  /* Tape shell black, warmed slightly instead of neutral/blue-black. */
-  --color-void: #0b0c09;
-  --color-panel: #16160f;
-  --color-panel-2: #1e1d14;
-  --color-ink: #f1ead9;
-  --color-mute: #8b8570;
+  /* Aero blues */
+  --color-aero: #1f6fd1;
+  --color-aero-light: #6fb4ff;
+  --color-aero-sky: #bfe0ff;
+  --color-aero-deep: #0b2a5b;
+  --color-aero-night: #04132b;
 
-  /* Camcorder REC-light amber — the primary accent. */
-  --color-signal: #ff9a2e;
-  /* VHS dub chroma-bleed cyan — secondary, used sparingly (ghosting/glitch). */
-  --color-bleed: #4fd6c4;
+  /* text */
+  --color-ink: #1b2533;
+  --color-mute: #5b6b80;
+  --color-frost: #eef6ff;
 
-  /* Aged cassette-label paper, for the tracklist stickers. */
-  --color-paper: #ece3ce;
-  --color-paper-ink: #24201a;
+  /* accents */
+  --color-leaf: #5fd35f;
+  --color-ember: #f39a1e;
+  --color-alert: #d9412f;
 }
 
 @layer base {
-  html {
-    scroll-behavior: smooth;
-    scroll-padding-top: 5rem;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    html {
-      scroll-behavior: auto;
-    }
-  }
-
   body {
-    background: var(--color-void);
+    background: var(--color-aero-night);
     color: var(--color-ink);
+    font-family: var(--font-ui);
   }
 
   ::selection {
-    background: var(--color-signal);
-    color: var(--color-void);
+    background: #3399ff;
+    color: #fff;
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-signal);
-    outline-offset: 3px;
+    outline: 1px dotted #0b2a5b;
+    outline-offset: 2px;
   }
 }
 
-@keyframes rec-blink {
+/* ------------------------------------------------------------------ */
+/* keyframes                                                           */
+/* ------------------------------------------------------------------ */
+
+@keyframes aero-open {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes aurora-drift {
   0%,
   100% {
-    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(-8deg) scaleY(1);
   }
   50% {
-    opacity: 0.25;
+    transform: translate3d(3%, -2%, 0) rotate(-5deg) scaleY(1.12);
+  }
+}
+
+@keyframes aurora-drift-alt {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(12deg);
+  }
+  50% {
+    transform: translate3d(-4%, 3%, 0) rotate(9deg);
+  }
+}
+
+/* the green segmented "loading" bar under the boot logo */
+@keyframes boot-sweep {
+  from {
+    transform: translateX(-60px);
+  }
+  to {
+    transform: translateX(220px);
+  }
+}
+
+@keyframes orb-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 6px rgba(120, 190, 255, 0.55),
+      inset 0 1px 1px rgba(255, 255, 255, 0.7);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(120, 190, 255, 0.9),
+      inset 0 1px 1px rgba(255, 255, 255, 0.7);
   }
 }
 
@@ -80,136 +123,455 @@
   }
 }
 
-/* Custom component classes live in this layer so Tailwind utilities (the
-   `utilities` layer, which Tailwind orders after `components`) can still
-   override them — e.g. `text-signal` on a `.deck-button` element. */
-@layer components {
-  .font-display {
-    font-family: var(--font-display);
+@keyframes pad-flash {
+  from {
+    filter: brightness(1.9) saturate(1.3);
   }
-  .font-body {
-    font-family: var(--font-body);
+  to {
+    filter: brightness(1) saturate(1);
   }
-  .font-mono {
-    font-family: var(--font-mono);
-  }
-  .font-readout {
-    font-family: var(--font-readout);
-  }
-  .font-pixel {
-    font-family: var(--font-pixel);
-  }
+}
 
-  /* ---- camcorder viewfinder chrome ---- */
-  .rec-dot {
-    animation: rec-blink 1.6s steps(2, jump-none) infinite;
+/* Custom component classes live in this layer so Tailwind utilities (the
+   later `utilities` layer) can still override them per element. */
+@layer components {
+  /* ---------------- wallpaper ---------------- */
+
+  /* Deep night blue with two drifting ribbons of green/cyan light — the
+     Vista "aurora" mood, painted entirely in CSS. */
+  .aero-wallpaper {
+    background:
+      radial-gradient(ellipse 80% 60% at 70% 110%, rgba(56, 160, 255, 0.55), transparent 70%),
+      radial-gradient(ellipse 60% 45% at 15% -10%, rgba(40, 110, 220, 0.5), transparent 70%),
+      linear-gradient(160deg, #031633 0%, #06306b 45%, #0a4a8f 70%, #042455 100%);
+  }
+  .aero-ribbon {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(38px);
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+  .aero-ribbon-a {
+    inset: 18% -20% 38% -10%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(90, 255, 190, 0.45) 30%,
+      rgba(80, 200, 255, 0.55) 60%,
+      transparent
+    );
+    animation: aurora-drift 26s ease-in-out infinite;
+  }
+  .aero-ribbon-b {
+    inset: 46% -10% 18% -25%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(120, 190, 255, 0.35) 35%,
+      rgba(150, 255, 220, 0.3) 65%,
+      transparent
+    );
+    animation: aurora-drift-alt 34s ease-in-out infinite;
   }
   @media (prefers-reduced-motion: reduce) {
-    .rec-dot {
+    .aero-ribbon-a,
+    .aero-ribbon-b {
       animation: none;
     }
   }
 
-  .viewfinder-bracket {
-    position: absolute;
-    width: 22px;
-    height: 22px;
-    border-color: color-mix(in srgb, var(--color-signal) 55%, transparent);
+  /* ---------------- window glass ---------------- */
+
+  .aero-glass {
+    background: linear-gradient(
+      to bottom,
+      rgba(186, 220, 255, 0.62) 0%,
+      rgba(120, 170, 230, 0.5) 40px,
+      rgba(96, 150, 220, 0.46) 100%
+    );
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid rgba(20, 40, 80, 0.75);
+    border-radius: 8px 8px 6px 6px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+      0 10px 30px rgba(0, 10, 40, 0.55),
+      0 2px 6px rgba(0, 10, 40, 0.35);
+  }
+  .aero-glass-inactive {
+    background: linear-gradient(
+      to bottom,
+      rgba(210, 222, 236, 0.55) 0%,
+      rgba(170, 186, 206, 0.45) 40px,
+      rgba(160, 176, 198, 0.42) 100%
+    );
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.4),
+      0 6px 18px rgba(0, 10, 40, 0.35);
+  }
+  /* a soft diagonal sheen streak across the top of the frame */
+  .aero-sheen {
+    background: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.28) 32%,
+      transparent 44%,
+      transparent 60%,
+      rgba(255, 255, 255, 0.16) 70%,
+      transparent 80%
+    );
     pointer-events: none;
   }
 
-  /* Thin horizontal scan lines, always on but barely there. */
-  .crt-scanlines {
-    background-image: repeating-linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--color-void) 92%, transparent) 0px,
-      color-mix(in srgb, var(--color-void) 92%, transparent) 1px,
-      transparent 1px,
-      transparent 3px
-    );
-    mix-blend-mode: overlay;
+  /* Vista title text sits on the glass with a white halo behind it. */
+  .aero-title-text {
+    color: #0d1b2e;
+    text-shadow:
+      0 0 10px rgba(255, 255, 255, 0.95),
+      0 0 4px rgba(255, 255, 255, 0.9);
   }
 
-  /* Film grain: a tiled SVG turbulence texture, static (no per-frame cost). */
-  .crt-grain {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    opacity: 0.05;
-    mix-blend-mode: overlay;
+  /* caption buttons (minimize / maximize / close), fused into one group */
+  .aero-caption {
+    display: flex;
+    border: 1px solid rgba(20, 40, 80, 0.7);
+    border-top: none;
+    border-radius: 0 0 5px 5px;
+    overflow: hidden;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
   }
-
-  /* ---- cassette label sticker (tracklist) ---- */
-  .tape-label {
-    background: var(--color-paper);
-    color: var(--color-paper-ink);
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  .aero-caption-btn {
+    display: grid;
+    place-items: center;
+    height: 19px;
+    width: 26px;
+    color: #fff;
+    font-size: 11px;
+    line-height: 1;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.55), rgba(190, 215, 245, 0.35) 50%, rgba(130, 165, 215, 0.4) 51%, rgba(170, 200, 240, 0.45));
+    border-right: 1px solid rgba(20, 40, 80, 0.45);
+    text-shadow: 0 0 2px rgba(0, 20, 60, 0.9);
   }
-
-  /* ---- deck chrome: the desktop OS's hardware panels ----
-     Not a Windows-95 grey/navy pastiche — this reads as the plastic and
-     brushed-metal of a cheap tape deck or camcorder: dark panel faces,
-     a thin warm highlight where light would catch a raised edge, and a
-     near-black shadow where it recedes. */
-  .deck-panel {
-    background: var(--color-panel);
-    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, var(--color-void));
+  .aero-caption-btn:hover {
+    background: linear-gradient(to bottom, rgba(220, 240, 255, 0.95), rgba(140, 200, 255, 0.8) 50%, rgba(60, 150, 255, 0.85) 51%, rgba(130, 210, 255, 0.9));
+    box-shadow: inset 0 0 6px rgba(255, 255, 255, 0.8);
+  }
+  .aero-caption-close {
+    width: 43px;
+    border-right: none;
+    background: linear-gradient(to bottom, #e8a598, #d9735f 50%, #c24a33 51%, #d77a5e);
+  }
+  .aero-caption-close:hover {
+    background: linear-gradient(to bottom, #ffc2b3, #f07b5f 50%, #e6391a 51%, #ff8a5c);
     box-shadow:
-      inset 1px 1px 0 color-mix(in srgb, var(--color-ink) 10%, transparent),
-      inset -1px -1px 0 rgba(0, 0, 0, 0.6);
+      inset 0 0 6px rgba(255, 255, 255, 0.7),
+      0 0 10px rgba(255, 90, 50, 0.9);
   }
-  .deck-panel-recessed {
-    background: var(--color-void);
-    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, var(--color-void));
-    box-shadow:
-      inset 1px 1px 0 rgba(0, 0, 0, 0.6),
-      inset -1px -1px 0 color-mix(in srgb, var(--color-ink) 8%, transparent);
-  }
-  .deck-button {
-    background: var(--color-panel-2);
-    border: 1px solid color-mix(in srgb, var(--color-ink) 14%, var(--color-void));
-    box-shadow:
-      inset 1px 1px 0 color-mix(in srgb, var(--color-ink) 14%, transparent),
-      inset -1px -1px 0 rgba(0, 0, 0, 0.7);
-    color: var(--color-ink);
-  }
-  .deck-button:active {
-    transform: translateY(1px);
-    box-shadow: inset -1px -1px 0 color-mix(in srgb, var(--color-ink) 10%, transparent);
+  .aero-caption-inactive .aero-caption-btn {
+    filter: saturate(0.2) brightness(1.05);
+    opacity: 0.85;
   }
 
-  /* minimal range inputs, tuned to the void/signal palette */
-  .signal-range {
+  /* the white client area inside a light window (Notepad, Mail, Explorer) */
+  .aero-client {
+    background: #fff;
+    border: 1px solid rgba(20, 40, 80, 0.55);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
+  }
+  /* the dark, glossy body of media/game apps */
+  .aero-dark {
+    background:
+      radial-gradient(ellipse 120% 60% at 50% 0%, rgba(40, 110, 200, 0.35), transparent 70%),
+      linear-gradient(to bottom, #0b1a30, #03070f);
+    color: var(--color-frost);
+    border: 1px solid rgba(20, 40, 80, 0.8);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+  }
+
+  /* Explorer-style toolbar strip under the title bar */
+  .aero-toolbar {
+    background: linear-gradient(to bottom, #fbfdff, #e3eef9 50%, #d2e3f5 51%, #dfeafa);
+    border-bottom: 1px solid #a0b8d6;
+  }
+  .aero-toolbar-dark {
+    background: linear-gradient(to bottom, #2c3440, #151a22 50%, #05080d 51%, #10151d);
+    border-bottom: 1px solid #000;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  /* ---------------- buttons ---------------- */
+
+  /* the classic Vista push button: silver, blue-lit on hover */
+  .aero-btn {
+    border: 1px solid #707070;
+    border-radius: 3px;
+    background: linear-gradient(to bottom, #f2f2f2, #ebebeb 50%, #dddddd 51%, #cfcfcf);
+    color: #1b2533;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+    transition:
+      background 120ms,
+      border-color 120ms;
+  }
+  .aero-btn:hover:not(:disabled) {
+    border-color: #3c7fb1;
+    background: linear-gradient(to bottom, #eaf6fd, #d9f0fc 50%, #bee6fd 51%, #a7d9f5);
+  }
+  .aero-btn:active:not(:disabled),
+  .aero-btn[aria-pressed="true"] {
+    border-color: #2c628b;
+    background: linear-gradient(to bottom, #e5f4fc, #c4e5f6 50%, #98d1ef 51%, #68b3db);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+  .aero-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .aero-btn-primary {
+    border-color: #3c7fb1;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.8),
+      0 0 0 1px rgba(60, 150, 230, 0.45);
+  }
+
+  /* glossy black button for the media player / games */
+  .aero-btn-dark {
+    border: 1px solid #000;
+    border-radius: 4px;
+    color: #eef6ff;
+    background: linear-gradient(to bottom, #4a5462, #262d37 50%, #0d1117 51%, #1c232d);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transition: box-shadow 120ms;
+  }
+  .aero-btn-dark:hover:not(:disabled) {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 0 10px rgba(80, 170, 255, 0.55),
+      0 0 8px rgba(80, 170, 255, 0.5);
+  }
+  .aero-btn-dark:active:not(:disabled),
+  .aero-btn-dark[aria-pressed="true"] {
+    background: linear-gradient(to bottom, #0d1117, #1b2f4a);
+    box-shadow:
+      inset 0 1px 3px rgba(0, 0, 0, 0.8),
+      inset 0 0 8px rgba(80, 170, 255, 0.45);
+  }
+  .aero-btn-dark:disabled {
+    opacity: 0.4;
+  }
+
+  /* the round glass orb: start button, media-player play button */
+  .aero-orb {
+    border-radius: 999px;
+    background:
+      radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.25) 32%, transparent 34%),
+      radial-gradient(circle at 50% 110%, #7fe0ff 0%, #2a8cf0 38%, #0c3f9a 75%, #061f52 100%);
+    border: 1px solid rgba(0, 20, 60, 0.85);
+    box-shadow:
+      0 0 6px rgba(120, 190, 255, 0.55),
+      inset 0 1px 1px rgba(255, 255, 255, 0.7);
+  }
+  .aero-orb:hover {
+    animation: orb-glow 1.6s ease-in-out infinite;
+    filter: brightness(1.12);
+  }
+  .aero-orb:active {
+    filter: brightness(0.92);
+  }
+
+  /* ---------------- taskbar ---------------- */
+
+  .aero-taskbar {
+    background: linear-gradient(to bottom, rgba(60, 72, 92, 0.72), rgba(14, 18, 26, 0.86) 50%, rgba(0, 0, 0, 0.9) 51%, rgba(10, 14, 20, 0.88));
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    backdrop-filter: blur(10px) saturate(140%);
+    border-top: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6);
+  }
+  .aero-task-btn {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 3px;
+    color: #fff;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04) 50%, rgba(0, 0, 0, 0.1) 51%, rgba(255, 255, 255, 0.06));
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+  }
+  .aero-task-btn:hover {
+    background: linear-gradient(to bottom, rgba(140, 200, 255, 0.4), rgba(80, 150, 230, 0.25) 50%, rgba(30, 90, 190, 0.35) 51%, rgba(90, 170, 255, 0.35));
+    border-color: rgba(160, 210, 255, 0.6);
+  }
+  .aero-task-btn-active {
+    background: linear-gradient(to bottom, rgba(170, 215, 255, 0.45), rgba(90, 160, 240, 0.35) 50%, rgba(40, 100, 200, 0.5) 51%, rgba(110, 185, 255, 0.45));
+    border-color: rgba(190, 225, 255, 0.75);
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+      inset 0 0 8px rgba(160, 215, 255, 0.5);
+  }
+
+  /* ---------------- start menu ---------------- */
+
+  .aero-start {
+    background: linear-gradient(to bottom, rgba(40, 55, 80, 0.8), rgba(8, 14, 24, 0.9));
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    backdrop-filter: blur(14px) saturate(150%);
+    border: 1px solid rgba(0, 0, 0, 0.85);
+    border-radius: 8px 8px 0 0;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+      0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+  .aero-start-link {
+    color: #fff;
+    border: 1px solid transparent;
+    border-radius: 3px;
+  }
+  .aero-start-link:hover,
+  .aero-start-link:focus-visible {
+    border-color: rgba(160, 210, 255, 0.55);
+    background: linear-gradient(to bottom, rgba(140, 195, 255, 0.35), rgba(60, 120, 220, 0.3));
+    outline: none;
+  }
+
+  /* ---------------- selection rows (Explorer / lists) ---------------- */
+
+  .aero-row {
+    border: 1px solid transparent;
+    border-radius: 3px;
+  }
+  .aero-row:hover,
+  .aero-row:focus-visible {
+    border-color: #b8d6fb;
+    background: linear-gradient(to bottom, #fafbfd, #ebf3fd);
+    outline: none;
+  }
+  .aero-row-selected,
+  .aero-row-selected:hover {
+    border-color: #7da2ce;
+    background: linear-gradient(to bottom, #dcebfc, #c1dbfc);
+  }
+  .aero-row-dark {
+    border: 1px solid transparent;
+    border-radius: 3px;
+  }
+  .aero-row-dark:hover,
+  .aero-row-dark:focus-visible {
+    border-color: rgba(120, 180, 255, 0.35);
+    background: linear-gradient(to bottom, rgba(90, 160, 255, 0.18), rgba(40, 100, 200, 0.12));
+    outline: none;
+  }
+  .aero-row-dark-selected,
+  .aero-row-dark-selected:hover {
+    border-color: rgba(140, 200, 255, 0.6);
+    background: linear-gradient(to bottom, rgba(90, 170, 255, 0.42), rgba(30, 90, 190, 0.35));
+  }
+
+  /* ---------------- form controls ---------------- */
+
+  .aero-input {
+    background: #fff;
+    color: #1b2533;
+    border: 1px solid #abadb3;
+    border-top-color: #8e8f8f;
+    border-radius: 2px;
+  }
+  .aero-input:hover {
+    border-color: #5794bf;
+  }
+  .aero-input:focus {
+    border-color: #3d7bad;
+    outline: none;
+    box-shadow: 0 0 0 1px rgba(61, 123, 173, 0.25);
+  }
+
+  /* slider: a thin inset track and a glossy blue thumb */
+  .aero-range {
     -webkit-appearance: none;
     appearance: none;
-    height: 16px;
+    height: 18px;
     background: transparent;
     cursor: pointer;
   }
-  .signal-range::-webkit-slider-runnable-track {
-    height: 2px;
-    background: color-mix(in srgb, var(--color-mute) 35%, transparent);
+  .aero-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to bottom, #1a1f27, #3a4452);
+    box-shadow:
+      inset 0 1px 1px rgba(0, 0, 0, 0.7),
+      0 1px 0 rgba(255, 255, 255, 0.15);
   }
-  .signal-range::-webkit-slider-thumb {
+  .aero-range::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    margin-top: -6px;
+    margin-top: -5px;
     height: 14px;
     width: 14px;
     border-radius: 999px;
-    background: var(--color-signal);
+    border: 1px solid #0b2a5b;
+    background: radial-gradient(circle at 50% 30%, #fff 0%, #9fd3ff 35%, #2a7fe0 80%);
+    box-shadow: 0 0 4px rgba(90, 170, 255, 0.8);
   }
-  .signal-range::-moz-range-track {
-    height: 2px;
-    background: color-mix(in srgb, var(--color-mute) 35%, transparent);
+  .aero-range::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to bottom, #1a1f27, #3a4452);
   }
-  .signal-range::-moz-range-thumb {
-    height: 14px;
-    width: 14px;
-    border: none;
+  .aero-range::-moz-range-thumb {
+    height: 12px;
+    width: 12px;
     border-radius: 999px;
-    background: var(--color-signal);
+    border: 1px solid #0b2a5b;
+    background: radial-gradient(circle at 50% 30%, #fff 0%, #9fd3ff 35%, #2a7fe0 80%);
+  }
+  .aero-range-light::-webkit-slider-runnable-track {
+    background: linear-gradient(to bottom, #b7c3d0, #e6ecf2);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.3);
   }
 
-  /* marquee for now-playing */
+  /* Vista's green progress fill */
+  .aero-progress {
+    background: linear-gradient(to bottom, #e6e6e6, #cfcfcf);
+    border: 1px solid #8d8d8d;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .aero-progress-fill {
+    height: 100%;
+    background: linear-gradient(to bottom, #b8f0a7, #5fd35f 50%, #25b025 51%, #6be36b);
+  }
+  .aero-progress-fill-red {
+    background: linear-gradient(to bottom, #ffb9a8, #f0634a 50%, #cf2c16 51%, #ff7a5c);
+  }
+
+  /* ---------------- sidebar gadgets ---------------- */
+
+  .aero-gadget {
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  /* ---------------- misc ---------------- */
+
+  .aero-open {
+    animation: aero-open 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .aero-open {
+      animation: none;
+    }
+  }
+
+  .icon-label {
+    color: #fff;
+    text-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.95),
+      0 0 6px rgba(0, 0, 0, 0.6);
+  }
+
   .animate-marquee {
     display: inline-block;
     animation: marquee 14s linear infinite;
@@ -220,17 +582,33 @@
       transform: none;
     }
   }
+
+  .pad-flash {
+    animation: pad-flash 260ms ease-out;
+  }
 }
 
-/* slim scrollbars matching the dark canvas */
+/* Vista-ish scrollbars: pale track, glossy rounded thumb */
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
 }
 *::-webkit-scrollbar-track {
-  background: var(--color-void);
+  background: linear-gradient(to right, #e7e7e7, #f7f7f7);
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--color-panel-2);
-  border-radius: 999px;
+  border: 1px solid #9a9a9a;
+  border-radius: 3px;
+  background: linear-gradient(to right, #f5f5f5, #dcdcdc 50%, #cdcdcd 51%, #e2e2e2);
+}
+*::-webkit-scrollbar-thumb:hover {
+  border-color: #3c7fb1;
+  background: linear-gradient(to right, #eaf6fd, #bee6fd 50%, #a7d9f5 51%, #d4ecfa);
+}
+.dark-scroll::-webkit-scrollbar-track {
+  background: #070b12;
+}
+.dark-scroll::-webkit-scrollbar-thumb {
+  border-color: #000;
+  background: linear-gradient(to right, #3a4452, #1c232d);
 }

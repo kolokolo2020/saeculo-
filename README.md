@@ -1,11 +1,26 @@
 # saeculo
 
-An interactive promo site for saeculo's instrumentals — the whole site is a
-fake retro desktop OS. Double-click (or Tab + Enter) desktop icons to open
-draggable windows: a Winamp-style music player with three live
-audio-reactive visualizer modes, a step-sequencer beat maker, a rhythm
-arcade game synced to track tempo, an About page, and a contact/booking
-page.
+An interactive promo site for saeculo's instrumentals, built as a glassy,
+Vista-era blue desktop: frosted Aero windows, a glowing start orb, a
+sidebar of gadgets, and a Bubbles screensaver. Click (or Tab + Enter) a
+desktop icon to open it.
+
+What's on the desktop:
+
+- **Media Player** — plays the beats with three live visualizers (Aurora,
+  Bars & Waves, Scope). Music lives in a global player, so it keeps
+  playing when the window closes; the sidebar Now Playing gadget and the
+  taskbar tray control it too.
+- **Beat Maker** — a 16-step drum sequencer with genre presets and a
+  randomizer; every sound is synthesized live.
+- **Games** — a games folder with three rhythm games:
+  - **Rhythm Rush** — the chosen beat plays and notes fall on its grid;
+    hit D / F / J / K. Ranked S–D on accuracy.
+  - **Beat Brawl** — a boss fight against a metronome that speeds up.
+  - **Pad Recall** — Simon on an MPC: repeat the pad pattern
+    (Q W E R / A S D F).
+- **about.txt** (Notepad), **Contact** (a compose-mail form that opens the
+  visitor's mail app), and a **Recycle Bin** of beats that didn't make it.
 
 ## Getting started
 
@@ -20,51 +35,45 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Nothing in here is real yet — swap it out before launch:
 
-- **Beats**: `src/data/tracks.ts` lists the tracks and their streaming
-  links. The actual audio in `public/audio/*.wav` is procedurally
-  synthesized (no samples, fully original) by `scripts/generate-audio.mjs`
-  — replace those files with your real instrumentals (any audio the
-  `<audio>` element supports), and update `src/data/tracks.ts` to match.
-  Re-run `npm run gen:audio` if you ever want to regenerate the
-  placeholders.
-- **Bio & socials**: `src/data/profile.ts`.
-- **Booking email**: also in `src/data/profile.ts`.
+- **Beats**: `src/data/tracks.ts` lists the tracks, their BPM (the rhythm
+  games chart notes from it), and streaming links. The audio in
+  `public/audio/*.wav` is procedurally synthesized (no samples) by
+  `scripts/generate-audio.mjs` — replace those files with your real
+  instrumentals and update `src/data/tracks.ts` to match, keeping each
+  track's `bpm` accurate so the games stay on the beat.
+- **Bio, socials, booking email**: `src/data/profile.ts`.
 
 ## Project structure
 
-- `src/components/window-manager/` — the draggable window system
-  (zustand store, drag hook, window chrome, taskbar/start-menu registry).
-- `src/components/desktop/` — the desktop shell: boot sequence, icons,
-  taskbar, start menu, CRT scanline overlay.
-- `src/components/apps/` — the actual "apps":
-  - `MusicPlayerApp` — player + canvas visualizer wired to the Web Audio
-    API, with three switchable modes (EQ bars, oscilloscope, neon tunnel —
-    click the mode badge on the visualizer to cycle).
-  - `BeatMakerApp` — a 16-step drum sequencer (kick/snare/hat/bass) with
-    live Web Audio synthesis (no samples) and a lookahead scheduler for
-    tight timing.
-  - `RhythmRushApp` — a 4-lane falling-note rhythm game (D/F/J/K) synced
-    to the tempo of whichever placeholder track you pick; scores and a
-    localStorage high score.
-  - `AboutApp`, `ContactApp` — simple content windows.
-- `src/lib/synth.ts` — shared real-time drum synthesis (kick/snare/hat/
-  bass/blip) used by both BeatMaker and RhythmRush's hit sounds.
-- `scripts/generate-audio.mjs` — synthesizes the placeholder beats.
-- `scripts/verify.mjs` — a Playwright smoke test covering the boot
-  sequence, keyboard-only app access, dragging, playback, the visualizer
-  animating, Beat Maker step toggling/playback, Rhythm Rush scoring, and
-  the mobile full-screen fallback. Not part of the build; run manually
-  against a local dev server if you want to re-check things
-  (`npm i -D playwright-core` first, it's intentionally not a saved
-  dependency).
+- `src/app/globals.css` — the Aero theme: glass frames, caption buttons,
+  Vista push buttons, taskbar, start menu, sliders, aurora wallpaper.
+- `src/components/desktop/` — the shell: boot + Welcome screen, desktop
+  icons, taskbar, start menu (with search, lock, restart), sidebar gadgets,
+  Bubbles screensaver.
+- `src/components/window-manager/` — windows: zustand store, drag and
+  resize hooks, maximize, the glass `WindowFrame`, and the app registry.
+- `src/components/player/` — the global audio player store, the single
+  `<audio>` element (`AudioEngine`), and the visualizer.
+- `src/components/games/` + `src/lib/laneEngine.ts` — the shared engine
+  behind Rhythm Rush and Beat Brawl: beat-quantized charts, an audio-clock
+  timer, the canvas playfield, and the looping backing track.
+- `src/components/apps/`, `src/components/lab/` — the individual apps.
+- `src/components/ui/` — `AppIcon` (the glossy SVG icon set), `Glyph`
+  (monochrome control glyphs — unicode ▶ ⏭ ✕ render as colour emoji on
+  some platforms), and the start-orb mark.
+- `src/lib/synth.ts` — real-time drum synthesis used by the Beat Maker and
+  game sound effects.
+- `scripts/verify.mjs` — a Playwright smoke test (37 checks: windows,
+  global audio, gadgets, every game actually played, lock/restart, idle
+  screensaver, mobile). Not part of the build — run it against a dev
+  server on port 3210 after `npm i --no-save playwright-core`.
 
 ## Mobile
 
-Below 768px, windows open full-screen one at a time instead of as
-draggable floating windows — dragging doesn't make sense on a phone. Use
-the taskbar or the "▾ desk" button to get back to the icon grid.
+Below 768px, windows open full-screen one at a time; the sidebar hides and
+games open with a single tap. Minimize or use the taskbar to get back to
+the icons.
 
 ## Deploying
 
-Static, no backend/database — deploys cleanly to Vercel or any Next.js
-host: `npm run build && npm start`, or connect the repo to Vercel.
+Static, no backend or database — deploys to Vercel or any Next.js host.

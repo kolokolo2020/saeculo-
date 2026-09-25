@@ -6,11 +6,11 @@ export default function manifest(): MetadataRoute.Manifest {
     name: `${PROFILE.artistName} — ${PROFILE.tagline}`,
     short_name: PROFILE.artistName,
     description:
-      "saeculo makes instrumentals for late-night drives and old video game menus. Listen to the beats, build a loop, test your ear.",
+      "saeculo makes instrumentals for late-night drives and old video game menus. Listen to the beats, build a loop, play the rhythm games.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0e0d12",
-    theme_color: "#0e0d12",
+    background_color: "#0b2a5b",
+    theme_color: "#0b2a5b",
     icons: [
       {
         src: "/favicon.ico",
