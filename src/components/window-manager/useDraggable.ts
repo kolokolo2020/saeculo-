@@ -3,9 +3,7 @@
 import { useCallback, useRef } from "react";
 import { clamp } from "@/lib/audio";
 import type { WindowKind } from "@/lib/types";
-import { useWindowStore } from "./windowStore";
-
-const TASKBAR_HEIGHT = 40;
+import { TASKBAR_HEIGHT, useWindowStore } from "./windowStore";
 
 export function useDraggable(kind: WindowKind, disabled: boolean) {
   const dragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
@@ -17,7 +15,7 @@ export function useDraggable(kind: WindowKind, disabled: boolean) {
       if (disabled) return;
       if ((e.target as HTMLElement).closest("button")) return;
       const win = windows[kind];
-      if (!win) return;
+      if (!win || win.maximized) return;
       dragRef.current = { offsetX: e.clientX - win.x, offsetY: e.clientY - win.y };
       e.currentTarget.setPointerCapture(e.pointerId);
     },

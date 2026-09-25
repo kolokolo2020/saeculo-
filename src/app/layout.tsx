@@ -1,45 +1,34 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, IBM_Plex_Mono, Manrope, Press_Start_2P, VT323 } from "next/font/google";
+import { IBM_Plex_Mono, Open_Sans, Press_Start_2P } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
 import "./globals.css";
 
-const displayFont = Bricolage_Grotesque({
+// Segoe UI is the real Vista face, but it can't be served from Google
+// Fonts — it's listed first in --font-ui (see globals.css) so Windows
+// visitors get it, and Open Sans is the loaded stand-in everywhere else.
+const uiFont = Open_Sans({
   subsets: ["latin"],
-  variable: "--font-display",
+  variable: "--nf-ui",
 });
 
-const bodyFont = Manrope({
-  subsets: ["latin"],
-  variable: "--font-body",
-});
-
+// Consolas stand-in for Notepad and numeric readouts.
 const monoFont = IBM_Plex_Mono({
   weight: ["400", "500"],
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--nf-mono",
 });
 
-// The camcorder HUD readout — REC indicator, tape counter, timestamps —
-// gets its own genuine CRT-terminal face, used nowhere else on the page.
-const readoutFont = VT323({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-readout",
-});
-
-// The OS chrome itself (window titles, icon labels, taskbar, start menu)
-// gets a chunky 8-bit face — the one deliberate throwback to the original
-// desktop build, everything else stays the tape-deck identity.
+// Arcade scoreboards inside the games only — the OS chrome stays Segoe.
 const pixelFont = Press_Start_2P({
   weight: "400",
   subsets: ["latin"],
-  variable: "--font-pixel",
+  variable: "--nf-pixel",
 });
 
 const title = "saeculo — instrumentals & beats";
 const description =
-  "The desktop of saeculo: a bootleg retro OS where you can play instrumentals, build a loop in the beat maker, and dig through the beats.";
+  "The desktop of saeculo: a glassy mid-2000s desktop where you can play instrumentals, build a loop in the beat maker, and play rhythm games synced to the beats.";
 const siteUrl = "https://saeculo.vercel.app";
 
 export const metadata: Metadata = {
@@ -78,7 +67,7 @@ const jsonLd = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0c09",
+  themeColor: "#0b2a5b",
 };
 
 export default function RootLayout({
@@ -87,7 +76,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable} ${readoutFont.variable} ${pixelFont.variable} h-full`}
+      className={`${uiFont.variable} ${monoFont.variable} ${pixelFont.variable} h-full`}
     >
       <head>
         <script
@@ -95,7 +84,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="h-full overflow-hidden">
+      <body className="h-full overflow-clip">
         {children}
         <SpeedInsights />
       </body>

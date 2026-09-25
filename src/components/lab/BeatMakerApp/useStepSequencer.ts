@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playBass, playHat, playKick, playSnare } from "@/lib/synth";
+import { usePlayerStore } from "@/components/player/playerStore";
 
 export const STEP_COUNT = 16;
 export type Lane = "kick" | "snare" | "hat" | "bass";
@@ -20,6 +21,45 @@ const DEFAULT_PATTERN: Record<Lane, boolean[]> = {
 function bools(activeSteps: number[]): boolean[] {
   return Array.from({ length: STEP_COUNT }, (_, i) => activeSteps.includes(i));
 }
+
+export const PRESETS: Record<string, { bpm: number; pattern: Record<Lane, boolean[]> }> = {
+  "Boom Bap": {
+    bpm: 90,
+    pattern: {
+      kick: bools([0, 7, 10]),
+      snare: bools([4, 12]),
+      hat: bools([0, 2, 4, 6, 8, 10, 12, 14]),
+      bass: bools([0, 7, 10]),
+    },
+  },
+  Trap: {
+    bpm: 140,
+    pattern: {
+      kick: bools([0, 6, 11]),
+      snare: bools([8]),
+      hat: bools([0, 1, 2, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15]),
+      bass: bools([0, 6, 11]),
+    },
+  },
+  House: {
+    bpm: 124,
+    pattern: {
+      kick: bools([0, 4, 8, 12]),
+      snare: bools([4, 12]),
+      hat: bools([2, 6, 10, 14]),
+      bass: bools([2, 3, 6, 10, 11, 14]),
+    },
+  },
+  "Lo-Fi": {
+    bpm: 78,
+    pattern: {
+      kick: bools([0, 3, 10]),
+      snare: bools([4, 12]),
+      hat: bools([0, 4, 6, 8, 12, 14]),
+      bass: bools([0, 3, 8, 10]),
+    },
+  },
+};
 
 export function useStepSequencer() {
   const [pattern, setPattern] = useState(DEFAULT_PATTERN);
@@ -89,6 +129,8 @@ export function useStepSequencer() {
   }, [playing]);
 
   const play = useCallback(() => {
+    // one soundtrack at a time: the media player steps aside
+    usePlayerStore.getState().pause();
     if (!ctxRef.current) ctxRef.current = new AudioContext();
     else if (ctxRef.current.state === "suspended") void ctxRef.current.resume();
     nextStepRef.current = 0;
@@ -110,6 +152,27 @@ export function useStepSequencer() {
     setPattern({ kick: bools([]), snare: bools([]), hat: bools([]), bass: bools([]) });
   }, []);
 
+  const loadPreset = useCallback((name: string) => {
+    const preset = PRESETS[name];
+    if (!preset) return;
+    setPattern(preset.pattern);
+    setBpm(preset.bpm);
+  }, []);
+
+  // Random, but musical: kick on the one, snare on the backbeat, hats
+  // dense, bass shadowing some of the kicks.
+  const randomize = useCallback(() => {
+    const pick = (p: number, force: number[] = []) =>
+      Array.from({ length: STEP_COUNT }, (_, i) => force.includes(i) || Math.random() < p);
+    const kick = pick(0.18, [0]);
+    setPattern({
+      kick,
+      snare: pick(0.06, [4, 12]),
+      hat: pick(0.6),
+      bass: kick.map((k) => k && Math.random() < 0.7),
+    });
+  }, []);
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -118,5 +181,5 @@ export function useStepSequencer() {
     };
   }, []);
 
-  return { pattern, toggleStep, bpm, setBpm, playing, play, stop, clear, displayStep };
+  return { pattern, toggleStep, bpm, setBpm, playing, play, stop, clear, loadPreset, randomize, displayStep };
 }

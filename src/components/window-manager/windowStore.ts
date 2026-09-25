@@ -1,16 +1,10 @@
 import { create } from "zustand";
 import type { WindowKind, WindowState } from "@/lib/types";
+import { APP_BY_KIND } from "./windowRegistry";
 
-const DEFAULT_SIZES: Record<WindowKind, { width: number; height: number }> = {
-  saeculo: { width: 480, height: 560 },
-  about: { width: 440, height: 420 },
-  contact: { width: 400, height: 380 },
-  beatmaker: { width: 620, height: 460 },
-  rhythm: { width: 520, height: 480 },
-  brawl: { width: 520, height: 560 },
-};
-
-const CASCADE_STEP = 32;
+const CASCADE_STEP = 30;
+export const TASKBAR_HEIGHT = 40;
+export const MIN_WINDOW = { width: 320, height: 240 };
 
 interface WindowManagerState {
   windows: Partial<Record<WindowKind, WindowState>>;
@@ -20,8 +14,11 @@ interface WindowManagerState {
   openWindow: (kind: WindowKind) => void;
   closeWindow: (kind: WindowKind) => void;
   toggleMinimize: (kind: WindowKind) => void;
+  toggleMaximize: (kind: WindowKind) => void;
   focusWindow: (kind: WindowKind) => void;
   setPosition: (kind: WindowKind, x: number, y: number) => void;
+  setSize: (kind: WindowKind, width: number, height: number) => void;
+  minimizeAll: () => void;
 }
 
 export const useWindowStore = create<WindowManagerState>((set) => ({
@@ -43,11 +40,15 @@ export const useWindowStore = create<WindowManagerState>((set) => ({
           nextZ: state.nextZ + 1,
         };
       }
-      const size = DEFAULT_SIZES[kind];
-      const cascade = (state.openCount % 5) * CASCADE_STEP;
       const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
-      const x = Math.max(16, Math.min(96 + cascade, vw - size.width - 16));
-      const y = 48 + cascade;
+      const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+      const base = APP_BY_KIND[kind].defaultSize;
+      // never open bigger than the screen minus the taskbar
+      const width = Math.min(base.width, vw - 24);
+      const height = Math.min(base.height, vh - TASKBAR_HEIGHT - 24);
+      const cascade = (state.openCount % 6) * CASCADE_STEP;
+      const x = Math.max(12, Math.min(140 + cascade, vw - width - 12));
+      const y = Math.max(8, Math.min(28 + cascade, vh - TASKBAR_HEIGHT - height - 8));
       return {
         windows: {
           ...state.windows,
@@ -55,9 +56,11 @@ export const useWindowStore = create<WindowManagerState>((set) => ({
             kind,
             x,
             y,
-            ...size,
+            width,
+            height,
             zIndex: state.nextZ,
             minimized: false,
+            maximized: false,
           },
         },
         focusedKind: kind,
@@ -101,6 +104,20 @@ export const useWindowStore = create<WindowManagerState>((set) => ({
       };
     }),
 
+  toggleMaximize: (kind) =>
+    set((state) => {
+      const existing = state.windows[kind];
+      if (!existing) return state;
+      return {
+        windows: {
+          ...state.windows,
+          [kind]: { ...existing, maximized: !existing.maximized, zIndex: state.nextZ },
+        },
+        focusedKind: kind,
+        nextZ: state.nextZ + 1,
+      };
+    }),
+
   focusWindow: (kind) =>
     set((state) => {
       const existing = state.windows[kind];
@@ -122,4 +139,19 @@ export const useWindowStore = create<WindowManagerState>((set) => ({
       if (!existing) return state;
       return { windows: { ...state.windows, [kind]: { ...existing, x, y } } };
     }),
+
+  setSize: (kind, width, height) =>
+    set((state) => {
+      const existing = state.windows[kind];
+      if (!existing) return state;
+      return { windows: { ...state.windows, [kind]: { ...existing, width, height } } };
+    }),
+
+  minimizeAll: () =>
+    set((state) => ({
+      windows: Object.fromEntries(
+        Object.entries(state.windows).map(([k, w]) => [k, { ...w, minimized: true }]),
+      ) as WindowManagerState["windows"],
+      focusedKind: null,
+    })),
 }));

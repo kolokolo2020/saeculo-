@@ -1,86 +1,117 @@
 "use client";
 
-import { useWindowStore } from "./windowStore";
+import { TASKBAR_HEIGHT, useWindowStore } from "./windowStore";
 import { useDraggable } from "./useDraggable";
+import { useResizable } from "./useResizable";
+import { APP_BY_KIND } from "./windowRegistry";
+import AppIcon from "@/components/ui/AppIcon";
+import Glyph from "@/components/ui/Glyph";
 import type { WindowKind } from "@/lib/types";
 
 interface WindowFrameProps {
   kind: WindowKind;
-  title: string;
-  icon: string;
   isMobile: boolean;
   children: React.ReactNode;
 }
 
-export default function WindowFrame({ kind, title, icon, isMobile, children }: WindowFrameProps) {
+// A frosted Aero window: glass frame, glowing title text, fused caption
+// buttons with the red close, and a white or glossy-dark client area.
+export default function WindowFrame({ kind, isMobile, children }: WindowFrameProps) {
   const win = useWindowStore((s) => s.windows[kind]);
   const focusedKind = useWindowStore((s) => s.focusedKind);
   const closeWindow = useWindowStore((s) => s.closeWindow);
   const toggleMinimize = useWindowStore((s) => s.toggleMinimize);
+  const toggleMaximize = useWindowStore((s) => s.toggleMaximize);
   const drag = useDraggable(kind, isMobile);
+  const resize = useResizable(kind);
 
   if (!win) return null;
 
+  const app = APP_BY_KIND[kind];
+  const title = app.title;
   const focused = focusedKind === kind;
   const hidden = win.minimized || (isMobile && !focused);
+  const fill = isMobile || win.maximized;
 
-  const style: React.CSSProperties = isMobile
-    ? { zIndex: win.zIndex }
+  const style: React.CSSProperties = fill
+    ? { zIndex: win.zIndex, left: 0, top: 0, right: 0, bottom: TASKBAR_HEIGHT }
     : {
         transform: `translate3d(${win.x}px, ${win.y}px, 0)`,
         width: win.width,
         height: win.height,
         zIndex: win.zIndex,
+        left: 0,
+        top: 0,
       };
 
   return (
     <section
       aria-label={title}
       style={style}
-      className={`deck-panel absolute flex flex-col p-1 shadow-[4px_4px_0_rgba(0,0,0,0.5)] ${
-        isMobile ? "inset-x-0 top-0 bottom-10" : "top-0 left-0"
-      } ${hidden ? "invisible pointer-events-none" : "visible"}`}
+      onPointerDown={() => useWindowStore.getState().focusWindow(kind)}
+      className={`aero-glass aero-open absolute flex flex-col ${focused ? "" : "aero-glass-inactive"} ${
+        fill ? "rounded-none!" : ""
+      } ${hidden ? "pointer-events-none invisible" : "visible"}`}
     >
+      <div className={`aero-sheen absolute inset-x-0 top-0 h-9 ${fill ? "" : "rounded-t-[8px]"}`} aria-hidden />
+
       <header
         onPointerDown={drag.onPointerDown}
         onPointerMove={drag.onPointerMove}
         onPointerUp={drag.onPointerUp}
-        className={`font-pixel flex h-8 shrink-0 touch-none items-center gap-2 border-b px-2 text-[10px] tracking-wide select-none ${
-          focused
-            ? "border-signal/40 bg-[linear-gradient(to_right,color-mix(in_srgb,var(--color-signal)_28%,var(--color-void)),var(--color-panel))] text-ink"
-            : "border-ink/10 bg-panel-2 text-mute"
-        } ${isMobile ? "" : "cursor-move"}`}
+        onDoubleClick={() => !isMobile && toggleMaximize(kind)}
+        className="relative flex h-[30px] shrink-0 touch-none items-start gap-2 pr-1.5 pl-2 select-none"
       >
-        <span aria-hidden className={`rec-dot leading-none ${focused ? "text-signal" : "text-mute"}`}>
-          {icon}
+        <span className="mt-[7px]">
+          <AppIcon kind={kind} size={16} />
         </span>
-        <h2 className="flex-1 truncate">{title}</h2>
-        {isMobile ? (
+        <h2 className={`aero-title-text mt-[6px] flex-1 truncate text-[13px] ${focused ? "" : "opacity-70"}`}>
+          {title}
+        </h2>
+        <div className={`aero-caption ${focused ? "" : "aero-caption-inactive"}`}>
           <button
             onClick={() => toggleMinimize(kind)}
             aria-label={`Minimize ${title}`}
-            className="deck-button font-pixel h-6 px-2 text-[9px]"
+            className="aero-caption-btn"
           >
-            ▾ desk
+            <Glyph name="minimize" size={12} />
           </button>
-        ) : (
+          {!isMobile && (
+            <button
+              onClick={() => toggleMaximize(kind)}
+              aria-label={`${win.maximized ? "Restore" : "Maximize"} ${title}`}
+              className="aero-caption-btn"
+            >
+              <Glyph name={win.maximized ? "restore" : "maximize"} size={12} />
+            </button>
+          )}
           <button
-            onClick={() => toggleMinimize(kind)}
-            aria-label={`Minimize ${title}`}
-            className="deck-button h-5 w-5 text-xs leading-none font-bold"
+            onClick={() => closeWindow(kind)}
+            aria-label={`Close ${title}`}
+            className="aero-caption-btn aero-caption-close"
           >
-            _
+            <Glyph name="close" size={12} />
           </button>
-        )}
-        <button
-          onClick={() => closeWindow(kind)}
-          aria-label={`Close ${title}`}
-          className="deck-button h-5 w-5 text-xs leading-none font-bold"
-        >
-          ✕
-        </button>
+        </div>
       </header>
-      <div className="deck-panel-recessed min-h-0 flex-1 overflow-auto p-3">{children}</div>
+
+      <div className="relative min-h-0 flex-1 px-[6px] pb-[6px]">
+        <div
+          className={`${app.surface === "dark" ? "aero-dark" : "aero-client"} h-full overflow-hidden rounded-[2px]`}
+        >
+          {children}
+        </div>
+      </div>
+
+      {!fill && (
+        <div
+          onPointerDown={resize.onPointerDown}
+          onPointerMove={resize.onPointerMove}
+          onPointerUp={resize.onPointerUp}
+          aria-hidden
+          className="absolute right-0 bottom-0 h-4 w-4 cursor-nwse-resize touch-none"
+        />
+      )}
     </section>
   );
 }

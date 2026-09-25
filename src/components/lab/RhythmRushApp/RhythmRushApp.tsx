@@ -1,97 +1,55 @@
 "use client";
 
-import { TRACKS } from "@/data/tracks";
-import { LANE_KEYS, useRhythmGame } from "./useRhythmGame";
-
-const JUDGEMENT_STYLE: Record<string, string> = {
-  perfect: "text-signal",
-  good: "text-bleed",
-  miss: "text-mute",
-};
+import LaneStage from "@/components/games/LaneStage";
+import TrackPicker from "@/components/games/TrackPicker";
+import { LANE_KEYS } from "@/lib/laneEngine";
+import { rankFor, useRhythmGame } from "./useRhythmGame";
 
 export default function RhythmRushApp() {
-  const {
-    canvasRef,
-    trackIndex,
-    setTrackIndex,
-    gameState,
-    score,
-    combo,
-    timeLeft,
-    judgement,
-    highScore,
-    start,
-    hitLane,
-  } = useRhythmGame();
+  const game = useRhythmGame();
+  const { phase, score, combo, timeLeft, best, result } = game;
+
+  const hud = (
+    <div className="font-pixel pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-2.5 text-[9px] text-white [text-shadow:0_0_8px_rgba(80,170,255,0.9)]">
+      <span>SCORE {score}</span>
+      <span className={combo >= 10 ? "text-[#9fffb0]" : ""}>{combo > 1 ? `${combo}x COMBO` : ""}</span>
+      <span>{phase === "running" ? `${timeLeft}s` : `BEST ${best}`}</span>
+    </div>
+  );
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="font-mono flex flex-wrap items-center gap-4 text-xs text-mute">
-        <span className="text-ink">score {score}</span>
-        <span>combo {combo}x</span>
-        <span>best {highScore}</span>
-        <span className="ml-auto">{gameState === "running" ? `${timeLeft}s` : "—"}</span>
-      </div>
-
-      <div className="relative aspect-[4/3] w-full">
-        <canvas ref={canvasRef} className="h-full w-full rounded-md bg-panel" aria-hidden />
-        {judgement && (
-          <p
-            className={`font-mono pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 text-xs tracking-widest uppercase ${JUDGEMENT_STYLE[judgement]}`}
-          >
-            {judgement}
-          </p>
-        )}
-
-        {gameState !== "running" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-md bg-void/85 p-4 text-center">
-            {gameState === "ended" && (
-              <p className="font-mono text-xs text-signal">
-                run over — score {score}
-                {score >= highScore && score > 0 ? " — new best!" : ""}
-              </p>
-            )}
-            <label className="font-mono text-[11px] text-mute" htmlFor="rr-track">
-              synced to
-            </label>
-            <select
-              id="rr-track"
-              value={trackIndex}
-              onChange={(e) => setTrackIndex(Number(e.target.value))}
-              className="font-mono rounded-md border border-mute/30 bg-panel px-2 py-1 text-xs text-ink"
-            >
-              {TRACKS.map((t, i) => (
-                <option key={t.id} value={i}>
-                  {t.title} — {t.bpm}bpm
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={start}
-              className="font-mono rounded-full border border-mute/30 px-5 py-2 text-xs tracking-widest text-ink uppercase hover:border-signal hover:text-signal"
-            >
-              ▶ {gameState === "ended" ? "play again" : "start"}
-            </button>
-            <p className="font-mono max-w-[16rem] text-[11px] text-mute">
-              hit {LANE_KEYS.map((k) => k.toUpperCase()).join(" / ")} as the bars cross the line
+    <div className="flex h-full flex-col p-3">
+      <LaneStage
+        canvasRef={game.canvasRef}
+        phase={phase}
+        countdown={game.countdown}
+        judgement={game.judgement}
+        onLane={game.hitLane}
+        top={hud}
+      >
+        <p className="font-pixel text-[13px] text-white [text-shadow:0_0_12px_rgba(80,170,255,0.9)]">RHYTHM RUSH</p>
+        {phase === "done" && result && (
+          <div className="rounded-[6px] border border-white/15 bg-white/5 px-4 py-2 text-[12px] text-[#d7e4f3]">
+            <p className="text-[15px] text-white">
+              Score <span className="font-semibold">{score}</span> · Rank{" "}
+              <span className="font-pixel text-[14px] text-[#ffd27a]">{rankFor(result.stats)}</span>
             </p>
+            <p className="mt-1 text-[#9fb2c9]">
+              {result.stats.perfect} perfect · {result.stats.good} good · {result.stats.miss} miss · best combo{" "}
+              {result.maxCombo}
+            </p>
+            {result.newBest && <p className="mt-1 font-semibold text-[#9fffb0]">New personal best!</p>}
           </div>
         )}
-      </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        {LANE_KEYS.map((key, i) => (
-          <button
-            key={key}
-            onClick={() => hitLane(i)}
-            disabled={gameState !== "running"}
-            aria-label={`Hit lane ${key.toUpperCase()}`}
-            className="font-mono h-10 rounded-md border border-mute/30 text-xs tracking-widest text-ink uppercase hover:border-signal hover:text-signal disabled:opacity-30"
-          >
-            {key.toUpperCase()}
-          </button>
-        ))}
-      </div>
+        <TrackPicker id="rr-track" value={game.trackIndex} onChange={game.setTrackIndex} />
+        <button onClick={game.start} className="aero-btn aero-btn-primary px-6 py-1.5 text-[13px]">
+          {phase === "done" ? "Play again" : "Start"}
+        </button>
+        <p className="max-w-[18rem] text-[11.5px] text-[#9fb2c9]">
+          The beat plays, notes fall on its grid. Hit {LANE_KEYS.map((k) => k.toUpperCase()).join(" / ")} (or tap
+          the pads) as they cross the line.
+        </p>
+      </LaneStage>
     </div>
   );
 }
