@@ -9,6 +9,7 @@ import {
   renderBeatWav,
   setPendingBeat,
   shareUrl,
+  subscribePendingBeat,
   type BeatLane,
 } from "@/lib/beatCode";
 
@@ -77,9 +78,19 @@ export function useStepSequencer() {
   const [displayStep, setDisplayStep] = useState(-1);
   const [exporting, setExporting] = useState(false);
   const [shareStatus, setShareStatus] = useState<{ state: "copied" | "manual"; url: string } | null>(null);
+  const [exportFailed, setExportFailed] = useState(false);
 
+  // the initializers above took any pending beat; later links (pasted into a
+  // tab where the Beat Maker is already open) arrive through the subscription
   useEffect(() => {
     setPendingBeat(null);
+    return subscribePendingBeat(() => {
+      const beat = peekPendingBeat();
+      if (!beat) return;
+      setPendingBeat(null);
+      setPattern(beat.pattern);
+      setBpm(beat.bpm);
+    });
   }, []);
 
   const ctxRef = useRef<AudioContext | null>(null);
@@ -190,6 +201,7 @@ export function useStepSequencer() {
 
   const exportWav = useCallback(async () => {
     setExporting(true);
+    setExportFailed(false);
     try {
       const blob = await renderBeatWav({ bpm: bpmRef.current, pattern: patternRef.current });
       const url = URL.createObjectURL(blob);
@@ -198,6 +210,9 @@ export function useStepSequencer() {
       a.download = `saeculo-beatmaker-${Math.round(bpmRef.current)}bpm.wav`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch {
+      // offline rendering unsupported or out of memory
+      setExportFailed(true);
     } finally {
       setExporting(false);
     }
@@ -236,6 +251,7 @@ export function useStepSequencer() {
     displayStep,
     exportWav,
     exporting,
+    exportFailed,
     share,
     shareStatus,
     dismissShare: () => setShareStatus(null),

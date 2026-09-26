@@ -81,13 +81,20 @@ export default function Desktop() {
   }, []);
 
   // A share link (#beat=…) opens straight into the Beat Maker with that
-  // loop; the hash is then dropped so a refresh doesn't re-import it.
+  // loop; the hash is then dropped so a refresh doesn't re-import it. A link
+  // pasted into a tab that already has the site open only changes the hash,
+  // so listen for that too.
   useEffect(() => {
-    const beat = decodeBeat(window.location.hash);
-    if (!beat) return;
-    setPendingBeat(beat);
-    useWindowStore.getState().openWindow("beatmaker");
-    history.replaceState(null, "", window.location.pathname + window.location.search);
+    const importFromHash = () => {
+      const beat = decodeBeat(window.location.hash);
+      if (!beat) return;
+      setPendingBeat(beat);
+      useWindowStore.getState().openWindow("beatmaker");
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    };
+    importFromHash();
+    window.addEventListener("hashchange", importFromHash);
+    return () => window.removeEventListener("hashchange", importFromHash);
   }, []);
 
   // Right-click on the bare desktop (not on a window, gadget or the taskbar)

@@ -27,6 +27,7 @@ export default function BeatMakerApp() {
     displayStep,
     exportWav,
     exporting,
+    exportFailed,
     share,
     shareStatus,
     dismissShare,
@@ -78,7 +79,7 @@ export default function BeatMakerApp() {
           aria-label="Export loop as WAV"
           className="aero-btn-dark px-3 py-1.5 text-[12px]"
         >
-          {exporting ? "Rendering…" : "Export .wav"}
+          {exporting ? "Rendering…" : exportFailed ? "Export failed — retry" : "Export .wav"}
         </button>
         <div className="ml-auto flex items-center gap-2">
           <span className="w-16 rounded-[3px] border border-black bg-[#03070f] px-1.5 py-0.5 text-right font-mono text-[13px] text-[#7fe0ff] shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)]">

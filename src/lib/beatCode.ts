@@ -45,14 +45,23 @@ export function shareUrl(beat: SharedBeat): string {
   return `${window.location.origin}${window.location.pathname}#${encodeBeat(beat)}`;
 }
 
-// A beat that arrived via a share link, waiting for the Beat Maker to open.
-// Read with peek (safe to call more than once — Strict Mode double-invokes
-// state initializers) and cleared by the Beat Maker once it has mounted.
+// A beat that arrived via a share link, waiting for the Beat Maker to pick
+// it up. A Beat Maker that mounts later reads it with peek (safe to call more
+// than once — Strict Mode double-invokes state initializers); one that is
+// already open subscribes and is told when a new link lands.
 let pending: SharedBeat | null = null;
+const listeners = new Set<() => void>();
 export const setPendingBeat = (beat: SharedBeat | null) => {
   pending = beat;
+  if (beat) listeners.forEach((fn) => fn());
 };
 export const peekPendingBeat = () => pending;
+export const subscribePendingBeat = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
 
 /** Bass pitch per step — the same line the live sequencer plays. */
 export const bassFreqForStep = (step: number) => (step % 8 < 4 ? 55 : 73.4);

@@ -184,6 +184,25 @@ try {
       (await sharedBm.getByLabel("bass step 4").getAttribute("aria-pressed")) === "true",
   );
   check("share hash is cleared after import", (await shared.evaluate(() => location.hash)) === "");
+  // a link pasted into a tab that already has the site open only changes the hash
+  await shared.evaluate(() => (location.hash = "#beat=90-0001000000000000"));
+  await shared.waitForTimeout(300);
+  check(
+    "pasting a share link into an open Beat Maker swaps in that beat",
+    (await sharedBm.getByText("90 bpm").count()) === 1 &&
+      (await sharedBm.getByLabel("kick step 1", { exact: true }).getAttribute("aria-pressed")) === "true" &&
+      (await sharedBm.getByLabel("bass step 4").getAttribute("aria-pressed")) === "false",
+  );
+  await shared.getByRole("button", { name: "Close Beat Maker" }).click();
+  await shared.waitForTimeout(300);
+  await shared.evaluate(() => (location.hash = "#beat=110-0000000100000000"));
+  await shared.waitForTimeout(400);
+  check(
+    "pasting a share link with the Beat Maker closed opens it with that beat",
+    (await sharedBm.isVisible()) &&
+      (await sharedBm.getByText("110 bpm").count()) === 1 &&
+      (await sharedBm.getByLabel("snare step 1", { exact: true }).getAttribute("aria-pressed")) === "true",
+  );
   await shared.close();
 
   // ---- right-click menu + Personalize ----
