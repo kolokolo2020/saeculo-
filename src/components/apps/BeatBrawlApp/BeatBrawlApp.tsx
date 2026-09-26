@@ -4,6 +4,9 @@ import LaneStage from "@/components/games/LaneStage";
 import TrackPicker from "@/components/games/TrackPicker";
 import { LANE_KEYS } from "@/lib/laneEngine";
 import { BOSS_MAX_HP, BOSS_NAME, PLAYER_MAX_HP, useBeatBrawl } from "./useBeatBrawl";
+import { SECRET_WORDS } from "@/data/secrets";
+
+const BRAWL_WORD = SECRET_WORDS.find((s) => s.id === "brawl")!.word;
 
 function HealthBar({
   label,
@@ -113,6 +116,11 @@ export default function BeatBrawlApp() {
         {outcome === "won" && (
           <p className="text-[14px] text-[#9fffb0]">
             {BOSS_NAME}&apos;s pendulum stops. You keep the beat — {playerHP} HP left.
+          </p>
+        )}
+        {outcome === "won" && (
+          <p className="font-pixel text-[9px] leading-relaxed text-[#ffd27a]">
+            IT DROPPED A SCRAP OF PAPER: &quot;{BRAWL_WORD.toUpperCase()}&quot;
           </p>
         )}
         {outcome === "lost" && <p className="text-[14px] text-[#ff9a8a]">{BOSS_NAME} wins. The room falls silent.</p>}

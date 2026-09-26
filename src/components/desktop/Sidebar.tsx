@@ -7,6 +7,8 @@ import { useWindowStore } from "@/components/window-manager/windowStore";
 import Glyph from "@/components/ui/Glyph";
 import { useNow } from "@/hooks/useNow";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { PROFILE } from "@/data/profile";
+import { formatLeft, releaseProgress } from "@/lib/release";
 
 // Trig results can differ in the last float digit between the server's
 // and the browser's JS engines, which breaks hydration — round them.
@@ -110,6 +112,29 @@ function NowPlayingGadget() {
   );
 }
 
+// The next drop, as a download that is taking its time.
+function ReleaseGadget() {
+  const now = useNow();
+  const openWindow = useWindowStore((s) => s.openWindow);
+  const progress = now ? releaseProgress(now) : null;
+  if (!PROFILE.nextRelease) return null;
+  return (
+    <button
+      onClick={() => openWindow("release")}
+      aria-label="Release countdown gadget"
+      className="aero-gadget block w-full p-2 text-left"
+    >
+      <p className="truncate text-[11.5px] font-semibold text-white">next_single.exe</p>
+      <div className="aero-progress mt-1.5 h-2.5">
+        <div className="aero-progress-fill" style={{ width: `${Math.floor((progress?.fraction ?? 0) * 100)}%` }} />
+      </div>
+      <p className="mt-1 font-mono text-[10.5px] text-white/75">
+        {!progress ? "calculating…" : progress.done ? "download complete" : `${formatLeft(progress)} left`}
+      </p>
+    </button>
+  );
+}
+
 // Two dials in the style of the classic CPU/RAM meter gadget: live output
 // level (RMS off the analyser) and the current track's tempo.
 function MeterGadget() {
@@ -197,6 +222,7 @@ export default function Sidebar() {
       className="absolute top-0 right-0 bottom-10 z-[5] hidden w-[180px] flex-col gap-4 border-l border-white/10 bg-gradient-to-r from-transparent to-[rgba(4,16,36,0.45)] px-3 pt-4 lg:flex"
     >
       <ClockGadget />
+      <ReleaseGadget />
       <NowPlayingGadget />
       <MeterGadget />
     </aside>

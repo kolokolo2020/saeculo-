@@ -50,7 +50,7 @@ try {
   check("boot screen appears", await page.getByLabel("Skip boot sequence").isVisible().catch(() => false));
   await page.getByLabel("Skip boot sequence").click({ force: true });
   await page.waitForTimeout(300);
-  check("desktop shows 6 icons", (await desktop.getByRole("button").count()) === 6);
+  check("desktop shows 7 icons", (await desktop.getByRole("button").count()) === 7);
 
   // ---- media player + global audio ----
   await desktop.getByRole("button", { name: "Media Player", exact: true }).focus();
@@ -288,7 +288,61 @@ try {
   const bin = win("Recycle Bin");
   await bin.getByRole("button", { name: "Empty Recycle Bin" }).click();
   await bin.getByRole("button", { name: "Yes", exact: true }).click();
-  check("Recycle Bin empties", await bin.getByText("This folder is empty.").isVisible());
+  check(
+    "Recycle Bin empties, except vault.zip",
+    (await bin.getByRole("row").count()) === 2 &&
+      (await bin.getByText("vault.zip could not be deleted: the file is in use.").isVisible()),
+  );
+  await close("Recycle Bin");
+
+  // ---- release countdown ----
+  await openFromDesktop("next_single.exe");
+  const release = win("Downloading next_single.exe");
+  await page.waitForTimeout(1200); // the shared clock ticks once a second
+  check(
+    "next_single.exe counts down to the release",
+    /^\d+d \d\d:\d\d:\d\d$/.test(await release.getByLabel("Time left").innerText()) &&
+      Number(await release.getByRole("progressbar").getAttribute("aria-valuenow")) >= 0,
+    await release.getByLabel("Time left").innerText(),
+  );
+  await close("Downloading next_single.exe");
+
+  // ---- secret hunt: three hidden words open vault.zip ----
+  const balloon = page.getByRole("status").filter({ hasText: "Hidden word found" });
+  await openFromDesktop("about.txt");
+  await win("about.txt - Notepad").getByRole("button", { name: "Edit" }).click();
+  await page.waitForTimeout(200);
+  check("selecting about.txt reveals word 1", (await balloon.innerText().catch(() => "")).includes("(1/3)"));
+  await close("about.txt - Notepad");
+
+  await page.mouse.click(700, 600);
+  for (const key of ["ArrowUp", "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"]) {
+    await page.keyboard.press(key);
+  }
+  await page.waitForTimeout(200);
+  check("the Konami code reveals word 3", (await balloon.innerText().catch(() => "")).includes("Word 3 is LOOPS"));
+
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("textbox", { name: "Start Search" }).fill("vault");
+  check("Start Search denies access to the vault", await page.getByText(/vault is not accessible/).isVisible());
+  await page.keyboard.press("Escape");
+
+  await openFromDesktop("Recycle Bin");
+  await win("Recycle Bin").getByRole("row", { name: /vault\.zip/ }).dblclick();
+  await page.waitForTimeout(250);
+  const vault = win("vault.zip");
+  await vault.getByLabel("Vault password").fill("letmein");
+  await vault.getByRole("button", { name: "Extract" }).click();
+  check("a wrong vault password is refused", await vault.getByText("The password is incorrect.", { exact: false }).isVisible());
+  await vault.getByLabel("Vault password").fill("Late Night Loops");
+  await vault.getByRole("button", { name: "Extract" }).click();
+  await page.waitForTimeout(200);
+  check("the right password opens the vault", await vault.getByRole("list", { name: "Unreleased snippets" }).isVisible());
+  await vault.getByRole("button", { name: /^Play untitled_0412/ }).click();
+  await page.waitForTimeout(300);
+  check("a vault snippet plays", await vault.getByRole("button", { name: /^Pause untitled_0412/ }).isVisible());
+  await vault.getByRole("button", { name: /^Pause untitled_0412/ }).click();
+  await close("vault.zip");
   await close("Recycle Bin");
 
   // ---- lock / restart ----
@@ -341,6 +395,13 @@ try {
   await m.getByRole("list", { name: "Games" }).getByRole("button", { name: "Pad Recall" }).tap();
   await m.waitForTimeout(200);
   check("mobile: a single tap opens a game", await m.getByRole("region", { name: "Pad Recall", exact: true }).isVisible());
+  await m.getByLabel("Taskbar").getByRole("button", { name: "Start", exact: true }).tap();
+  await m.getByRole("textbox", { name: "Start Search" }).fill("up up down down left right left right b a");
+  await m.waitForTimeout(200);
+  check(
+    "mobile: the cheat code typed into Start Search reveals word 3",
+    (await m.getByRole("status").filter({ hasText: "Hidden word found" }).innerText().catch(() => "")).includes("LOOPS"),
+  );
   await mContext.close();
 } finally {
   await browser.close();

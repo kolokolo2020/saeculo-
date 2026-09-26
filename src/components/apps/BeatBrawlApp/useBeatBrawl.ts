@@ -5,6 +5,7 @@ import { playHat, playKick, playSnare } from "@/lib/synth";
 import { readBest, submitBest } from "@/lib/bestScores";
 import { TRACKS } from "@/data/tracks";
 import { useLaneGame } from "@/components/games/useLaneGame";
+import { useSecretStore } from "@/components/secrets/secretStore";
 
 const FIGHT_LENGTH_S = 120; // generous — the fight ends on HP, not the clock
 const BASE_TRAVEL_S = 1.45;
@@ -105,7 +106,10 @@ export function useBeatBrawl() {
         endRef.current ?? (bossRef.current < playerRef.current ? "won" : "lost");
       setOutcome(result);
       // best = the most health you walked away with from a win
-      if (result === "won") setBest(submitBest("brawl", playerRef.current));
+      if (result === "won") {
+        setBest(submitBest("brawl", playerRef.current));
+        useSecretStore.getState().find("brawl");
+      }
     },
   });
 

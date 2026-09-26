@@ -17,7 +17,8 @@ export default function DesktopIcon({ app }: { app: AppMeta }) {
     >
       <AppIcon kind={app.kind} size={44} />
       <span className="icon-label w-full text-center text-[12px] leading-tight [overflow-wrap:anywhere]">
-        {app.label}
+        {/* long file names wrap before the extension, like Explorer did */}
+        {app.label.replace(/\.(\w+)$/, "\u200b.$1")}
       </span>
     </button>
   );

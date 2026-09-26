@@ -16,4 +16,16 @@ export const PROFILE = {
     { label: "YouTube", url: "https://youtube.com/", handle: "@saeculo" },
     { label: "Instagram", url: "https://instagram.com/", handle: "@saeculo" },
   ] satisfies SocialLink[],
+  /**
+   * PLACEHOLDER — the next drop, shown as a "Downloading next_single.exe"
+   * countdown. The bar fills from `announced` to `date`; once `date` passes
+   * it flips to "Download complete" with a button to `url` (if set).
+   * Set to null to hide the countdown.
+   */
+  nextRelease: {
+    title: "untitled single",
+    announced: "2026-09-20T18:00:00+02:00",
+    date: "2026-11-13T18:00:00+01:00",
+    url: "",
+  } as { title: string; announced: string; date: string; url: string } | null,
 };

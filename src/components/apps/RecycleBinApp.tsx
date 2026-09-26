@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { playBlip, playSnare } from "@/lib/synth";
+import { useWindowStore } from "@/components/window-manager/windowStore";
 
 interface Scrap {
   name: string;
@@ -23,14 +24,18 @@ const SCALE = [0, 2, 4, 5, 7, 9, 11];
 const noteFreq = (degree: number) =>
   523.25 * Math.pow(2, (SCALE[degree % 7] + 12 * Math.floor(degree / 7)) / 12);
 
+const VAULT = { name: "vault.zip", from: "C:\\saeculo", deleted: "??/??/????", size: "128 MB" };
+
 // An easter egg: the beats that didn't make it. Double-click one to hear
-// the idea, or empty the bin for good.
+// the idea, or empty the bin for good. vault.zip can't be deleted: it's the
+// door to the secret hunt.
 export default function RecycleBinApp() {
   const [items, setItems] = useState(SCRAPS);
   const [selected, setSelected] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
+  const openWindow = useWindowStore((s) => s.openWindow);
 
   useEffect(() => () => void ctxRef.current?.close(), []);
 
@@ -52,7 +57,7 @@ export default function RecycleBinApp() {
     setItems([]);
     setSelected(null);
     setConfirming(false);
-    setNote(null);
+    setNote("vault.zip could not be deleted: the file is in use.");
   };
 
   return (
@@ -60,7 +65,6 @@ export default function RecycleBinApp() {
       <div className="aero-toolbar flex h-9 shrink-0 items-center gap-2 px-2">
         <button
           onClick={() => setConfirming(true)}
-          disabled={!items.length}
           className="aero-btn px-3 py-1 text-[12px]"
         >
           Empty Recycle Bin
@@ -74,49 +78,59 @@ export default function RecycleBinApp() {
         </button>
       </div>
 
-      {items.length ? (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full text-left text-[12px]">
-            <thead className="sticky top-0 bg-gradient-to-b from-white to-[#eef2f7] text-mute">
-              <tr>
-                <th className="border-r border-b border-[#d4dbe4] px-2 py-1 font-normal">Name</th>
-                <th className="border-r border-b border-[#d4dbe4] px-2 py-1 font-normal max-sm:hidden">Original Location</th>
-                <th className="border-r border-b border-[#d4dbe4] px-2 py-1 font-normal">Date Deleted</th>
-                <th className="border-b border-[#d4dbe4] px-2 py-1 text-right font-normal">Size</th>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="w-full text-left text-[12px]">
+          <thead className="sticky top-0 bg-gradient-to-b from-white to-[#eef2f7] text-mute">
+            <tr>
+              <th className="border-r border-b border-[#d4dbe4] px-2 py-1 font-normal">Name</th>
+              <th className="border-r border-b border-[#d4dbe4] px-2 py-1 font-normal max-sm:hidden">Original Location</th>
+              <th className="border-r border-b border-[#d4dbe4] px-2 py-1 font-normal">Date Deleted</th>
+              <th className="border-b border-[#d4dbe4] px-2 py-1 text-right font-normal">Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              tabIndex={0}
+              onClick={() => setSelected(VAULT.name)}
+              onDoubleClick={() => openWindow("vault")}
+              onKeyDown={(e) => e.key === "Enter" && openWindow("vault")}
+              className={`cursor-default ${selected === VAULT.name ? "aero-row-selected" : "hover:bg-[#eef5fd]"}`}
+            >
+              <td className="px-2 py-1">
+                {VAULT.name} <span className="text-[10.5px] text-[#a0782c]">(password protected)</span>
+              </td>
+              <td className="px-2 py-1 text-mute max-sm:hidden">{VAULT.from}</td>
+              <td className="px-2 py-1 text-mute">{VAULT.deleted}</td>
+              <td className="px-2 py-1 text-right text-mute">{VAULT.size}</td>
+            </tr>
+            {items.map((scrap) => (
+              <tr
+                key={scrap.name}
+                tabIndex={0}
+                onClick={() => setSelected(scrap.name)}
+                onDoubleClick={() => playSketch(scrap)}
+                onKeyDown={(e) => e.key === "Enter" && playSketch(scrap)}
+                className={`cursor-default ${selected === scrap.name ? "aero-row-selected" : "hover:bg-[#eef5fd]"}`}
+              >
+                <td className="px-2 py-1">{scrap.name}</td>
+                <td className="px-2 py-1 text-mute max-sm:hidden">{scrap.from}</td>
+                <td className="px-2 py-1 text-mute">{scrap.deleted}</td>
+                <td className="px-2 py-1 text-right text-mute">{scrap.size}</td>
               </tr>
-            </thead>
-            <tbody>
-              {items.map((scrap) => (
-                <tr
-                  key={scrap.name}
-                  tabIndex={0}
-                  onClick={() => setSelected(scrap.name)}
-                  onDoubleClick={() => playSketch(scrap)}
-                  onKeyDown={(e) => e.key === "Enter" && playSketch(scrap)}
-                  className={`cursor-default ${selected === scrap.name ? "aero-row-selected" : "hover:bg-[#eef5fd]"}`}
-                >
-                  <td className="px-2 py-1">{scrap.name}</td>
-                  <td className="px-2 py-1 text-mute max-sm:hidden">{scrap.from}</td>
-                  <td className="px-2 py-1 text-mute">{scrap.deleted}</td>
-                  <td className="px-2 py-1 text-right text-mute">{scrap.size}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="grid flex-1 place-items-center text-[12px] text-mute">This folder is empty.</p>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="shrink-0 border-t border-[#d4dbe4] bg-[#f1f5fa] px-3 py-1 text-[11px] text-mute">
-        {note ?? (items.length ? `${items.length} items · double-click one to hear what could have been` : "0 items")}
+        {note ?? `${items.length + 1} items · double-click one to hear what could have been`}
       </div>
 
       {confirming && (
         <div className="absolute inset-0 grid place-items-center bg-black/20" role="dialog" aria-label="Delete multiple items">
           <div className="w-[300px] rounded-[6px] border border-[#6a7f99] bg-white p-4 shadow-2xl">
             <p className="text-[13px]">
-              Are you sure you want to permanently delete these {items.length} items?
+              Are you sure you want to permanently delete these {items.length + 1} items?
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={empty} className="aero-btn aero-btn-primary px-5 py-1 text-[12px]">

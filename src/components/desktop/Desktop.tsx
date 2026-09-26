@@ -29,6 +29,11 @@ import RhythmRushApp from "@/components/lab/RhythmRushApp/RhythmRushApp";
 import BeatBrawlApp from "@/components/apps/BeatBrawlApp/BeatBrawlApp";
 import PadRecallApp from "@/components/apps/PadRecallApp/PadRecallApp";
 import PersonalizeApp from "@/components/apps/PersonalizeApp";
+import VaultApp from "@/components/apps/VaultApp";
+import ReleaseApp from "@/components/apps/ReleaseApp";
+import TrayBalloon from "./TrayBalloon";
+import { useSecretStore } from "@/components/secrets/secretStore";
+import { createKonamiListener } from "@/components/secrets/konami";
 import type { WindowKind } from "@/lib/types";
 
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
@@ -42,6 +47,8 @@ const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   contact: ContactApp,
   recycle: RecycleBinApp,
   personalize: PersonalizeApp,
+  vault: VaultApp,
+  release: ReleaseApp,
 };
 
 export default function Desktop() {
@@ -78,6 +85,19 @@ export default function Desktop() {
   // the saved look is applied after mount so the first render matches SSR
   useEffect(() => {
     usePersonalizeStore.getState().hydrate();
+    useSecretStore.getState().hydrate();
+  }, []);
+
+  // ↑ ↑ ↓ ↓ ← → ← → B A anywhere outside a text field reveals a hidden word
+  useEffect(() => {
+    const konami = createKonamiListener();
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.closest("input, textarea, select, [contenteditable=true]")) return;
+      if (konami(e.key)) useSecretStore.getState().find("konami");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   // A share link (#beat=…) opens straight into the Beat Maker with that
@@ -156,6 +176,7 @@ export default function Desktop() {
 
       {menu && <DesktopContextMenu x={menu.x} y={menu.y} onClose={closeMenu} onRefresh={refresh} />}
       {startOpen && <StartMenu onClose={closeStart} onRestart={restart} onLock={() => setLocked(true)} />}
+      <TrayBalloon />
       <Taskbar onStartClick={() => setStartOpen((v) => !v)} startOpen={startOpen} />
       {showScreensaver && <ScreensaverOverlay onDismiss={locked ? unlock : undefined} />}
     </main>

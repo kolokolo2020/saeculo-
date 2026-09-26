@@ -26,6 +26,13 @@ What's on the desktop:
 - **Right-click the desktop** for a context menu, including **Personalize**:
   six glass colors, four wallpapers, and a transparency toggle, saved in
   the browser.
+- **next_single.exe** — the countdown to the next release, as a download
+  dialog that's taking its time (also a sidebar gadget).
+- **The vault** — `vault.zip` sits in the Recycle Bin and can't be deleted.
+  It opens with three hidden words, one each from about.txt (white-on-white
+  text, revealed by selecting it), winning Beat Brawl, and the Konami code
+  (↑ ↑ ↓ ↓ ← → ← → B A, or typed out in Start Search on phones). Inside:
+  unreleased snippets and a note. Progress is saved in the browser.
 
 ## Getting started
 
@@ -46,7 +53,10 @@ Nothing in here is real yet — swap it out before launch:
   `scripts/generate-audio.mjs` — replace those files with your real
   instrumentals and update `src/data/tracks.ts` to match, keeping each
   track's `bpm` accurate so the games stay on the beat.
-- **Bio, socials, booking email**: `src/data/profile.ts`.
+- **Bio, socials, booking email, next release date**: `src/data/profile.ts`.
+- **Vault words, password and unreleased snippets**: `src/data/secrets.ts`.
+- **Link preview image**: generated from the profile by
+  `src/app/opengraph-image.tsx`.
 
 ## Project structure
 
