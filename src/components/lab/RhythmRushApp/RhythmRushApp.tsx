@@ -3,7 +3,7 @@
 import LaneStage from "@/components/games/LaneStage";
 import TrackPicker from "@/components/games/TrackPicker";
 import { LANE_KEYS } from "@/lib/laneEngine";
-import { rankFor, useRhythmGame } from "./useRhythmGame";
+import { DIFFICULTIES, rankFor, useRhythmGame, type Difficulty } from "./useRhythmGame";
 
 export default function RhythmRushApp() {
   const game = useRhythmGame();
@@ -41,6 +41,22 @@ export default function RhythmRushApp() {
             {result.newBest && <p className="mt-1 font-semibold text-[#9fffb0]">New personal best!</p>}
           </div>
         )}
+        <div className="flex overflow-hidden rounded-[4px] border border-black" role="group" aria-label="Difficulty">
+          {(Object.keys(DIFFICULTIES) as Difficulty[]).map((d) => (
+            <button
+              key={d}
+              onClick={() => game.chooseDifficulty(d)}
+              aria-pressed={game.difficulty === d}
+              className={`rounded-none! border-0! px-3.5 py-1 text-[12px] ${
+                game.difficulty === d
+                  ? "bg-gradient-to-b from-[#3d8ee8] to-[#0f3f86] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                  : "aero-btn-dark text-[#b7c7dc]"
+              }`}
+            >
+              {DIFFICULTIES[d].label}
+            </button>
+          ))}
+        </div>
         <TrackPicker id="rr-track" value={game.trackIndex} onChange={game.setTrackIndex} />
         <button onClick={game.start} className="aero-btn aero-btn-primary px-6 py-1.5 text-[13px]">
           {phase === "done" ? "Play again" : "Start"}

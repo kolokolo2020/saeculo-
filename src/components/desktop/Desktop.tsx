@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import BootScreen from "./BootScreen";
+import DesktopContextMenu from "./DesktopContextMenu";
 import DesktopIcon from "./DesktopIcon";
 import ScreensaverOverlay from "./ScreensaverOverlay";
 import Sidebar from "./Sidebar";
 import StartMenu from "./StartMenu";
 import Taskbar from "./Taskbar";
+import { usePersonalizeStore } from "./personalizeStore";
 import WindowFrame from "@/components/window-manager/WindowFrame";
 import { APPS } from "@/components/window-manager/windowRegistry";
 import { useWindowStore } from "@/components/window-manager/windowStore";
@@ -16,6 +18,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { PROFILE } from "@/data/profile";
+import { decodeBeat, setPendingBeat } from "@/lib/beatCode";
 import MediaPlayerApp from "@/components/apps/MediaPlayerApp";
 import AboutApp from "@/components/apps/AboutApp";
 import ContactApp from "@/components/apps/ContactApp";
@@ -25,6 +28,7 @@ import BeatMakerApp from "@/components/lab/BeatMakerApp/BeatMakerApp";
 import RhythmRushApp from "@/components/lab/RhythmRushApp/RhythmRushApp";
 import BeatBrawlApp from "@/components/apps/BeatBrawlApp/BeatBrawlApp";
 import PadRecallApp from "@/components/apps/PadRecallApp/PadRecallApp";
+import PersonalizeApp from "@/components/apps/PersonalizeApp";
 import type { WindowKind } from "@/lib/types";
 
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
@@ -37,6 +41,7 @@ const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   about: AboutApp,
   contact: ContactApp,
   recycle: RecycleBinApp,
+  personalize: PersonalizeApp,
 };
 
 export default function Desktop() {
@@ -44,6 +49,11 @@ export default function Desktop() {
   const [forceBoot, setForceBoot] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const glass = usePersonalizeStore((s) => s.glass);
+  const wallpaper = usePersonalizeStore((s) => s.wallpaper);
+  const transparency = usePersonalizeStore((s) => s.transparency);
   const windows = useWindowStore((s) => s.windows);
   const isMobile = useIsMobile();
   const reducedMotion = usePrefersReducedMotion();
@@ -62,9 +72,47 @@ export default function Desktop() {
     setForceBoot(true);
     setBooting(true);
   }, []);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+
+  // the saved look is applied after mount so the first render matches SSR
+  useEffect(() => {
+    usePersonalizeStore.getState().hydrate();
+  }, []);
+
+  // A share link (#beat=…) opens straight into the Beat Maker with that
+  // loop; the hash is then dropped so a refresh doesn't re-import it. A link
+  // pasted into a tab that already has the site open only changes the hash,
+  // so listen for that too.
+  useEffect(() => {
+    const importFromHash = () => {
+      const beat = decodeBeat(window.location.hash);
+      if (!beat) return;
+      setPendingBeat(beat);
+      useWindowStore.getState().openWindow("beatmaker");
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    };
+    importFromHash();
+    window.addEventListener("hashchange", importFromHash);
+    return () => window.removeEventListener("hashchange", importFromHash);
+  }, []);
+
+  // Right-click on the bare desktop (not on a window, gadget or the taskbar)
+  const onContextMenu = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("section, footer, aside, button, [role=menu], nav[aria-label='Start menu']")) return;
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY });
+  };
 
   return (
-    <main className="aero-wallpaper relative h-dvh w-full overflow-clip text-ink">
+    <main
+      data-glass={glass}
+      data-wall={wallpaper}
+      data-transparency={transparency ? "on" : "off"}
+      onContextMenu={onContextMenu}
+      className="aero-wallpaper relative h-dvh w-full overflow-clip text-ink"
+    >
       <AudioEngine />
       {booting && <BootScreen onDone={finishBoot} force={forceBoot} />}
 
@@ -85,8 +133,9 @@ export default function Desktop() {
 
       {/* desktop icons */}
       <nav
+        key={refreshKey}
         aria-label="Desktop"
-        className="absolute top-2 left-1 flex max-h-[calc(100%-56px)] flex-col flex-wrap content-start gap-1 max-md:right-1 max-md:flex-row"
+        className="aero-open absolute top-2 left-1 flex max-h-[calc(100%-56px)] flex-col flex-wrap content-start gap-1 max-md:right-1 max-md:flex-row"
       >
         {APPS.filter((a) => a.onDesktop).map((app) => (
           <DesktopIcon key={app.kind} app={app} />
@@ -105,6 +154,7 @@ export default function Desktop() {
         );
       })}
 
+      {menu && <DesktopContextMenu x={menu.x} y={menu.y} onClose={closeMenu} onRefresh={refresh} />}
       {startOpen && <StartMenu onClose={closeStart} onRestart={restart} onLock={() => setLocked(true)} />}
       <Taskbar onStartClick={() => setStartOpen((v) => !v)} startOpen={startOpen} />
       {showScreensaver && <ScreensaverOverlay onDismiss={locked ? unlock : undefined} />}

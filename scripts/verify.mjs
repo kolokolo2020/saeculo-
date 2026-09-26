@@ -2,6 +2,7 @@
 //   npm i --no-save playwright-core && npm run dev -- -p 3210
 //   node scripts/verify.mjs
 import { chromium } from "playwright-core";
+import { readFileSync } from "fs";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3210";
 const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
@@ -20,7 +21,8 @@ const browser = await chromium.launch({ executablePath: CHROME });
 const consoleErrors = [];
 
 try {
-  const context = await browser.newContext({ viewport: { width: 1366, height: 800 } });
+  const context = await browser.newContext({ viewport: { width: 1366, height: 800 }, acceptDownloads: true });
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(BASE).origin });
   const page = await context.newPage();
   page.on("console", (msg) => msg.type() === "error" && !isEnvNoise(msg.text()) && consoleErrors.push(msg.text()));
   page.on("pageerror", (err) => consoleErrors.push(String(err)));
@@ -119,18 +121,22 @@ try {
   check("start search + Enter launches Pad Recall", await pads.isVisible());
 
   // ---- Pad Recall: actually play round 1 ----
+  // Pads only flash for ~350ms, so record every light-up with a
+  // MutationObserver armed before Start instead of polling for it.
+  await page.evaluate(() => {
+    window.__litPads = [];
+    const btns = [...document.querySelectorAll('[aria-label="Drum pads"] button')];
+    const obs = new MutationObserver(() => {
+      btns.forEach((b, i) => {
+        const lit = b.style.background.includes("radial-gradient") && !b.style.background.includes("217, 65, 47");
+        if (lit && window.__litPads.at(-1) !== i) window.__litPads.push(i);
+      });
+    });
+    btns.forEach((b) => obs.observe(b, { attributes: true, attributeFilter: ["style"] }));
+  });
   await pads.getByRole("button", { name: "Start" }).click();
-  const litPad = await page.waitForFunction(
-    () => {
-      const btns = [...document.querySelectorAll('[aria-label="Drum pads"] button')];
-      const i = btns.findIndex((b) => b.style.background.includes("radial-gradient") && !b.style.background.includes("217, 65, 47"));
-      return i >= 0 ? i : false;
-    },
-    null,
-    { timeout: 3000 },
-  );
-  const padIndex = await litPad.jsonValue();
-  await pads.getByText("Your turn").waitFor({ timeout: 3000 });
+  await pads.getByText("Your turn").waitFor({ timeout: 4000 });
+  const padIndex = await page.evaluate(() => window.__litPads[0]);
   await page.keyboard.press(["q", "w", "e", "r", "a", "s", "d", "f"][padIndex]);
   await pads.getByText("ROUND 2").waitFor({ timeout: 3000 }).catch(() => {});
   check("Pad Recall: repeating the pattern advances to round 2", await pads.getByText("ROUND 2").isVisible());
@@ -147,7 +153,88 @@ try {
   await page.waitForTimeout(500);
   check("Beat Maker plays", await bm.getByRole("button", { name: "Stop sequencer" }).isVisible());
   await bm.getByRole("button", { name: "Stop sequencer" }).click();
+
+  await bm.getByRole("combobox", { name: "Load preset" }).selectOption("House");
+  await bm.getByRole("button", { name: "Copy share link" }).click();
+  const shareLink = await bm.getByRole("textbox", { name: "Share link" }).inputValue();
+  // House @124: kick 0/4/8/12 → 1111, snare 4/12 → 1010, hat 2/6/10/14 → 4444, bass → 4c4c
+  check("share link encodes the loop", shareLink.endsWith("#beat=124-1111101044444c4c"), shareLink);
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    bm.getByRole("button", { name: "Export loop as WAV" }).click(),
+  ]);
+  const wav = readFileSync(await download.path());
+  check(
+    "Export .wav downloads a real WAV file",
+    wav.toString("ascii", 0, 4) === "RIFF" && wav.toString("ascii", 8, 12) === "WAVE" && wav.length > 500_000,
+    `${download.suggestedFilename()} ${wav.length} bytes`,
+  );
   await close("Beat Maker");
+
+  const shared = await context.newPage();
+  await shared.goto(shareLink, { waitUntil: "networkidle" });
+  await shared.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
+  await shared.waitForTimeout(300);
+  const sharedBm = shared.getByRole("region", { name: "Beat Maker", exact: true });
+  check(
+    "opening a share link boots into the Beat Maker with that beat",
+    (await sharedBm.isVisible()) &&
+      (await sharedBm.getByText("124 bpm").count()) === 1 &&
+      (await sharedBm.getByLabel("bass step 4").getAttribute("aria-pressed")) === "true",
+  );
+  check("share hash is cleared after import", (await shared.evaluate(() => location.hash)) === "");
+  // a link pasted into a tab that already has the site open only changes the hash
+  await shared.evaluate(() => (location.hash = "#beat=90-0001000000000000"));
+  await shared.waitForTimeout(300);
+  check(
+    "pasting a share link into an open Beat Maker swaps in that beat",
+    (await sharedBm.getByText("90 bpm").count()) === 1 &&
+      (await sharedBm.getByLabel("kick step 1", { exact: true }).getAttribute("aria-pressed")) === "true" &&
+      (await sharedBm.getByLabel("bass step 4").getAttribute("aria-pressed")) === "false",
+  );
+  await shared.getByRole("button", { name: "Close Beat Maker" }).click();
+  await shared.waitForTimeout(300);
+  await shared.evaluate(() => (location.hash = "#beat=110-0000000100000000"));
+  await shared.waitForTimeout(400);
+  check(
+    "pasting a share link with the Beat Maker closed opens it with that beat",
+    (await sharedBm.isVisible()) &&
+      (await sharedBm.getByText("110 bpm").count()) === 1 &&
+      (await sharedBm.getByLabel("snare step 1", { exact: true }).getAttribute("aria-pressed")) === "true",
+  );
+  await shared.close();
+
+  // ---- right-click menu + Personalize ----
+  const root = page.locator("main");
+  await page.mouse.click(700, 420, { button: "right" });
+  check("right-click on the desktop opens a context menu", await page.getByRole("menu", { name: "Desktop menu" }).isVisible());
+  await page.getByRole("menuitem", { name: "Personalize" }).click();
+  await page.waitForTimeout(250);
+  await page.getByRole("button", { name: "Glass color Violet" }).click();
+  await page.getByRole("button", { name: "Background Dusk" }).click();
+  check(
+    "Personalize applies glass color and background live",
+    (await root.getAttribute("data-glass")) === "violet" && (await root.getAttribute("data-wall")) === "dusk",
+  );
+  const thumbBg = (label) =>
+    page.getByRole("button", { name: `Background ${label}` }).locator("span").first().evaluate((el) => getComputedStyle(el).backgroundImage);
+  check("wallpaper thumbnails preview their own background", (await thumbBg("Aurora")) !== (await thumbBg("Dusk")));
+  await page.getByRole("button", { name: "OK", exact: true }).click();
+
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("navigation", { name: "Start menu" }).getByRole("button", { name: "Personalize" }).first().click();
+  await page.getByRole("button", { name: "Glass color Rose" }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  check("Cancel restores the previous look", (await root.getAttribute("data-glass")) === "violet");
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
+  await page.waitForTimeout(300);
+  check(
+    "the chosen look survives a reload",
+    (await root.getAttribute("data-glass")) === "violet" && (await root.getAttribute("data-wall")) === "dusk",
+  );
 
   // ---- Games Explorer → Rhythm Rush ----
   await openFromDesktop("Games");
@@ -155,6 +242,9 @@ try {
   await page.getByRole("button", { name: "Play Rhythm Rush" }).click();
   await page.waitForTimeout(300);
   const rr = win("Rhythm Rush");
+  await rr.getByRole("button", { name: "Hard", exact: true }).click();
+  check("Rhythm Rush difficulty can be chosen", (await rr.getByRole("button", { name: "Hard", exact: true }).getAttribute("aria-pressed")) === "true");
+  await rr.getByRole("button", { name: "Normal", exact: true }).click();
   await rr.getByRole("button", { name: "Start" }).click();
   const sawGo = await rr
     .getByText("GO", { exact: true })

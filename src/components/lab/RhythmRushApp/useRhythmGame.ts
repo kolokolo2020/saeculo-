@@ -2,11 +2,18 @@
 
 import { useRef, useState } from "react";
 import { playBlip, playHat } from "@/lib/synth";
-import { readBest, submitBest } from "@/lib/bestScores";
+import { readBest, submitBest, type BestKey } from "@/lib/bestScores";
 import { TRACKS } from "@/data/tracks";
 import { useLaneGame } from "@/components/games/useLaneGame";
 
 export const RUN_LENGTH_S = 34;
+
+export type Difficulty = "easy" | "normal" | "hard";
+export const DIFFICULTIES: Record<Difficulty, { label: string; density: number; travel: number; best: BestKey }> = {
+  easy: { label: "Easy", density: 0.4, travel: 1.9, best: "rhythmEasy" },
+  normal: { label: "Normal", density: 0.62, travel: 1.5, best: "rhythm" },
+  hard: { label: "Hard", density: 0.88, travel: 1.12, best: "rhythmHard" },
+};
 
 export interface RunStats {
   perfect: number;
@@ -29,10 +36,11 @@ export function rankFor(stats: RunStats): string {
 // plus a combo bonus, a fixed-length run, and a rank from accuracy.
 export function useRhythmGame() {
   const [trackIndex, setTrackIndex] = useState(1);
+  const [difficulty, setDifficulty] = useState<Difficulty>("normal");
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [timeLeft, setTimeLeft] = useState(RUN_LENGTH_S);
-  const [best, setBest] = useState(() => readBest("rhythm"));
+  const [best, setBest] = useState(() => readBest(DIFFICULTIES.normal.best));
   const [result, setResult] = useState<{ stats: RunStats; maxCombo: number; newBest: boolean } | null>(null);
 
   const scoreRef = useRef(0);
@@ -46,7 +54,16 @@ export function useRhythmGame() {
     setCombo(0);
   };
 
+  const level = DIFFICULTIES[difficulty];
+
+  const chooseDifficulty = (d: Difficulty) => {
+    setDifficulty(d);
+    setBest(readBest(DIFFICULTIES[d].best));
+    setResult(null);
+  };
+
   const game = useLaneGame({
+    travel: () => level.travel,
     onHit: (judgement, _lane, ctx) => {
       statsRef.current[judgement] += 1;
       comboRef.current += 1;
@@ -70,8 +87,8 @@ export function useRhythmGame() {
       }
     },
     onEnd: () => {
-      const prevBest = readBest("rhythm");
-      setBest(submitBest("rhythm", scoreRef.current));
+      const prevBest = readBest(level.best);
+      setBest(submitBest(level.best, scoreRef.current));
       setResult({
         stats: { ...statsRef.current },
         maxCombo: maxComboRef.current,
@@ -90,8 +107,20 @@ export function useRhythmGame() {
     setCombo(0);
     setTimeLeft(RUN_LENGTH_S);
     setResult(null);
-    void game.start(TRACKS[trackIndex], RUN_LENGTH_S, 0.62);
+    void game.start(TRACKS[trackIndex], RUN_LENGTH_S, level.density);
   };
 
-  return { ...game, trackIndex, setTrackIndex, score, combo, timeLeft, best, result, start };
+  return {
+    ...game,
+    trackIndex,
+    setTrackIndex,
+    difficulty,
+    chooseDifficulty,
+    score,
+    combo,
+    timeLeft,
+    best,
+    result,
+    start,
+  };
 }

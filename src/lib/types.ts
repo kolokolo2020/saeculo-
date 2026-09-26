@@ -7,7 +7,8 @@ export type WindowKind =
   | "pads"
   | "about"
   | "contact"
-  | "recycle";
+  | "recycle"
+  | "personalize";
 
 export interface WindowState {
   kind: WindowKind;

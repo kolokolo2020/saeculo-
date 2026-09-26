@@ -107,6 +107,16 @@ export const APPS: AppMeta[] = [
     onDesktop: true,
     defaultSize: { width: 460, height: 340 },
   },
+  {
+    kind: "personalize",
+    title: "Personalize",
+    label: "Personalize",
+    description: "Glass color & desktop background",
+    category: "system",
+    surface: "light",
+    onDesktop: false,
+    defaultSize: { width: 500, height: 470 },
+  },
 ];
 
 export const APP_BY_KIND = Object.fromEntries(APPS.map((a) => [a.kind, a])) as Record<

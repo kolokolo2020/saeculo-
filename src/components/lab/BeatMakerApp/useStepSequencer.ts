@@ -3,9 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playBass, playHat, playKick, playSnare } from "@/lib/synth";
 import { usePlayerStore } from "@/components/player/playerStore";
+import {
+  bassFreqForStep,
+  peekPendingBeat,
+  renderBeatWav,
+  setPendingBeat,
+  shareUrl,
+  subscribePendingBeat,
+  type BeatLane,
+} from "@/lib/beatCode";
 
 export const STEP_COUNT = 16;
-export type Lane = "kick" | "snare" | "hat" | "bass";
+export type Lane = BeatLane;
 export const LANES: Lane[] = ["kick", "snare", "hat", "bass"];
 
 const LOOKAHEAD_MS = 25;
@@ -62,10 +71,27 @@ export const PRESETS: Record<string, { bpm: number; pattern: Record<Lane, boolea
 };
 
 export function useStepSequencer() {
-  const [pattern, setPattern] = useState(DEFAULT_PATTERN);
-  const [bpm, setBpm] = useState(100);
+  // a beat arriving from a share link (#beat=…) seeds the grid
+  const [pattern, setPattern] = useState(() => peekPendingBeat()?.pattern ?? DEFAULT_PATTERN);
+  const [bpm, setBpm] = useState(() => peekPendingBeat()?.bpm ?? 100);
   const [playing, setPlaying] = useState(false);
   const [displayStep, setDisplayStep] = useState(-1);
+  const [exporting, setExporting] = useState(false);
+  const [shareStatus, setShareStatus] = useState<{ state: "copied" | "manual"; url: string } | null>(null);
+  const [exportFailed, setExportFailed] = useState(false);
+
+  // the initializers above took any pending beat; later links (pasted into a
+  // tab where the Beat Maker is already open) arrive through the subscription
+  useEffect(() => {
+    setPendingBeat(null);
+    return subscribePendingBeat(() => {
+      const beat = peekPendingBeat();
+      if (!beat) return;
+      setPendingBeat(null);
+      setPattern(beat.pattern);
+      setBpm(beat.bpm);
+    });
+  }, []);
 
   const ctxRef = useRef<AudioContext | null>(null);
   const patternRef = useRef(pattern);
@@ -98,7 +124,7 @@ export function useStepSequencer() {
     if (p.kick[step]) playKick(ctx, ctx.destination, time);
     if (p.snare[step]) playSnare(ctx, ctx.destination, time);
     if (p.hat[step]) playHat(ctx, ctx.destination, time);
-    if (p.bass[step]) playBass(ctx, ctx.destination, time, step % 8 < 4 ? 55 : 73.4);
+    if (p.bass[step]) playBass(ctx, ctx.destination, time, bassFreqForStep(step));
     scheduledRef.current.push({ step, time });
   }, []);
 
@@ -173,6 +199,36 @@ export function useStepSequencer() {
     });
   }, []);
 
+  const exportWav = useCallback(async () => {
+    setExporting(true);
+    setExportFailed(false);
+    try {
+      const blob = await renderBeatWav({ bpm: bpmRef.current, pattern: patternRef.current });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `saeculo-beatmaker-${Math.round(bpmRef.current)}bpm.wav`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch {
+      // offline rendering unsupported or out of memory
+      setExportFailed(true);
+    } finally {
+      setExporting(false);
+    }
+  }, []);
+
+  const share = useCallback(async () => {
+    const url = shareUrl({ bpm: bpmRef.current, pattern: patternRef.current });
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareStatus({ state: "copied", url });
+    } catch {
+      // clipboard blocked — show the link so it can be copied by hand
+      setShareStatus({ state: "manual", url });
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -181,5 +237,23 @@ export function useStepSequencer() {
     };
   }, []);
 
-  return { pattern, toggleStep, bpm, setBpm, playing, play, stop, clear, loadPreset, randomize, displayStep };
+  return {
+    pattern,
+    toggleStep,
+    bpm,
+    setBpm,
+    playing,
+    play,
+    stop,
+    clear,
+    loadPreset,
+    randomize,
+    displayStep,
+    exportWav,
+    exporting,
+    exportFailed,
+    share,
+    shareStatus,
+    dismissShare: () => setShareStatus(null),
+  };
 }

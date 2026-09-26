@@ -11,7 +11,11 @@ import type { WindowKind } from "@/lib/types";
 function bestLine(kind: WindowKind): string {
   if (kind === "rhythm") {
     const b = readBest("rhythm");
-    return b ? `Best score: ${b.toLocaleString()}` : "No runs yet";
+    const hard = readBest("rhythmHard");
+    if (!b && !hard) return "No runs yet";
+    return [b && `Best (Normal): ${b.toLocaleString()}`, hard && `Hard: ${hard.toLocaleString()}`]
+      .filter(Boolean)
+      .join(" · ");
   }
   if (kind === "brawl") {
     const b = readBest("brawl");

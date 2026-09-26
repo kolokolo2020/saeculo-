@@ -222,6 +222,26 @@ export default function AppIcon({ kind, size = 48 }: { kind: WindowKind; size?: 
         </>
       );
       break;
+    case "personalize":
+      body = (
+        <>
+          <defs>
+            <linearGradient id={`${id}-screen`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#6fb0f0" />
+              <stop offset="0.35" stopColor="#4cc4bd" />
+              <stop offset="0.65" stopColor="#9a86e8" />
+              <stop offset="1" stopColor="#ea8fb4" />
+            </linearGradient>
+            {gloss}
+          </defs>
+          <rect x="4" y="7" width="40" height="28" rx="3" fill="#1d2430" stroke="#000" />
+          <rect x="7" y="10" width="34" height="22" rx="1.5" fill={u("screen")} />
+          <rect x="7" y="10" width="34" height="9" rx="1.5" fill={u("gloss")} opacity="0.5" />
+          <path d="M19 35h10l2 6H17z" fill="#4a5566" stroke="#1d2430" strokeWidth="0.8" />
+          <rect x="13" y="40.5" width="22" height="3" rx="1.5" fill="#6b7686" stroke="#1d2430" strokeWidth="0.8" />
+        </>
+      );
+      break;
   }
 
   return (
