@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LaneEngine, LANE_KEYS, generateLaneNotes, type Judgement } from "@/lib/laneEngine";
 import { loadBuffer, startLoop } from "@/lib/backingTrack";
+import { gridTempo } from "@/data/tracks";
 import { usePlayerStore } from "@/components/player/playerStore";
 import type { Track } from "@/lib/types";
 
@@ -120,9 +121,10 @@ export function useLaneGame(handlers: LaneGameHandlers) {
       buffer = null; // play silently rather than not at all
     }
     const startAt = ctx.currentTime + 0.15;
-    if (buffer) backingRef.current = startLoop(ctx, buffer, startAt, 0.55);
+    const tempo = gridTempo(track);
+    if (buffer) backingRef.current = startLoop(ctx, buffer, startAt, 0.55, { bpm: tempo, offset: track.beatOffset ?? 0 });
     const engine = engineRef.current ?? new LaneEngine();
-    engine.begin(ctx, startAt, track.bpm, generateLaneNotes(track.bpm, lengthS, density), lengthS + 0.6);
+    engine.begin(ctx, startAt, tempo, generateLaneNotes(tempo, lengthS, density), lengthS + 0.6);
     engineRef.current = engine;
     runningRef.current = true;
     setPhase("running");

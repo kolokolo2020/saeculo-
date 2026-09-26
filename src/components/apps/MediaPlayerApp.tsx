@@ -62,11 +62,23 @@ export default function MediaPlayerApp() {
         {tab === "now" ? (
           <div className="relative h-full">
             <Visualizer mode={vizMode} playing={playing} reducedMotion={reducedMotion} className="h-full" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-4 pt-10 pb-3">
-              <p className="text-lg font-semibold text-white drop-shadow">{track.title}</p>
-              <p className="text-[13px] text-[#9fc3ea]">
-                saeculo · {track.mood} · {track.bpm} bpm
-              </p>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end gap-3 bg-gradient-to-t from-black/85 to-transparent px-4 pt-10 pb-3">
+              {track.cover && (
+                // eslint-disable-next-line @next/next/no-img-element -- a small local cover; no optimizer needed
+                <img
+                  src={track.cover}
+                  alt={`${track.title} cover art`}
+                  width={72}
+                  height={72}
+                  className="h-[72px] w-[72px] shrink-0 rounded-[3px] border border-white/30 shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+                />
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-lg font-semibold text-white drop-shadow">{track.title}</p>
+                <p className="text-[13px] text-[#9fc3ea]">
+                  saeculo · {track.mood} · {track.bpm} bpm
+                </p>
+              </div>
             </div>
             <button
               onClick={() => setVizIndex((i) => (i + 1) % VIZ_MODES.length)}
@@ -81,7 +93,7 @@ export default function MediaPlayerApp() {
             <li className="grid grid-cols-[2rem_1fr_6rem_3.5rem] px-2 pb-1 text-[11px] text-[#7f93ad]">
               <span>#</span>
               <span>Title</span>
-              <span>Genre</span>
+              <span>Key</span>
               <span className="text-right">BPM</span>
             </li>
             {TRACKS.map((t, i) => {
@@ -95,8 +107,14 @@ export default function MediaPlayerApp() {
                     }`}
                   >
                     <span className="text-[#8fb4e0]">{isCurrent && playing ? <Glyph name="play" size={11} /> : i + 1}</span>
-                    <span className="truncate">{t.title}</span>
-                    <span className="truncate text-[#9fb2c9]">{t.mood.split(" / ")[0]}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      {t.cover && (
+                        // eslint-disable-next-line @next/next/no-img-element -- tiny local thumbnail
+                        <img src={t.cover} alt="" width={24} height={24} className="h-6 w-6 shrink-0 rounded-[2px]" />
+                      )}
+                      <span className="truncate">{t.title}</span>
+                    </span>
+                    <span className="truncate text-[#9fb2c9]">{t.mood}</span>
                     <span className="text-right text-[#9fb2c9]">{t.bpm}</span>
                   </button>
                   {isCurrent && (

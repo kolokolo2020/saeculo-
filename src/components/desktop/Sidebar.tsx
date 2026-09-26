@@ -85,14 +85,22 @@ function NowPlayingGadget() {
       <div className="overflow-hidden rounded-[4px] border border-black/60 bg-[#03070f]">
         <Visualizer mode="bars" playing={playing} reducedMotion={reducedMotion} className="h-12" />
       </div>
-      <button
-        onClick={() => openWindow("player")}
-        className="mt-1.5 block w-full truncate text-left text-[12px] font-semibold text-white hover:underline"
-        title="Open Media Player"
-      >
-        {track.title}
-      </button>
-      <p className="truncate text-[10.5px] text-white/70">{track.mood}</p>
+      <div className="mt-1.5 flex items-center gap-2">
+        {track.cover && (
+          // eslint-disable-next-line @next/next/no-img-element -- tiny local thumbnail
+          <img src={track.cover} alt="" width={30} height={30} className="h-[30px] w-[30px] shrink-0 rounded-[2px] border border-white/25" />
+        )}
+        <div className="min-w-0 flex-1">
+          <button
+            onClick={() => openWindow("player")}
+            className="block w-full truncate text-left text-[12px] font-semibold text-white hover:underline"
+            title="Open Media Player"
+          >
+            {track.title}
+          </button>
+          <p className="truncate text-[10.5px] text-white/70">{track.mood}</p>
+        </div>
+      </div>
       <div className="mt-1.5 flex items-center justify-center gap-1.5">
         <button onClick={prev} aria-label="Gadget previous track" className="aero-btn-dark grid h-6 w-7 place-items-center">
           <Glyph name="prev" size={11} />
