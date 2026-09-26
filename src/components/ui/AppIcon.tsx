@@ -242,6 +242,49 @@ export default function AppIcon({ kind, size = 48 }: { kind: WindowKind; size?: 
         </>
       );
       break;
+    case "vault":
+      body = (
+        <>
+          <defs>
+            <linearGradient id={`${id}-folder`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#ffe9a6" />
+              <stop offset="1" stopColor="#e3a92b" />
+            </linearGradient>
+          </defs>
+          <path d="M4 12a2 2 0 0 1 2-2h11l4 4h21a2 2 0 0 1 2 2v24a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill={u("folder")} stroke="#a5740f" strokeWidth="1" />
+          <path d="M4 18h40" stroke="#fff3c9" strokeWidth="1" opacity="0.8" />
+          {/* the zipper */}
+          <rect x="21" y="14" width="6" height="28" fill="#6b7686" />
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <rect key={i} x={i % 2 ? 24 : 21} y={15 + i * 4} width="3" height="2.4" fill="#d9dee5" />
+          ))}
+          <rect x="19.5" y="37" width="9" height="7" rx="1.5" fill="#f2c64a" stroke="#8a5a06" strokeWidth="0.8" />
+          <circle cx="24" cy="40.5" r="1.1" fill="#6b4504" />
+        </>
+      );
+      break;
+    case "release":
+      body = (
+        <>
+          <defs>
+            <linearGradient id={`${id}-page`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#ffffff" />
+              <stop offset="1" stopColor="#d7e3f1" />
+            </linearGradient>
+            <linearGradient id={`${id}-arrow`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#b8f0a7" />
+              <stop offset="0.5" stopColor="#3fbf3f" />
+              <stop offset="1" stopColor="#157a15" />
+            </linearGradient>
+          </defs>
+          <path d="M10 5h19l9 9v29H10z" fill={u("page")} stroke="#6b829e" strokeWidth="1" strokeLinejoin="round" />
+          <path d="M29 5v9h9" fill="#e8eff8" stroke="#6b829e" strokeWidth="1" strokeLinejoin="round" />
+          <rect x="14" y="36" width="20" height="4" rx="1" fill="#cfcfcf" stroke="#8d8d8d" strokeWidth="0.6" />
+          <rect x="14.4" y="36.4" width="12" height="3.2" rx="0.6" fill="#4fcf4f" />
+          <path d="M20 12h8v9h5l-9 10-9-10h5z" fill={u("arrow")} stroke="#0f5e0f" strokeWidth="0.9" strokeLinejoin="round" />
+        </>
+      );
+      break;
   }
 
   return (

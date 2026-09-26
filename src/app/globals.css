@@ -207,6 +207,17 @@
   }
 }
 
+@keyframes vault-shake {
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+
 /* Custom component classes live in this layer so Tailwind utilities (the
    later `utilities` layer) can still override them per element. */
 @layer components {

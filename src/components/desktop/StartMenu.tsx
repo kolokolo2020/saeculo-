@@ -7,6 +7,8 @@ import AppIcon from "@/components/ui/AppIcon";
 import Glyph from "@/components/ui/Glyph";
 import StartMark from "@/components/ui/StartMark";
 import { PROFILE } from "@/data/profile";
+import { isKonamiPhrase } from "@/components/secrets/konami";
+import { useSecretStore } from "@/components/secrets/secretStore";
 import type { WindowKind } from "@/lib/types";
 
 const PINNED: WindowKind[] = ["player", "beatmaker"];
@@ -19,6 +21,8 @@ const RIGHT_LINKS: { label: string; kind: WindowKind }[] = [
   { label: "Recycle Bin", kind: "recycle" },
   { label: "Personalize", kind: "personalize" },
 ];
+
+const LISTED = APPS.filter((a) => !a.hidden);
 
 function matches(app: AppMeta, query: string) {
   const q = query.trim().toLowerCase();
@@ -80,10 +84,10 @@ export default function StartMenu({
     onClose();
   };
 
-  const results = useMemo(() => APPS.filter((a) => matches(a, query)), [query]);
+  const results = useMemo(() => LISTED.filter((a) => matches(a, query)), [query]);
   const searching = query.trim().length > 0;
-  const pinned = APPS.filter((a) => PINNED.includes(a.kind));
-  const rest = APPS.filter((a) => !PINNED.includes(a.kind));
+  const pinned = LISTED.filter((a) => PINNED.includes(a.kind));
+  const rest = LISTED.filter((a) => !PINNED.includes(a.kind));
 
   return (
     <>
@@ -99,7 +103,9 @@ export default function StartMenu({
               results.length ? (
                 results.map((app) => <Item key={app.kind} app={app} onLaunch={launch} />)
               ) : (
-                <li className="px-2 py-3 text-[12px] text-mute">No items match your search.</li>
+                <li className="px-2 py-3 text-[12px] text-mute">
+                  {/vault/i.test(query) ? "C:\\saeculo\\vault is not accessible. Access is denied." : "No items match your search."}
+                </li>
               )
             ) : (
               <>
@@ -118,7 +124,15 @@ export default function StartMenu({
               <input
                 ref={searchRef}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  // the cheat code works typed out here too, for phones
+                  if (isKonamiPhrase(e.target.value)) {
+                    useSecretStore.getState().find("konami");
+                    onClose();
+                    return;
+                  }
+                  setQuery(e.target.value);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && results[0]) launch(results[0].kind);
                 }}

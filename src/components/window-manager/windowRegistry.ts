@@ -13,6 +13,8 @@ export interface AppMeta {
   /** Light Explorer/Notepad client area, or the glossy dark media body. */
   surface: "light" | "dark";
   onDesktop: boolean;
+  /** Left out of the start menu and its search — found, not listed. */
+  hidden?: boolean;
   defaultSize: { width: number; height: number };
 }
 
@@ -116,6 +118,27 @@ export const APPS: AppMeta[] = [
     surface: "light",
     onDesktop: false,
     defaultSize: { width: 500, height: 470 },
+  },
+  {
+    kind: "release",
+    title: "Downloading next_single.exe",
+    label: "next_single.exe",
+    description: "Countdown to the next release",
+    category: "app",
+    surface: "light",
+    onDesktop: true,
+    defaultSize: { width: 420, height: 270 },
+  },
+  {
+    kind: "vault",
+    title: "vault.zip",
+    label: "vault.zip",
+    description: "Password protected",
+    category: "system",
+    surface: "light",
+    onDesktop: false,
+    hidden: true,
+    defaultSize: { width: 460, height: 420 },
   },
 ];
 
