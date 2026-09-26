@@ -17,6 +17,7 @@ const RIGHT_LINKS: { label: string; kind: WindowKind }[] = [
   { label: "About", kind: "about" },
   { label: "Contact", kind: "contact" },
   { label: "Recycle Bin", kind: "recycle" },
+  { label: "Personalize", kind: "personalize" },
 ];
 
 function matches(app: AppMeta, query: string) {

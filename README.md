@@ -12,15 +12,20 @@ What's on the desktop:
   playing when the window closes; the sidebar Now Playing gadget and the
   taskbar tray control it too.
 - **Beat Maker** — a 16-step drum sequencer with genre presets and a
-  randomizer; every sound is synthesized live.
+  randomizer; every sound is synthesized live. **Share link** copies a URL
+  that opens the site with that exact loop loaded (`#beat=<bpm>-<hex>`),
+  and **Export .wav** renders 4 bars offline and downloads them.
 - **Games** — a games folder with three rhythm games:
   - **Rhythm Rush** — the chosen beat plays and notes fall on its grid;
-    hit D / F / J / K. Ranked S–D on accuracy.
+    hit D / F / J / K. Easy / Normal / Hard, ranked S–D on accuracy.
   - **Beat Brawl** — a boss fight against a metronome that speeds up.
   - **Pad Recall** — Simon on an MPC: repeat the pad pattern
     (Q W E R / A S D F).
 - **about.txt** (Notepad), **Contact** (a compose-mail form that opens the
   visitor's mail app), and a **Recycle Bin** of beats that didn't make it.
+- **Right-click the desktop** for a context menu, including **Personalize**:
+  six glass colors, four wallpapers, and a transparency toggle, saved in
+  the browser.
 
 ## Getting started
 
@@ -63,7 +68,10 @@ Nothing in here is real yet — swap it out before launch:
   some platforms), and the start-orb mark.
 - `src/lib/synth.ts` — real-time drum synthesis used by the Beat Maker and
   game sound effects.
-- `scripts/verify.mjs` — a Playwright smoke test (37 checks: windows,
+- `src/lib/beatCode.ts` — share-link encoding and the offline WAV render.
+- `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
+  variables it switches live at the top of `globals.css`.
+- `scripts/verify.mjs` — a Playwright smoke test (47 checks: windows,
   global audio, gadgets, every game actually played, lock/restart, idle
   screensaver, mobile). Not part of the build — run it against a dev
   server on port 3210 after `npm i --no-save playwright-core`.

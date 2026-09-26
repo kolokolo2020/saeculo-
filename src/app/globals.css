@@ -46,6 +46,81 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* personalization: glass colour + wallpaper, switched by data-attrs   */
+/* on the desktop root (see personalizeStore.ts)                       */
+/* ------------------------------------------------------------------ */
+
+/* The defaults are also bound to their own attribute values, so a nested
+   element (e.g. a wallpaper thumbnail in Personalize) can opt back into
+   Aurora/Sky even when the desktop around it is set to something else. */
+:root,
+[data-glass="sky"] {
+  --glass-hi: 186 220 255;
+  --glass-mid: 120 170 230;
+  --glass-lo: 96 150 220;
+}
+
+:root,
+[data-wall="aurora"] {
+  --wall:
+    radial-gradient(ellipse 80% 60% at 70% 110%, rgba(56, 160, 255, 0.55), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 15% -10%, rgba(40, 110, 220, 0.5), transparent 70%),
+    linear-gradient(160deg, #031633 0%, #06306b 45%, #0a4a8f 70%, #042455 100%);
+  --ribbon-a: linear-gradient(90deg, transparent, rgba(90, 255, 190, 0.45) 30%, rgba(80, 200, 255, 0.55) 60%, transparent);
+  --ribbon-b: linear-gradient(90deg, transparent, rgba(120, 190, 255, 0.35) 35%, rgba(150, 255, 220, 0.3) 65%, transparent);
+}
+
+[data-glass="teal"] {
+  --glass-hi: 190 245 240;
+  --glass-mid: 100 200 196;
+  --glass-lo: 70 170 170;
+}
+[data-glass="leaf"] {
+  --glass-hi: 212 245 196;
+  --glass-mid: 132 200 110;
+  --glass-lo: 96 170 80;
+}
+[data-glass="violet"] {
+  --glass-hi: 222 214 255;
+  --glass-mid: 160 145 230;
+  --glass-lo: 128 110 210;
+}
+[data-glass="rose"] {
+  --glass-hi: 255 220 232;
+  --glass-mid: 232 150 184;
+  --glass-lo: 210 110 150;
+}
+[data-glass="graphite"] {
+  --glass-hi: 222 226 232;
+  --glass-mid: 150 158 170;
+  --glass-lo: 110 120 135;
+}
+
+[data-wall="harmony"] {
+  --wall:
+    radial-gradient(ellipse 80% 60% at 70% 110%, rgba(70, 230, 180, 0.5), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 15% -10%, rgba(30, 160, 170, 0.5), transparent 70%),
+    linear-gradient(160deg, #02262a 0%, #064a4c 45%, #0b7466 70%, #033633 100%);
+  --ribbon-a: linear-gradient(90deg, transparent, rgba(200, 255, 150, 0.4) 30%, rgba(90, 240, 200, 0.5) 60%, transparent);
+  --ribbon-b: linear-gradient(90deg, transparent, rgba(120, 255, 210, 0.35) 35%, rgba(230, 255, 170, 0.28) 65%, transparent);
+}
+[data-wall="dusk"] {
+  --wall:
+    radial-gradient(ellipse 90% 60% at 60% 115%, rgba(255, 150, 80, 0.6), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 15% -10%, rgba(120, 60, 200, 0.55), transparent 70%),
+    linear-gradient(165deg, #150a33 0%, #3d1766 40%, #86306f 72%, #c85a5a 100%);
+  --ribbon-a: linear-gradient(90deg, transparent, rgba(255, 170, 210, 0.4) 30%, rgba(255, 200, 120, 0.45) 60%, transparent);
+  --ribbon-b: linear-gradient(90deg, transparent, rgba(190, 140, 255, 0.35) 35%, rgba(255, 150, 190, 0.3) 65%, transparent);
+}
+[data-wall="midnight"] {
+  --wall:
+    radial-gradient(ellipse 70% 50% at 75% 110%, rgba(40, 90, 200, 0.35), transparent 70%),
+    linear-gradient(160deg, #01030a 0%, #050c1c 50%, #0a1834 100%);
+  --ribbon-a: linear-gradient(90deg, transparent, rgba(60, 140, 255, 0.22) 30%, rgba(90, 200, 255, 0.25) 60%, transparent);
+  --ribbon-b: linear-gradient(90deg, transparent, rgba(80, 120, 255, 0.18) 35%, rgba(120, 220, 255, 0.15) 65%, transparent);
+}
+
+/* ------------------------------------------------------------------ */
 /* keyframes                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -140,10 +215,8 @@
   /* Deep night blue with two drifting ribbons of green/cyan light — the
      Vista "aurora" mood, painted entirely in CSS. */
   .aero-wallpaper {
-    background:
-      radial-gradient(ellipse 80% 60% at 70% 110%, rgba(56, 160, 255, 0.55), transparent 70%),
-      radial-gradient(ellipse 60% 45% at 15% -10%, rgba(40, 110, 220, 0.5), transparent 70%),
-      linear-gradient(160deg, #031633 0%, #06306b 45%, #0a4a8f 70%, #042455 100%);
+    background: var(--wall);
+    transition: background 400ms;
   }
   .aero-ribbon {
     position: absolute;
@@ -154,24 +227,12 @@
   }
   .aero-ribbon-a {
     inset: 18% -20% 38% -10%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(90, 255, 190, 0.45) 30%,
-      rgba(80, 200, 255, 0.55) 60%,
-      transparent
-    );
+    background: var(--ribbon-a);
     animation: aurora-drift 26s ease-in-out infinite;
   }
   .aero-ribbon-b {
     inset: 46% -10% 18% -25%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(120, 190, 255, 0.35) 35%,
-      rgba(150, 255, 220, 0.3) 65%,
-      transparent
-    );
+    background: var(--ribbon-b);
     animation: aurora-drift-alt 34s ease-in-out infinite;
   }
   @media (prefers-reduced-motion: reduce) {
@@ -186,9 +247,9 @@
   .aero-glass {
     background: linear-gradient(
       to bottom,
-      rgba(186, 220, 255, 0.62) 0%,
-      rgba(120, 170, 230, 0.5) 40px,
-      rgba(96, 150, 220, 0.46) 100%
+      rgb(var(--glass-hi) / 0.62) 0%,
+      rgb(var(--glass-mid) / 0.5) 40px,
+      rgb(var(--glass-lo) / 0.46) 100%
     );
     -webkit-backdrop-filter: blur(14px) saturate(160%);
     backdrop-filter: blur(14px) saturate(160%);
@@ -586,6 +647,28 @@
   .pad-flash {
     animation: pad-flash 260ms ease-out;
   }
+}
+
+/* "Enable transparency" unchecked: opaque glass, no backdrop blur. */
+[data-transparency="off"] .aero-glass,
+[data-transparency="off"] .aero-glass-inactive {
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--glass-hi)) 0%,
+    rgb(var(--glass-mid)) 40px,
+    rgb(var(--glass-lo)) 100%
+  );
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-transparency="off"] .aero-glass-inactive {
+  filter: saturate(0.35) brightness(1.08);
+}
+[data-transparency="off"] .aero-taskbar,
+[data-transparency="off"] .aero-start {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: #0b0f16;
 }
 
 /* Vista-ish scrollbars: pale track, glossy rounded thumb */

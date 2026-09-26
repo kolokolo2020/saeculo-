@@ -1,11 +1,11 @@
-// Tiny real-time drum synthesizer shared by BeatMaker and RhythmRush.
+// Tiny drum synthesizer shared by the Beat Maker and the games. Takes any
+// BaseAudioContext, so the same voices render live or offline (WAV export).
 // Same synthesis approach as scripts/generate-audio.mjs (sine sweeps +
-// filtered noise bursts) but driven live through Web Audio nodes instead of
-// rendered to a buffer offline.
+// filtered noise bursts), built from Web Audio nodes.
 
 let noiseBuffer: AudioBuffer | null = null;
 
-function getNoiseBuffer(ctx: AudioContext): AudioBuffer {
+function getNoiseBuffer(ctx: BaseAudioContext): AudioBuffer {
   if (noiseBuffer && noiseBuffer.sampleRate === ctx.sampleRate) return noiseBuffer;
   const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
   const data = buf.getChannelData(0);
@@ -14,7 +14,7 @@ function getNoiseBuffer(ctx: AudioContext): AudioBuffer {
   return buf;
 }
 
-export function playKick(ctx: AudioContext, dest: AudioNode, time: number, gain = 0.9) {
+export function playKick(ctx: BaseAudioContext, dest: AudioNode, time: number, gain = 0.9) {
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
   osc.type = "sine";
@@ -27,7 +27,7 @@ export function playKick(ctx: AudioContext, dest: AudioNode, time: number, gain 
   osc.stop(time + 0.3);
 }
 
-export function playSnare(ctx: AudioContext, dest: AudioNode, time: number, gain = 0.5) {
+export function playSnare(ctx: BaseAudioContext, dest: AudioNode, time: number, gain = 0.5) {
   const noise = ctx.createBufferSource();
   noise.buffer = getNoiseBuffer(ctx);
   const filter = ctx.createBiquadFilter();
@@ -51,7 +51,7 @@ export function playSnare(ctx: AudioContext, dest: AudioNode, time: number, gain
   osc.stop(time + 0.11);
 }
 
-export function playHat(ctx: AudioContext, dest: AudioNode, time: number, gain = 0.25) {
+export function playHat(ctx: BaseAudioContext, dest: AudioNode, time: number, gain = 0.25) {
   const noise = ctx.createBufferSource();
   noise.buffer = getNoiseBuffer(ctx);
   const filter = ctx.createBiquadFilter();
@@ -65,7 +65,7 @@ export function playHat(ctx: AudioContext, dest: AudioNode, time: number, gain =
   noise.stop(time + 0.05);
 }
 
-export function playBass(ctx: AudioContext, dest: AudioNode, time: number, freq = 55, gain = 0.4) {
+export function playBass(ctx: BaseAudioContext, dest: AudioNode, time: number, freq = 55, gain = 0.4) {
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
   osc.type = "triangle";
@@ -78,7 +78,7 @@ export function playBass(ctx: AudioContext, dest: AudioNode, time: number, freq 
   osc.stop(time + 0.36);
 }
 
-export function playBlip(ctx: AudioContext, dest: AudioNode, time: number, freq = 880, gain = 0.3) {
+export function playBlip(ctx: BaseAudioContext, dest: AudioNode, time: number, freq = 880, gain = 0.3) {
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
   osc.type = "square";

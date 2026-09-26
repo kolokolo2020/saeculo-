@@ -2,7 +2,10 @@
 // Games Explorer's "best" column. Storage can be missing (private mode,
 // blocked cookies) — reads fall back to 0 and writes fail silently.
 export const BEST_KEYS = {
+  // "rhythm" is Normal difficulty — the original key, so old bests carry over
   rhythm: "saeculo-rhythm-highscore",
+  rhythmEasy: "saeculo-rhythm-easy-best",
+  rhythmHard: "saeculo-rhythm-hard-best",
   brawl: "saeculo-brawl-best",
   pads: "saeculo-pads-best",
 } as const;

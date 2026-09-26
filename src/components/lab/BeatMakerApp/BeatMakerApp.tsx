@@ -13,8 +13,24 @@ const LANE_COLOR: Record<Lane, [string, string]> = {
 };
 
 export default function BeatMakerApp() {
-  const { pattern, toggleStep, bpm, setBpm, playing, play, stop, clear, loadPreset, randomize, displayStep } =
-    useStepSequencer();
+  const {
+    pattern,
+    toggleStep,
+    bpm,
+    setBpm,
+    playing,
+    play,
+    stop,
+    clear,
+    loadPreset,
+    randomize,
+    displayStep,
+    exportWav,
+    exporting,
+    share,
+    shareStatus,
+    dismissShare,
+  } = useStepSequencer();
   const [preset, setPreset] = useState("");
 
   return (
@@ -53,6 +69,17 @@ export default function BeatMakerApp() {
             ))}
           </select>
         </label>
+        <button onClick={share} aria-label="Copy share link" className="aero-btn-dark px-3 py-1.5 text-[12px]">
+          Share link
+        </button>
+        <button
+          onClick={() => void exportWav()}
+          disabled={exporting}
+          aria-label="Export loop as WAV"
+          className="aero-btn-dark px-3 py-1.5 text-[12px]"
+        >
+          {exporting ? "Rendering…" : "Export .wav"}
+        </button>
         <div className="ml-auto flex items-center gap-2">
           <span className="w-16 rounded-[3px] border border-black bg-[#03070f] px-1.5 py-0.5 text-right font-mono text-[13px] text-[#7fe0ff] shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)]">
             {bpm} bpm
@@ -69,6 +96,27 @@ export default function BeatMakerApp() {
           />
         </div>
       </div>
+
+      {shareStatus && (
+        <div
+          role="status"
+          className="flex shrink-0 items-center gap-2 border-b border-black/60 bg-[linear-gradient(to_bottom,rgba(90,170,255,0.25),rgba(30,90,190,0.15))] px-3 py-1.5 text-[12px] text-[#dbeaff]"
+        >
+          <span className="shrink-0">
+            {shareStatus.state === "copied" ? "Link copied — anyone who opens it gets this beat." : "Copy this link:"}
+          </span>
+          <input
+            readOnly
+            value={shareStatus.url}
+            aria-label="Share link"
+            onFocus={(e) => e.currentTarget.select()}
+            className="aero-input min-w-0 flex-1 px-1.5 py-0.5 text-[11px]"
+          />
+          <button onClick={dismissShare} aria-label="Dismiss" className="aero-btn-dark grid h-6 w-6 place-items-center">
+            <Glyph name="close" size={10} />
+          </button>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-auto p-3">
         {LANES.map((lane) => {
