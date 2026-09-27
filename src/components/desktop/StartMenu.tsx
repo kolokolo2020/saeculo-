@@ -20,6 +20,7 @@ const RIGHT_LINKS: { label: string; kind: WindowKind }[] = [
   { label: "Contact", kind: "contact" },
   { label: "Recycle Bin", kind: "recycle" },
   { label: "Personalize", kind: "personalize" },
+  { label: "Welcome Center", kind: "welcome" },
 ];
 
 const LISTED = APPS.filter((a) => !a.hidden);

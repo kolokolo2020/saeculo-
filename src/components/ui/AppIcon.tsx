@@ -155,6 +155,25 @@ export default function AppIcon({ kind, size = 48 }: { kind: WindowKind; size?: 
         </>
       );
       break;
+    case "welcome":
+      body = (
+        <>
+          <defs>
+            <radialGradient id={`${id}-orb`} cx="0.5" cy="0.35" r="0.7">
+              <stop offset="0" stopColor="#bfe6ff" />
+              <stop offset="0.55" stopColor="#1f6fd1" />
+              <stop offset="1" stopColor="#0b2a5b" />
+            </radialGradient>
+            {gloss}
+          </defs>
+          <circle cx="24" cy="24" r="19" fill={u("orb")} stroke="#0b2a5b" />
+          {[0, 1, 2, 3].map((i) => (
+            <rect key={i} x={15 + i * 5} y={30 - [6, 12, 9, 14][i]} width="3.2" height={[6, 12, 9, 14][i]} rx="1" fill="#fff" />
+          ))}
+          <ellipse cx="24" cy="15" rx="13" ry="7" fill={u("gloss")} opacity="0.55" />
+        </>
+      );
+      break;
     case "personalize":
       body = (
         <>

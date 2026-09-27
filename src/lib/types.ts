@@ -7,7 +7,8 @@ export type WindowKind =
   | "recycle"
   | "personalize"
   | "vault"
-  | "release";
+  | "release"
+  | "welcome";
 
 export interface WindowState {
   kind: WindowKind;

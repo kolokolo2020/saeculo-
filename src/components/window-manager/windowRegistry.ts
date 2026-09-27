@@ -90,6 +90,16 @@ export const APPS: AppMeta[] = [
     defaultSize: { width: 500, height: 470 },
   },
   {
+    kind: "welcome",
+    title: "Welcome Center",
+    label: "Welcome Center",
+    description: "Start here: the music, the game, the links",
+    category: "system",
+    surface: "light",
+    onDesktop: false,
+    defaultSize: { width: 660, height: 630 },
+  },
+  {
     kind: "release",
     title: "Downloading next_single.exe",
     label: "next_single.exe",

@@ -35,7 +35,8 @@ try {
   const win = (title) => page.getByRole("region", { name: title, exact: true });
   const close = async (title) => {
     await page.getByRole("button", { name: `Close ${title}`, exact: true }).click();
-    await page.waitForTimeout(150);
+    // windows play a short close animation before they go
+    await page.getByRole("region", { name: title, exact: true }).waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
   };
   const audioPaused = () => page.getByTestId("player-audio").evaluate((el) => el.paused);
 
@@ -46,6 +47,10 @@ try {
   await page.getByLabel("Skip boot sequence").click({ force: true });
   await page.waitForTimeout(300);
   check("desktop shows 7 icons", (await desktop.getByRole("button").count()) === 7);
+  const welcome = win("Welcome Center");
+  check("the Welcome Center greets a first visit", await welcome.getByRole("button", { name: "Play care4me" }).isVisible());
+  await welcome.getByRole("checkbox", { name: "Show at startup" }).uncheck();
+  await close("Welcome Center");
 
   // ---- media player + global audio ----
   await desktop.getByRole("button", { name: "Media Player", exact: true }).focus();
@@ -215,7 +220,7 @@ try {
       (await sharedBm.getByLabel("bass step 4").getAttribute("aria-pressed")) === "false",
   );
   await shared.getByRole("button", { name: "Close Beat Maker" }).click();
-  await shared.waitForTimeout(300);
+  await sharedBm.waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
   await shared.evaluate(() => (location.hash = "#beat=110-0000000100000000"));
   await shared.waitForTimeout(400);
   check(
@@ -420,7 +425,9 @@ try {
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
   // ---- idle screensaver (virtual clock, isolated context) ----
+  const noWelcome = () => localStorage.setItem("saeculo-welcome", "off");
   const ssContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await ssContext.addInitScript(noWelcome);
   const ssPage = await ssContext.newPage();
   await ssPage.clock.install();
   await ssPage.goto(BASE, { waitUntil: "networkidle" });
@@ -437,6 +444,7 @@ try {
 
   // ---- mobile ----
   const mContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await mContext.addInitScript(noWelcome);
   const m = await mContext.newPage();
   await m.goto(BASE, { waitUntil: "networkidle" });
   await m.getByLabel("Skip boot sequence").click({ force: true });
@@ -457,6 +465,7 @@ try {
   );
   for (const title of ["Beat Deck"]) {
     await m.getByRole("button", { name: `Close ${title}`, exact: true }).tap().catch(() => {});
+    await m.getByRole("region", { name: title, exact: true }).waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
   }
   await m.waitForTimeout(200);
   await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Beat Maker", exact: true }).tap();
@@ -473,6 +482,7 @@ try {
     userAgent:
       "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
   });
+  await iContext.addInitScript(noWelcome);
   const ip = await iContext.newPage();
   await ip.goto(BASE, { waitUntil: "networkidle" });
   await ip.getByLabel("Skip boot sequence").click({ force: true });

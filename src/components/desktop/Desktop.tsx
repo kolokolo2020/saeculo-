@@ -27,6 +27,7 @@ import ContactApp from "@/components/apps/ContactApp";
 import RecycleBinApp from "@/components/apps/RecycleBinApp";
 import BeatMakerApp from "@/components/lab/BeatMakerApp/BeatMakerApp";
 import PersonalizeApp from "@/components/apps/PersonalizeApp";
+import WelcomeCenter, { WELCOME_KEY } from "@/components/apps/WelcomeCenter";
 import VaultApp from "@/components/apps/VaultApp";
 import ReleaseApp from "@/components/apps/ReleaseApp";
 import TrayBalloon from "./TrayBalloon";
@@ -47,6 +48,7 @@ const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   personalize: PersonalizeApp,
   vault: VaultApp,
   release: ReleaseApp,
+  welcome: WelcomeCenter,
 };
 
 export default function Desktop() {
@@ -68,6 +70,18 @@ export default function Desktop() {
   const finishBoot = useCallback(() => {
     setBooting(false);
     setForceBoot(false);
+    // the Welcome Center greets first-time visitors (and anyone who keeps
+    // "Show at startup" ticked), unless a link already opened something
+    let show = true;
+    try {
+      show = localStorage.getItem(WELCOME_KEY) !== "off" && !sessionStorage.getItem("saeculo-welcomed");
+      sessionStorage.setItem("saeculo-welcomed", "1");
+    } catch {
+      // storage blocked: show it
+    }
+    if (show && Object.keys(useWindowStore.getState().windows).length === 0) {
+      useWindowStore.getState().openWindow("welcome");
+    }
   }, []);
   const closeStart = useCallback(() => setStartOpen(false), []);
   const unlock = useCallback(() => setLocked(false), []);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { TASKBAR_HEIGHT, useWindowStore } from "./windowStore";
 import { useDraggable } from "./useDraggable";
 import { useResizable } from "./useResizable";
@@ -24,6 +25,8 @@ export default function WindowFrame({ kind, isMobile, children }: WindowFramePro
   const toggleMaximize = useWindowStore((s) => s.toggleMaximize);
   const drag = useDraggable(kind, isMobile);
   const resize = useResizable(kind);
+  // closing plays a short shrink-and-fade first, like Vista did
+  const [closing, setClosing] = useState(false);
 
   if (!win) return null;
 
@@ -49,9 +52,14 @@ export default function WindowFrame({ kind, isMobile, children }: WindowFramePro
       aria-label={title}
       style={style}
       onPointerDown={() => useWindowStore.getState().focusWindow(kind)}
-      className={`aero-glass aero-open absolute flex flex-col ${focused ? "" : "aero-glass-inactive"} ${
-        fill ? "rounded-none!" : ""
-      } ${hidden ? "pointer-events-none invisible" : "visible"}`}
+      onAnimationEnd={(e) => {
+        if (closing && e.animationName === "aero-close") closeWindow(kind);
+      }}
+      className={`aero-glass absolute flex flex-col transition-[opacity,scale,translate,visibility] duration-200 ease-out motion-reduce:transition-none ${
+        closing ? "aero-closing pointer-events-none" : "aero-open"
+      } ${focused ? "" : "aero-glass-inactive"} ${fill ? "rounded-none!" : ""} ${
+        hidden ? "pointer-events-none invisible translate-y-10 scale-90 opacity-0" : "visible"
+      }`}
     >
       <div className={`aero-sheen absolute inset-x-0 top-0 h-9 ${fill ? "" : "rounded-t-[8px]"}`} aria-hidden />
 
@@ -86,7 +94,10 @@ export default function WindowFrame({ kind, isMobile, children }: WindowFramePro
             </button>
           )}
           <button
-            onClick={() => closeWindow(kind)}
+            onClick={() => {
+              if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) closeWindow(kind);
+              else setClosing(true);
+            }}
             aria-label={`Close ${title}`}
             className="aero-caption-btn aero-caption-close"
           >
