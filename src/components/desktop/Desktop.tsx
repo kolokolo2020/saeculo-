@@ -37,18 +37,18 @@ import WelcomeCenter, { WELCOME_KEY } from "@/components/apps/WelcomeCenter";
 import VaultApp from "@/components/apps/VaultApp";
 import ReleaseApp from "@/components/apps/ReleaseApp";
 import FootageApp from "@/components/apps/FootageApp";
-import RadioApp from "@/components/apps/RadioApp";
 import TrayBalloon from "./TrayBalloon";
 import { useSecretStore } from "@/components/secrets/secretStore";
 import { createKonamiListener } from "@/components/secrets/konami";
 import type { WindowKind } from "@/lib/types";
 
-// the Room, the Pictures (which reuse its artwork) and the game are the
-// heaviest pieces, so each downloads only when first needed
+// the Room, the Pictures (which reuse its artwork), the radio and the game
+// download only when first needed
 const RoomIntro = dynamic(() => import("@/components/room/RoomIntro"), {
   ssr: false,
   loading: () => <div className="fixed inset-0 z-[10000] bg-black" />,
 });
+const RadioApp = dynamic(() => import("@/components/apps/RadioApp"), { ssr: false });
 const PicturesApp = dynamic(() => import("@/components/apps/PicturesApp"), { ssr: false });
 const BeatDeckApp = dynamic(() => import("@/components/apps/BeatDeckApp/BeatDeckApp"), { ssr: false });
 

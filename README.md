@@ -21,6 +21,19 @@ Midnight). Between midnight and 4 am, Tape turns into Midnight and the
 desktop's light goes dark red. The rain icon in the tray switches on room
 tone: rain, vinyl crackle and hum, synthesized live.
 
+**After dark, things happen.** Once a visit, maybe, something small goes
+wrong: a window's title says something it shouldn't, the clocks tick
+backwards for a few seconds, the cat from the Room walks the length of the
+taskbar, or a file flickers into the Recycle Bin and is gone. Midnight
+always gets one, within a few minutes; Tape gets one on half its visits;
+Clean never does. None of them takes a click or focus, and none is read out
+to screen readers. In Tape and Midnight, windows also switch on like an old
+tube set (a bright line that opens into the picture), close to a line and
+then a dot with a soft relay click, and desktop icons split their colour
+when hovered. Reduced motion keeps the Vista animations and skips the cat.
+The haunts live in `src/components/desktop/Haunts.tsx`; the browser tests
+force them with `window.__saeculoHaunt("title" | "clock" | "cat" | "bin")`.
+
 What's on the desktop:
 
 - **Welcome Center** — opens once per visit after boot: the latest
@@ -64,6 +77,19 @@ What's on the desktop:
   unlocks the next **certification**, a difficulty ladder from Demo through
   Mixtape, EP, Album and Gold to Platinum, each adding a rule (higher
   targets, fewer redraws, leaner pay, pricier shop, a smaller hand).
+- **Night Radio** — a pirate-radio receiver. Switch it on and drag, scroll
+  or arrow-key the dial through live static. Each track is a station
+  (88.3, 94.7, 101.9) with a call sign and a DJ line typed out on the
+  amber display; it plays through the global player, so the gadgets, tray
+  and lock screen follow, and off-station the song bleeds through muffled
+  under the hiss. The presets jump straight to the stations. There's one
+  more station past the end of the printed scale: it plays something from
+  the vault and reads out a clue. Stations and lines: `src/data/radio.ts`.
+- **Pictures** — the Room's film poster (*The Saeculo Tapes*) and three
+  show flyers, with a viewer (arrow keys step, Escape goes back). Drawn in
+  SVG in `src/components/room/posters.tsx`, shared with the Room.
+- **found_footage.txt** — a typed log from the night the tapes were made
+  (`src/data/lore.ts`).
 - **about.txt** (Notepad), **Contact** (a compose-mail form that opens the
   visitor's mail app), and a **Recycle Bin** of beats that didn't make it.
 - **Right-click the desktop** for a context menu, including **Personalize**:
@@ -102,6 +128,11 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   `node scripts/analyze-tracks.mjs` (needs `playwright-core` and `sharp`).
 - **Bio, socials, booking email, next release date**: `src/data/profile.ts`.
   The bio and the next release are still placeholders.
+- **Night Radio stations, DJ lines and the hidden frequency**:
+  `src/data/radio.ts`; the snippet the hidden station plays is
+  `RADIO_SNIPPET` in `src/data/secrets.ts`.
+- **found_footage.txt**: `src/data/lore.ts` (wrap words in █ to black
+  them out).
 - **Vault words, password and unreleased snippets**: `src/data/secrets.ts`.
   The snippets and the letter are still placeholders (the snippets reuse
   the synthesized demo loops in `public/audio/*.wav`, made by
@@ -149,9 +180,15 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   progressions, step scheduling, the offline render and share codes.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (101 checks: the Room intro, windows,
+- `src/components/desktop/Haunts.tsx`, `hauntStore.ts` — the once-a-visit
+  haunts and their scheduler.
+- `src/components/apps/RadioApp.tsx`, `src/lib/radioStatic.ts` — Night
+  Radio and its synthesized static.
+- `scripts/verify.mjs` — a Playwright smoke test (126 checks: the Room intro, windows,
   global audio, the player and its Projector / Tape looks, gadgets, the Beat Maker, Beat Deck played, the
-  secret hunt, lock/restart, idle screensaver, an axe accessibility audit,
+  secret hunt, found_footage.txt and Pictures, the CRT windows, every haunt,
+  the haunt scheduler in Midnight and Clean, Night Radio and its hidden
+  station, lock/restart, idle screensaver, an axe accessibility audit,
   mobile, iPhone playback). Not part of the build: run it against a dev
   server on port 3210 after `npm i --no-save playwright-core axe-core`.
 
@@ -162,6 +199,14 @@ way to home-screen widgets: Now Playing (cover, play, progress, live bars)
 and the release countdown. Beat Deck is turn-based, so it plays the same
 with taps, and its hand folds into two rows of four. Minimize or use the taskbar to get back to
 the icons.
+
+## Performance
+
+The Room, Beat Deck, Pictures and Night Radio are split out and only
+download when first needed (the Room's code is about 48 KB before gzip,
+14 KB after, and never loads for returning visitors or deep links). The
+effects animate `transform`, `scale`, `opacity` and `filter` only, and the
+grain is one pre-rendered tile.
 
 ## Deploying
 
