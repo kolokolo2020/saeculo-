@@ -42,8 +42,10 @@ What's on the desktop:
 - **about.txt** (Notepad), **Contact** (a compose-mail form that opens the
   visitor's mail app), and a **Recycle Bin** of beats that didn't make it.
 - **Right-click the desktop** for a context menu, including **Personalize**:
-  six glass colors, four wallpapers, and a transparency toggle, saved in
-  the browser.
+  six glass colors, five wallpapers, and a transparency toggle, saved in
+  the browser. **DreamScene** is a live wallpaper: it takes the playing
+  track's cover palette and its aurora sways with the low end and
+  brightens on every beat.
 - **next_single.exe** — the countdown to the next release, as a download
   dialog that's taking its time (also a sidebar gadget).
 - **The vault** — `vault.zip` sits in the Recycle Bin and can't be deleted.
@@ -114,7 +116,7 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   progressions, step scheduling, the offline render and share codes.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (81 checks: windows,
+- `scripts/verify.mjs` — a Playwright smoke test (83 checks: windows,
   global audio, the player, gadgets, the Beat Maker, Beat Deck played, the
   secret hunt, lock/restart, idle screensaver, mobile, iPhone playback). Not part of the build — run it against a dev
   server on port 3210 after `npm i --no-save playwright-core`.

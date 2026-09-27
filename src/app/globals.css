@@ -119,6 +119,16 @@
   --ribbon-a: linear-gradient(90deg, transparent, rgba(60, 140, 255, 0.22) 30%, rgba(90, 200, 255, 0.25) 60%, transparent);
   --ribbon-b: linear-gradient(90deg, transparent, rgba(80, 120, 255, 0.18) 35%, rgba(120, 220, 255, 0.15) 65%, transparent);
 }
+/* DreamScene paints itself on a canvas (DreamScene.tsx); this is what
+   shows before its first frame and in the Personalize thumbnail */
+[data-wall="dreamscene"] {
+  --wall:
+    radial-gradient(ellipse 70% 55% at 50% 115%, rgba(150, 110, 255, 0.55), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(255, 140, 110, 0.25), transparent 70%),
+    linear-gradient(170deg, #07051a 0%, #140f3a 55%, #2a1d5e 100%);
+  --ribbon-a: linear-gradient(90deg, transparent, rgba(255, 150, 120, 0.4) 30%, rgba(160, 130, 255, 0.5) 60%, transparent);
+  --ribbon-b: linear-gradient(90deg, transparent, rgba(160, 130, 255, 0.3) 35%, rgba(255, 170, 140, 0.25) 65%, transparent);
+}
 
 /* ------------------------------------------------------------------ */
 /* keyframes                                                           */

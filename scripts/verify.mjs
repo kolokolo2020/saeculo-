@@ -281,6 +281,17 @@ try {
   const thumbBg = (label) =>
     page.getByRole("button", { name: `Background ${label}` }).locator("span").first().evaluate((el) => getComputedStyle(el).backgroundImage);
   check("wallpaper thumbnails preview their own background", (await thumbBg("Aurora")) !== (await thumbBg("Dusk")));
+  await page.getByRole("button", { name: "Background DreamScene" }).click();
+  await page.waitForTimeout(300);
+  const dreamPainted = await root.locator(":scope > canvas").evaluate((c) => {
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) lit += d[i] + d[i + 1] + d[i + 2];
+    return c.width > 0 && lit > 0;
+  });
+  check("the DreamScene wallpaper paints a live canvas", dreamPainted);
+  await page.getByRole("button", { name: "Background Dusk" }).click();
+  check("switching away from DreamScene removes its canvas", (await root.locator(":scope > canvas").count()) === 0);
   await page.getByRole("button", { name: "OK", exact: true }).click();
 
   await page.getByRole("button", { name: "Start", exact: true }).click();

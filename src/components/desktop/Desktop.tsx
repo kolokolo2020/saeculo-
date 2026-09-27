@@ -19,6 +19,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { PROFILE } from "@/data/profile";
+import DreamScene from "./DreamScene";
 import { decodeGroove, setPendingGroove } from "@/lib/groove";
 import { trackIndexFromHash } from "@/lib/trackLink";
 import MediaPlayerApp from "@/components/apps/MediaPlayerApp";
@@ -161,10 +162,14 @@ export default function Desktop() {
       {/* wallpaper: drifting aurora ribbons + a quiet wordmark */}
       {/* clipped in their own box: the rotated ribbons would otherwise
           extend past the viewport and make the desktop scrollable */}
-      <div className="pointer-events-none absolute inset-0 overflow-clip" aria-hidden>
-        <div className="aero-ribbon aero-ribbon-a" />
-        <div className="aero-ribbon aero-ribbon-b" />
-      </div>
+      {wallpaper === "dreamscene" ? (
+        <DreamScene />
+      ) : (
+        <div className="pointer-events-none absolute inset-0 overflow-clip" aria-hidden>
+          <div className="aero-ribbon aero-ribbon-a" />
+          <div className="aero-ribbon aero-ribbon-b" />
+        </div>
+      )}
       <div
         aria-hidden
         className="pointer-events-none absolute right-8 bottom-16 text-right select-none lg:right-[212px]"
