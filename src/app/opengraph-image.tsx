@@ -102,7 +102,6 @@ export default async function Image() {
                         }}
                       >
                         {covers[i] ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- rendered by ImageResponse, not the browser
                           <img src={covers[i]!} width={150} height={150} alt="" style={{ objectFit: "cover" }} />
                         ) : (
                           <div style={{ width: 150, height: 150, background: "#0b2a5b" }} />
