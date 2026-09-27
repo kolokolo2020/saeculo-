@@ -2,7 +2,9 @@
 
 import { useSyncExternalStore } from "react";
 
-const QUERY = "(max-width: 768px)";
+// Narrow screens, and phones held sideways (short and touch-first): both
+// get one full-screen window at a time.
+const QUERY = "(max-width: 768px), (max-height: 500px) and (pointer: coarse)";
 
 function subscribe(callback: () => void) {
   const mql = window.matchMedia(QUERY);
