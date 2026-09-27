@@ -120,7 +120,7 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   progressions, step scheduling, the offline render and share codes.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (87 checks: windows,
+- `scripts/verify.mjs` — a Playwright smoke test (90 checks: windows,
   global audio, the player, gadgets, the Beat Maker, Beat Deck played, the
   secret hunt, lock/restart, idle screensaver, an axe accessibility audit,
   mobile, iPhone playback). Not part of the build: run it against a dev
@@ -128,8 +128,10 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
 
 ## Mobile
 
-Below 768px, windows open full-screen one at a time and the sidebar hides.
-Beat Deck is turn-based, so it plays the same with taps. Minimize or use the taskbar to get back to
+Below 768px, windows open full-screen one at a time, and the sidebar gives
+way to home-screen widgets: Now Playing (cover, play, progress, live bars)
+and the release countdown. Beat Deck is turn-based, so it plays the same
+with taps, and its hand folds into two rows of four. Minimize or use the taskbar to get back to
 the icons.
 
 ## Deploying

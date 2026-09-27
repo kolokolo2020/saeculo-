@@ -7,6 +7,7 @@ import DesktopContextMenu from "./DesktopContextMenu";
 import DesktopIcon from "./DesktopIcon";
 import ScreensaverOverlay from "./ScreensaverOverlay";
 import Sidebar from "./Sidebar";
+import MobileWidgets from "./MobileWidgets";
 import StartMenu from "./StartMenu";
 import Taskbar from "./Taskbar";
 import { usePersonalizeStore } from "./personalizeStore";
@@ -193,6 +194,7 @@ export default function Desktop() {
       </nav>
 
       <Sidebar />
+      {isMobile && <MobileWidgets />}
 
       {/* windows — kept mounted while minimized so games/sequencers keep state */}
       {(Object.keys(windows) as WindowKind[]).map((kind) => {

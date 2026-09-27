@@ -123,7 +123,7 @@ function NowPlayingGadget() {
 }
 
 // The next drop, as a download that is taking its time.
-function ReleaseGadget() {
+export function ReleaseGadget() {
   const now = useNow();
   const openWindow = useWindowStore((s) => s.openWindow);
   const progress = now ? releaseProgress(now) : null;

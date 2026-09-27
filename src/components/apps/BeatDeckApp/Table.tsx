@@ -114,7 +114,7 @@ export default function Table() {
   }, []);
 
   return (
-    <div ref={rootRef} className="relative flex h-full flex-col text-[#e6eef8]">
+    <div ref={rootRef} className="@container relative flex h-full flex-col text-[#e6eef8]">
       <Hud run={run} runKey={runKey} />
       <Rack />
 
@@ -170,7 +170,13 @@ export default function Table() {
 
           {/* the hand */}
           <div className="border-t border-black/60 bg-black/25 px-3 pt-4 pb-2">
-            <div className="dark-scroll flex gap-2 overflow-x-auto pt-3 pb-2" role="group" aria-label="Your hand" data-tour="hand">
+            {/* a row that scrolls on wide screens; on phones, the whole hand at once in two rows of four */}
+            <div
+              className="dark-scroll flex gap-2 overflow-x-auto pt-3 pb-2 @max-md:grid @max-md:grid-cols-4 @max-md:gap-1.5 @max-md:overflow-visible"
+              role="group"
+              aria-label="Your hand"
+              data-tour="hand"
+            >
               {hand.map(({ uid, inst, def }, i) => (
                 <DeckCard
                   key={uid}
@@ -181,6 +187,7 @@ export default function Table() {
                   dimmed={busy || (!selected.includes(uid) && selected.length >= max)}
                   onClick={() => pick(uid)}
                   onAudition={busy ? undefined : () => audition(uid)}
+                  fit
                 />
               ))}
             </div>

@@ -14,6 +14,7 @@ export default function DeckCard({
   selected = false,
   dimmed = false,
   compact = false,
+  fit = false,
   deal,
   onClick,
   onAudition,
@@ -24,6 +25,8 @@ export default function DeckCard({
   selected?: boolean;
   dimmed?: boolean;
   compact?: boolean;
+  /** In a narrow container (phones), shrink to fill a grid column. */
+  fit?: boolean;
   /** Animate in as a freshly dealt card, staggered by this index. */
   deal?: number;
   onClick?: () => void;
@@ -36,7 +39,7 @@ export default function DeckCard({
     roles.length === 1
       ? `linear-gradient(to bottom, ${ROLE_COLOR[roles[0]][0]}, ${ROLE_COLOR[roles[0]][1]})`
       : `linear-gradient(to right, ${roles.map((r, i) => `${ROLE_COLOR[r][1]} ${(i / roles.length) * 100}% ${((i + 1) / roles.length) * 100}%`).join(", ")})`;
-  const w = compact ? "w-[92px]" : "w-[104px]";
+  const w = compact ? "w-[92px]" : fit ? "w-[104px] @max-md:w-auto @max-md:min-w-0" : "w-[104px]";
 
   return (
     <div
@@ -68,15 +71,19 @@ export default function DeckCard({
         }
       >
         <span className="block h-[7px]" style={{ background: stripe }} />
-        <span className={`flex flex-col gap-1 ${compact ? "px-1.5 pt-1 pb-1.5" : "px-2 pt-1.5 pb-2"}`}>
-          <span className={`leading-tight font-semibold text-white ${compact ? "text-[11px]" : "text-[12.5px]"}`}>{def.name}</span>
+        <span className={`flex flex-col gap-1 ${compact ? "px-1.5 pt-1 pb-1.5" : fit ? "px-2 pt-1.5 pb-2 @max-md:px-1.5 @max-md:pt-1 @max-md:pb-1.5" : "px-2 pt-1.5 pb-2"}`}>
+          <span
+            className={`leading-tight font-semibold text-white ${compact ? "text-[11px]" : fit ? "text-[12.5px] @max-md:pr-4 @max-md:text-[11px]" : "text-[12.5px]"}`}
+          >
+            {def.name}
+          </span>
           <span className="flex items-center gap-1 text-[9.5px] tracking-wide text-[#9fb2c9] uppercase">
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: RARITY_COLOR[def.rarity] }} />
             {GENRE_LABEL[def.genre]}
           </span>
           {roles.map((role) => (
             <span key={role} className="flex items-center gap-1">
-              <span className="w-[26px] text-[8.5px] text-[#7f93ad]">{ROLE_LABEL[role]}</span>
+              <span className={`w-[26px] text-[8.5px] text-[#7f93ad] ${fit ? "@max-md:hidden" : ""}`}>{ROLE_LABEL[role]}</span>
               <span className="grid flex-1 grid-cols-16 gap-[1px]">
                 {Array.from({ length: 16 }, (_, step) => {
                   const on = def.hits.some((h) => h.role === role && h.step === step);
@@ -91,10 +98,17 @@ export default function DeckCard({
               </span>
             </span>
           ))}
-          <span className="mt-0.5 font-mono text-[11px] text-[#7fe0ff]">
-            {def.groove ? `+${def.groove} groove/hit` : "no hits"}
+          <span className={`mt-0.5 font-mono text-[11px] text-[#7fe0ff] ${fit ? "@max-md:text-[10px]" : ""}`}>
+            {def.groove ? (
+              <>
+                +{def.groove}
+                <span className={fit ? "@max-md:hidden" : ""}> groove</span>/hit
+              </>
+            ) : (
+              "no hits"
+            )}
           </span>
-          {def.text && !compact && <span className="text-[10px] leading-snug text-[#c9d6e6]">{def.text}</span>}
+          {def.text && !compact && <span className={`text-[10px] leading-snug text-[#c9d6e6] ${fit ? "@max-md:hidden" : ""}`}>{def.text}</span>}
           {mod && (
             <span className="mt-0.5 self-start rounded-[3px] px-1 py-[1px] font-pixel text-[7px] text-black" style={{ background: MODS[mod].color }} title={MODS[mod].text}>
               {MOD_BADGE[mod]}
@@ -106,7 +120,7 @@ export default function DeckCard({
         <button
           onClick={onAudition}
           aria-label={`Listen to ${def.name}`}
-          className="aero-btn-dark absolute top-2.5 right-1.5 grid h-5 w-5 place-items-center rounded-full"
+          className={`aero-btn-dark absolute top-2.5 right-1.5 grid h-5 w-5 place-items-center rounded-full ${fit ? "@max-md:top-2 @max-md:right-1 @max-md:h-4 @max-md:w-4" : ""}`}
         >
           <Glyph name="play" size={8} />
         </button>

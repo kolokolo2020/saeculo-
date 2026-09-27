@@ -557,13 +557,27 @@ try {
   const m = await mContext.newPage();
   await m.goto(BASE, { waitUntil: "networkidle" });
   await m.getByLabel("Skip boot sequence").click({ force: true });
+  const widget = m.getByRole("group", { name: "Now playing widget" });
+  check("mobile: the home screen shows a Now Playing widget", await widget.isVisible());
+  await widget.getByRole("button", { name: /^Play / }).tap();
+  await m.waitForTimeout(400);
+  check("mobile: the widget plays the music", await widget.getByRole("button", { name: /^Pause / }).isVisible());
+  await widget.getByRole("button", { name: /^Pause / }).tap();
   await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Beat Deck", exact: true }).tap();
   await m.waitForTimeout(1200); // the game loads on demand; the open animation (scale .94→1) settles
   const gBox = await m.getByRole("region", { name: "Beat Deck", exact: true }).boundingBox();
   check("mobile: windows open full-screen", gBox.width >= 389, `w=${gBox?.width}`);
   await m.getByRole("button", { name: "New run" }).tap();
   await m.getByRole("dialog", { name: "Tutorial" }).getByRole("button", { name: "Skip" }).tap();
-  await m.getByLabel("Your hand").getByRole("button", { name: / card$/ }).first().tap();
+  const mHand = m.getByLabel("Your hand").getByRole("button", { name: / card$/ });
+  const firstCard = await mHand.first().boundingBox();
+  const lastCard = await mHand.last().boundingBox();
+  check(
+    "mobile: the whole hand fits on screen, in two rows",
+    lastCard.x + lastCard.width <= 390 && lastCard.y > firstCard.y + firstCard.height / 2,
+    `last card at x=${Math.round(lastCard.x)}`,
+  );
+  await mHand.first().tap();
   check("mobile: Beat Deck plays with taps", await m.getByRole("button", { name: /^Play take \(1\/5\)/ }).isVisible());
   await m.getByLabel("Taskbar").getByRole("button", { name: "Start", exact: true }).tap();
   await m.getByRole("textbox", { name: "Start Search" }).fill("up up down down left right left right b a");
