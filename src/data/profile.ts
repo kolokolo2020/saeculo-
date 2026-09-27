@@ -1,20 +1,22 @@
 import type { SocialLink } from "@/lib/types";
 
-// PLACEHOLDER CONTENT — replace with your real bio and links.
+// The bio is a neutral PLACEHOLDER until saeculo writes one; the email and
+// links are real.
 export const PROFILE = {
   artistName: "saeculo",
   tagline: "instrumentals & beats",
   bio: [
-    "saeculo is a producer making instrumentals that live somewhere between late-night drives and old video game menus.",
-    "Every beat starts as a small loop and grows until it feels like a place you can stay in for a while. Influences range from boom bap and trap to chiptune, ambient, and film scores.",
-    "Poke around the desktop, open the beat maker, press play. If something loops in your head afterward, it worked.",
+    "saeculo makes instrumentals.",
+    "This desktop is where they live. Press play, build a loop in the Beat Maker, and see if you can out-play the boss in Beat Brawl.",
+    "Bookings, collabs and licensing: open Contact.",
   ],
-  bookingEmail: "booking@example.com",
+  bookingEmail: "saeculo888@gmail.com",
   socials: [
-    { label: "Spotify", url: "https://open.spotify.com/", handle: "saeculo" },
-    { label: "SoundCloud", url: "https://soundcloud.com/", handle: "saeculo" },
-    { label: "YouTube", url: "https://youtube.com/", handle: "@saeculo" },
-    { label: "Instagram", url: "https://instagram.com/", handle: "@saeculo" },
+    { label: "Spotify", url: "https://open.spotify.com/artist/20rwZAautzWKkxjkYA9sfg", handle: "saeculo" },
+    { label: "SoundCloud", url: "https://soundcloud.com/saeculo", handle: "saeculo" },
+    { label: "YouTube", url: "https://www.youtube.com/@saeculo", handle: "@saeculo" },
+    { label: "Instagram", url: "https://www.instagram.com/saeculo/", handle: "@saeculo" },
+    { label: "Linktree", url: "https://linktr.ee/saeculo", handle: "linktr.ee/saeculo" },
   ] satisfies SocialLink[],
   /**
    * PLACEHOLDER — the next drop, shown as a "Downloading next_single.exe"

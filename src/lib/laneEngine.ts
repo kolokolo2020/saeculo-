@@ -28,11 +28,15 @@ interface Particle {
   color: string;
 }
 
+/** Above this, a beat is felt half-time (trap at 140 grooves like 70), so
+ *  charts follow the half-time grid instead of piling up notes. */
+const HALF_TIME_ABOVE_BPM = 125;
+
 /** Chart notes on the 8th-note grid of the track, starting after a one-bar
  *  count-in. On-beat slots are likelier than off-beats so the pattern
  *  follows the groove instead of reading as random noise. */
 export function generateLaneNotes(bpm: number, lengthS: number, density: number): LaneNote[] {
-  const beat = 60 / bpm;
+  const beat = (60 / bpm) * (bpm > HALF_TIME_ABOVE_BPM ? 2 : 1);
   const eighth = beat / 2;
   const notes: LaneNote[] = [];
   let lastLane = -1;

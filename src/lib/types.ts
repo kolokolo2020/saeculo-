@@ -26,8 +26,17 @@ export interface WindowState {
 export interface Track {
   id: string;
   title: string;
+  /** Tempo as shown to visitors. */
   bpm: number;
+  /** Exact tempo of the audio file, measured, when it differs from `bpm` —
+   *  the rhythm games chart notes from this. */
+  tempo?: number;
+  /** Seconds from the start of the file to the first beat. */
+  beatOffset?: number;
+  /** Short subtitle: key, mood or genre. */
   mood: string;
+  /** Square cover art under public/. */
+  cover?: string;
   src: string;
   streamingLinks: { label: string; url: string }[];
 }

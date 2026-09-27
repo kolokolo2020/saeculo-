@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { playHat, playKick, playSnare } from "@/lib/synth";
 import { readBest, submitBest } from "@/lib/bestScores";
-import { TRACKS } from "@/data/tracks";
+import { TRACKS, gridTempo } from "@/data/tracks";
 import { useLaneGame } from "@/components/games/useLaneGame";
 import { useSecretStore } from "@/components/secrets/secretStore";
 
@@ -133,7 +133,7 @@ export function useBeatBrawl() {
     ...game,
     trackIndex,
     setTrackIndex,
-    bpm: TRACKS[trackIndex].bpm,
+    bpm: gridTempo(TRACKS[trackIndex]),
     playerHP,
     bossHP,
     combo,

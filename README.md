@@ -43,18 +43,21 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Placeholder content
+## Content
 
-Nothing in here is real yet — swap it out before launch:
+Real: the three tracks (`public/audio/*.mp3`) and their cover art
+(`public/covers/`), the booking email, and the social links.
 
-- **Beats**: `src/data/tracks.ts` lists the tracks, their BPM (the rhythm
-  games chart notes from it), and streaming links. The audio in
-  `public/audio/*.wav` is procedurally synthesized (no samples) by
-  `scripts/generate-audio.mjs` — replace those files with your real
-  instrumentals and update `src/data/tracks.ts` to match, keeping each
-  track's `bpm` accurate so the games stay on the beat.
+- **Tracks**: `src/data/tracks.ts`. `bpm` is what visitors see; `tempo` and
+  `beatOffset` are measured from the audio file (the rhythm games chart
+  notes from them), so re-measure them if a file is replaced. Tracks above
+  125 BPM are charted on the half-time grid.
 - **Bio, socials, booking email, next release date**: `src/data/profile.ts`.
+  The bio and the next release are still placeholders.
 - **Vault words, password and unreleased snippets**: `src/data/secrets.ts`.
+  The snippets and the letter are still placeholders (the snippets reuse
+  the synthesized demo loops in `public/audio/*.wav`, made by
+  `scripts/generate-audio.mjs`).
 - **Link preview image**: generated from the profile by
   `src/app/opengraph-image.tsx`.
 
