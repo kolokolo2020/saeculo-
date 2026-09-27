@@ -6,6 +6,7 @@ import { loadBuffer, startLoop } from "@/lib/backingTrack";
 import { gridTempo } from "@/data/tracks";
 import { usePlayerStore } from "@/components/player/playerStore";
 import type { Track } from "@/lib/types";
+import { getAudioContext } from "@/lib/audioContext";
 
 export type LanePhase = "idle" | "loading" | "running" | "done";
 
@@ -103,7 +104,7 @@ export function useLaneGame(handlers: LaneGameHandlers) {
   const start = useCallback(async (track: Track, lengthS: number, density: number) => {
     // one soundtrack at a time: the media player steps aside for the game
     usePlayerStore.getState().pause();
-    if (!ctxRef.current) ctxRef.current = new AudioContext();
+    ctxRef.current = getAudioContext();
     const ctx = ctxRef.current;
     backingRef.current?.stop();
     cancelAnimationFrame(rafRef.current);
@@ -148,6 +149,24 @@ export function useLaneGame(handlers: LaneGameHandlers) {
     [flash],
   );
 
+  // Switching tabs mid-run pauses it: the game clock is the audio clock,
+  // so suspending the context freezes the notes and the backing track
+  // together, and resuming picks up exactly where they left off.
+  useEffect(() => {
+    if (phase !== "running") return;
+    const onVisibility = () => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      if (document.hidden) void ctx.suspend();
+      else void ctx.resume();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (ctxRef.current?.state === "suspended") void ctxRef.current.resume();
+    };
+  }, [phase]);
+
   useEffect(() => {
     if (phase !== "running") return;
     const onKey = (e: KeyboardEvent) => {
@@ -165,7 +184,6 @@ export function useLaneGame(handlers: LaneGameHandlers) {
       cancelAnimationFrame(rafRef.current);
       backingRef.current?.stop();
       if (judgeTimerRef.current) clearTimeout(judgeTimerRef.current);
-      void ctxRef.current?.close();
     };
   }, []);
 

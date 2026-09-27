@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { playBlip, playSnare } from "@/lib/synth";
 import { useWindowStore } from "@/components/window-manager/windowStore";
+import { getAudioContext } from "@/lib/audioContext";
 
 interface Scrap {
   name: string;
@@ -37,11 +38,8 @@ export default function RecycleBinApp() {
   const ctxRef = useRef<AudioContext | null>(null);
   const openWindow = useWindowStore((s) => s.openWindow);
 
-  useEffect(() => () => void ctxRef.current?.close(), []);
-
   const ctx = () => {
-    if (!ctxRef.current) ctxRef.current = new AudioContext();
-    void ctxRef.current.resume();
+    ctxRef.current = getAudioContext();
     return ctxRef.current;
   };
 

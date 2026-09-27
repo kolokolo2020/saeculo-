@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { TRACKS } from "@/data/tracks";
+import { getAudioContext } from "@/lib/audioContext";
 
 // One <audio> element lives for the whole session (see AudioEngine), and
 // everything that plays or shows music — the media player window, the
@@ -36,6 +37,33 @@ interface PlayerState {
   toggleRepeat: () => void;
 }
 
+const PREFS_KEY = "saeculo-player";
+
+const isIOS = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  // iPadOS reports itself as a Mac
+  (navigator.userAgent.includes("Macintosh") && navigator.maxTouchPoints > 1);
+
+function savePrefs(volume: number, muted: boolean) {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ volume, muted }));
+  } catch {
+    // storage unavailable — the setting lasts for this visit
+  }
+}
+
+function loadPrefs(): { volume: number; muted: boolean } | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "null");
+    if (saved && typeof saved.volume === "number" && saved.volume >= 0 && saved.volume <= 1) {
+      return { volume: saved.volume, muted: saved.muted === true };
+    }
+  } catch {
+    // corrupted or blocked storage — keep the defaults
+  }
+  return null;
+}
+
 export const usePlayerStore = create<PlayerState>((set, get) => {
   // createMediaElementSource may only be called once per element, so the
   // graph is built lazily on the first user-initiated play (which also
@@ -46,8 +74,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       if (ctx.state === "suspended") void ctx.resume();
       return;
     }
-    if (!audio) return;
-    const context = new AudioContext();
+    // iOS suspends Web Audio when the screen locks, which would silence a
+    // player routed through it; a plain <audio> keeps playing in the
+    // background. The visualizers fall back to a tempo-synced spectrum.
+    if (!audio || isIOS()) return;
+    const context = getAudioContext();
     const analyser = context.createAnalyser();
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.8;
@@ -77,11 +108,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     ctx: null,
 
     attach: (el) => {
-      const { trackIndex, volume, muted } = get();
+      // runs after mount, so restoring saved prefs can't break hydration
+      const prefs = loadPrefs();
+      const { trackIndex } = get();
+      const volume = prefs?.volume ?? get().volume;
+      const muted = prefs?.muted ?? get().muted;
       if (!el.src) el.src = TRACKS[trackIndex].src;
       el.volume = volume;
       el.muted = muted;
-      set({ audio: el });
+      set({ audio: el, volume, muted });
     },
     detach: (el) => {
       if (get().audio === el) set({ audio: null });
@@ -130,13 +165,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         audio.volume = volume;
         if (volume > 0 && audio.muted) audio.muted = false;
       }
-      set({ volume, muted: volume > 0 ? false : get().muted });
+      const muted = volume > 0 ? false : get().muted;
+      set({ volume, muted });
+      savePrefs(volume, muted);
     },
     toggleMute: () => {
       const muted = !get().muted;
       const { audio } = get();
       if (audio) audio.muted = muted;
       set({ muted });
+      savePrefs(get().volume, muted);
     },
     toggleRepeat: () => set({ repeatOne: !get().repeatOne }),
   };

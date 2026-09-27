@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePlayerStore } from "./playerStore";
+import { readFrequencies, readWaveform } from "./spectrum";
 
 export const VIZ_MODES = ["aurora", "bars", "scope"] as const;
 export type VizMode = (typeof VIZ_MODES)[number];
@@ -57,9 +57,7 @@ export default function Visualizer({
     // Returns 0..1 band energies. When nothing is playing, a slow synthetic
     // swell stands in so the canvas breathes instead of sitting dead.
     const bands = () => {
-      const analyser = usePlayerStore.getState().analyser;
-      if (analyser && playing) {
-        analyser.getByteFrequencyData(freq);
+      if (playing && readFrequencies(freq)) {
         const avg = (from: number, to: number) => {
           let sum = 0;
           for (let i = from; i < to; i++) sum += freq[i];
@@ -103,10 +101,8 @@ export default function Visualizer({
 
     const drawBars = () => {
       ctx.clearRect(0, 0, w, h);
-      const analyser = usePlayerStore.getState().analyser;
       let levels: number[];
-      if (analyser && playing) {
-        analyser.getByteFrequencyData(freq);
+      if (playing && readFrequencies(freq)) {
         const usable = Math.floor(freq.length * 0.6);
         const chunk = usable / BAR_COUNT;
         levels = Array.from({ length: BAR_COUNT }, (_, i) => {
@@ -151,7 +147,6 @@ export default function Visualizer({
     const drawScope = () => {
       ctx.fillStyle = "rgba(3, 10, 22, 0.35)";
       ctx.fillRect(0, 0, w, h);
-      const analyser = usePlayerStore.getState().analyser;
       const mid = h / 2;
       ctx.lineWidth = 2;
       ctx.lineJoin = "round";
@@ -159,8 +154,7 @@ export default function Visualizer({
       ctx.shadowColor = "#39a6ff";
       ctx.shadowBlur = 12;
       ctx.beginPath();
-      if (analyser && playing) {
-        analyser.getByteTimeDomainData(wave);
+      if (playing && readWaveform(wave)) {
         const step = w / wave.length;
         for (let i = 0; i < wave.length; i++) {
           const y = mid + ((wave[i] - 128) / 128) * mid * 0.9;

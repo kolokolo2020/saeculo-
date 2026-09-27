@@ -5,6 +5,7 @@
 // It's a plain class on purpose: it owns a lot of per-frame mutable state
 // (notes being judged, particles decaying) that has no business living in
 // React state, and keeping it out of hooks keeps the render path clean.
+import { readLatencyOffsetMs } from "./latency";
 
 export const LANE_KEYS = ["d", "f", "j", "k"] as const;
 export const LANE_COUNT = LANE_KEYS.length;
@@ -64,6 +65,7 @@ export class LaneEngine {
   private clockStart = 0;
   private perfStart = 0;
   private latency = 0;
+  private userOffset = 0;
   private useAudioClock = false;
 
   constructor(
@@ -85,14 +87,15 @@ export class LaneEngine {
     // but a suspended context never advances, so fall back to wall time.
     this.useAudioClock = ctx.state === "running";
     this.latency = ctx.outputLatency || ctx.baseLatency || 0;
+    this.userOffset = readLatencyOffsetMs() / 1000;
     this.perfStart = performance.now() + (startAt - ctx.currentTime) * 1000;
   }
 
   now(): number {
     if (this.useAudioClock && this.ctx) {
-      return this.ctx.currentTime - this.clockStart - this.latency;
+      return this.ctx.currentTime - this.clockStart - this.latency - this.userOffset;
     }
-    return (performance.now() - this.perfStart) / 1000;
+    return (performance.now() - this.perfStart) / 1000 - this.userOffset;
   }
 
   /** Mark notes that scrolled past the window as missed; returns them. */

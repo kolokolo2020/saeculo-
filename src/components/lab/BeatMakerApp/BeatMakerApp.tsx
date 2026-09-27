@@ -119,13 +119,19 @@ export default function BeatMakerApp() {
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-auto p-3">
+      {/* in a narrow window (phones) each lane wraps into two rows of 8 so
+          the cells stay big enough to tap */}
+      <div className="@container flex min-h-0 flex-1 flex-col justify-center gap-2 overflow-auto p-3">
         {LANES.map((lane) => {
           const [hi, lo] = LANE_COLOR[lane];
           return (
             <div key={lane} className="flex items-center gap-2">
               <span className="w-11 shrink-0 text-[12px] text-[#b7c7dc]">{LANE_LABEL[lane]}</span>
-              <div className="grid flex-1 grid-cols-[repeat(16,minmax(0,1fr))] gap-1" role="group" aria-label={`${lane} steps`}>
+              <div
+                className="grid flex-1 grid-cols-[repeat(16,minmax(0,1fr))] gap-1 @max-md:grid-cols-[repeat(8,minmax(0,1fr))]"
+                role="group"
+                aria-label={`${lane} steps`}
+              >
                 {pattern[lane].map((active, step) => {
                   const current = displayStep === step;
                   return (
@@ -157,7 +163,7 @@ export default function BeatMakerApp() {
 
         <div className="flex gap-2">
           <span className="w-11 shrink-0" />
-          <div className="grid flex-1 grid-cols-[repeat(16,minmax(0,1fr))] gap-1" aria-hidden>
+          <div className="grid flex-1 grid-cols-[repeat(16,minmax(0,1fr))] gap-1 @max-md:grid-cols-[repeat(8,minmax(0,1fr))]" aria-hidden>
             {Array.from({ length: STEP_COUNT }, (_, i) => (
               <span
                 key={i}
@@ -171,7 +177,7 @@ export default function BeatMakerApp() {
       </div>
 
       <p className="shrink-0 border-t border-black/60 px-3 py-1.5 text-[11px] text-[#7f93ad]">
-        Click cells to build a loop — every sound is synthesized live, no samples.
+        Tap cells to build a loop — every sound is synthesized live, no samples.
       </p>
     </div>
   );
