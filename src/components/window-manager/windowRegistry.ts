@@ -40,44 +40,14 @@ export const APPS: AppMeta[] = [
     defaultSize: { width: 640, height: 430 },
   },
   {
-    kind: "games",
-    title: "Games",
-    label: "Games",
-    description: "Rhythm games synced to the beats",
-    category: "system",
-    surface: "light",
+    kind: "beatdeck",
+    title: "Beat Deck",
+    label: "Beat Deck",
+    description: "Make beats for clients, beat the bosses",
+    category: "game",
+    surface: "dark",
     onDesktop: true,
-    defaultSize: { width: 560, height: 420 },
-  },
-  {
-    kind: "rhythm",
-    title: "Rhythm Rush",
-    label: "Rhythm Rush",
-    description: "Hit the notes as they cross the line",
-    category: "game",
-    surface: "dark",
-    onDesktop: false,
-    defaultSize: { width: 500, height: 560 },
-  },
-  {
-    kind: "brawl",
-    title: "Beat Brawl",
-    label: "Beat Brawl",
-    description: "Out-rhythm the metronome boss",
-    category: "game",
-    surface: "dark",
-    onDesktop: false,
-    defaultSize: { width: 520, height: 600 },
-  },
-  {
-    kind: "pads",
-    title: "Pad Recall",
-    label: "Pad Recall",
-    description: "Repeat the drum-pad pattern",
-    category: "game",
-    surface: "dark",
-    onDesktop: false,
-    defaultSize: { width: 460, height: 520 },
+    defaultSize: { width: 960, height: 680 },
   },
   {
     kind: "about",
@@ -147,4 +117,3 @@ export const APP_BY_KIND = Object.fromEntries(APPS.map((a) => [a.kind, a])) as R
   AppMeta
 >;
 
-export const GAMES = APPS.filter((a) => a.category === "game");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import BootScreen from "./BootScreen";
 import DesktopContextMenu from "./DesktopContextMenu";
 import DesktopIcon from "./DesktopIcon";
@@ -23,12 +24,8 @@ import { trackIndexFromHash } from "@/lib/trackLink";
 import MediaPlayerApp from "@/components/apps/MediaPlayerApp";
 import AboutApp from "@/components/apps/AboutApp";
 import ContactApp from "@/components/apps/ContactApp";
-import GamesExplorerApp from "@/components/apps/GamesExplorerApp";
 import RecycleBinApp from "@/components/apps/RecycleBinApp";
 import BeatMakerApp from "@/components/lab/BeatMakerApp/BeatMakerApp";
-import RhythmRushApp from "@/components/lab/RhythmRushApp/RhythmRushApp";
-import BeatBrawlApp from "@/components/apps/BeatBrawlApp/BeatBrawlApp";
-import PadRecallApp from "@/components/apps/PadRecallApp/PadRecallApp";
 import PersonalizeApp from "@/components/apps/PersonalizeApp";
 import VaultApp from "@/components/apps/VaultApp";
 import ReleaseApp from "@/components/apps/ReleaseApp";
@@ -37,13 +34,13 @@ import { useSecretStore } from "@/components/secrets/secretStore";
 import { createKonamiListener } from "@/components/secrets/konami";
 import type { WindowKind } from "@/lib/types";
 
+// the game is the heaviest window, so it only downloads when first opened
+const BeatDeckApp = dynamic(() => import("@/components/apps/BeatDeckApp/BeatDeckApp"), { ssr: false });
+
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   player: MediaPlayerApp,
   beatmaker: BeatMakerApp,
-  games: GamesExplorerApp,
-  rhythm: RhythmRushApp,
-  brawl: BeatBrawlApp,
-  pads: PadRecallApp,
+  beatdeck: BeatDeckApp,
   about: AboutApp,
   contact: ContactApp,
   recycle: RecycleBinApp,

@@ -3,13 +3,13 @@
 // The vault.zip in the Recycle Bin opens with the three hidden words joined
 // together, in order. Each word is found somewhere else on the desktop:
 //   1. about.txt  — written in white-on-white; selecting the text reveals it
-//   2. Beat Brawl — the boss drops it when you win
+//   2. Beat Deck  — the first boss you beat drops it
 //   3. the Konami code (↑ ↑ ↓ ↓ ← → ← → B A) on the desktop, or typed
 //      into Start Search as "up up down down left right left right b a"
 // Change the words here and the whole hunt follows.
 export const SECRET_WORDS = [
   { id: "about", word: "late", where: "about.txt" },
-  { id: "brawl", word: "night", where: "Beat Brawl" },
+  { id: "brawl", word: "night", where: "Beat Deck" },
   { id: "konami", word: "loops", where: "an old cheat code" },
 ] as const;
 
@@ -43,7 +43,7 @@ export const VAULT_ITEMS: VaultItem[] = [
   {
     title: "boss_theme_v3 (snippet)",
     date: "8/21/2026",
-    note: "Beat Brawl's music, before it was Beat Brawl's",
+    note: "boss music, before it had a boss",
     src: "/audio/arcade-dust.wav",
   },
 ];

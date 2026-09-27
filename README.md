@@ -15,12 +15,16 @@ What's on the desktop:
   randomizer; every sound is synthesized live. **Share link** copies a URL
   that opens the site with that exact loop loaded (`#beat=<bpm>-<hex>`),
   and **Export .wav** renders 4 bars offline and downloads them.
-- **Games** — a games folder with three rhythm games:
-  - **Rhythm Rush** — the chosen beat plays and notes fall on its grid;
-    hit D / F / J / K. Easy / Normal / Hard, ranked S–D on accuracy.
-  - **Beat Brawl** — a boss fight against a metronome that speeds up.
-  - **Pad Recall** — Simon on an MPC: repeat the pad pattern
-    (Q W E R / A S D F).
+- **Beat Deck** — the game: a roguelike deckbuilder where every hand is a
+  beat. Cards are one-bar patterns (kicks, hats, 808s, chords, chops from
+  saeculo's tracks); play up to 5 as a take and the loop actually plays
+  while it scores. The roles you cover set the beat type (Sketch … Banger);
+  score = groove × hype. Eight rounds of clients with requests and bosses
+  with rules (the A&R, the Label, the Algorithm, the Neighbour, Writer's
+  Block, and Metro Nome). Between rounds a shop sells gear that bends the
+  rules, new sounds, studio time (level up a beat type) and card removal.
+  Runs save after every move; there's a Daily Run with the same shuffle
+  for everyone; the best take of a run exports as a WAV.
 - **about.txt** (Notepad), **Contact** (a compose-mail form that opens the
   visitor's mail app), and a **Recycle Bin** of beats that didn't make it.
 - **Right-click the desktop** for a context menu, including **Personalize**:
@@ -30,7 +34,7 @@ What's on the desktop:
   dialog that's taking its time (also a sidebar gadget).
 - **The vault** — `vault.zip` sits in the Recycle Bin and can't be deleted.
   It opens with three hidden words, one each from about.txt (white-on-white
-  text, revealed by selecting it), winning Beat Brawl, and the Konami code
+  text, revealed by selecting it), beating the first boss in Beat Deck, and the Konami code
   (↑ ↑ ↓ ↓ ← → ← → B A, or typed out in Start Search on phones). Inside:
   unreleased snippets and a note. Progress is saved in the browser.
 
@@ -72,27 +76,31 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   resize hooks, maximize, the glass `WindowFrame`, and the app registry.
 - `src/components/player/` — the global audio player store, the single
   `<audio>` element (`AudioEngine`), and the visualizer.
-- `src/components/games/` + `src/lib/laneEngine.ts` — the shared engine
-  behind Rhythm Rush and Beat Brawl: beat-quantized charts, an audio-clock
-  timer, the canvas playfield, and the looping backing track.
+- `src/lib/beatdeck/` — Beat Deck's rules as pure TypeScript (no DOM):
+  cards, gear, clients and bosses, the scoring engine, and the run's state
+  transitions, all seeded so a run replays from its seed. Balanced by
+  simulating a few hundred bot runs per change (the bot wins about a third).
+- `src/components/apps/BeatDeckApp/` — the game's UI and its sound: card
+  voices, chops sliced from the tracks and re-pitched to the run's key, and
+  the take playback that times every score pop off the audio clock.
 - `src/components/apps/`, `src/components/lab/` — the individual apps.
 - `src/components/ui/` — `AppIcon` (the glossy SVG icon set), `Glyph`
   (monochrome control glyphs — unicode ▶ ⏭ ✕ render as colour emoji on
   some platforms), and the start-orb mark.
 - `src/lib/synth.ts` — real-time drum synthesis used by the Beat Maker and
-  game sound effects.
+  Beat Deck.
 - `src/lib/beatCode.ts` — share-link encoding and the offline WAV render.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (47 checks: windows,
-  global audio, gadgets, every game actually played, lock/restart, idle
-  screensaver, mobile). Not part of the build — run it against a dev
+- `scripts/verify.mjs` — a Playwright smoke test (68 checks: windows,
+  global audio, gadgets, Beat Deck played, the secret hunt, lock/restart,
+  idle screensaver, mobile, iPhone playback). Not part of the build — run it against a dev
   server on port 3210 after `npm i --no-save playwright-core`.
 
 ## Mobile
 
-Below 768px, windows open full-screen one at a time; the sidebar hides and
-games open with a single tap. Minimize or use the taskbar to get back to
+Below 768px, windows open full-screen one at a time and the sidebar hides.
+Beat Deck is turn-based, so it plays the same with taps. Minimize or use the taskbar to get back to
 the icons.
 
 ## Deploying

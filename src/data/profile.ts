@@ -7,7 +7,7 @@ export const PROFILE = {
   tagline: "instrumentals & beats",
   bio: [
     "saeculo makes instrumentals.",
-    "This desktop is where they live. Press play, build a loop in the Beat Maker, and see if you can out-play the boss in Beat Brawl.",
+    "This desktop is where they live. Press play, build a loop in the Beat Maker, and see how far you get in Beat Deck.",
     "Bookings, collabs and licensing: open Contact.",
   ],
   bookingEmail: "saeculo888@gmail.com",

@@ -1,13 +1,12 @@
-// Per-game best scores in localStorage, shared between the games and the
-// Games Explorer's "best" column. Storage can be missing (private mode,
+// Personal bests in localStorage. Storage can be missing (private mode,
 // blocked cookies) — reads fall back to 0 and writes fail silently.
 export const BEST_KEYS = {
-  // "rhythm" is Normal difficulty — the original key, so old bests carry over
-  rhythm: "saeculo-rhythm-highscore",
-  rhythmEasy: "saeculo-rhythm-easy-best",
-  rhythmHard: "saeculo-rhythm-hard-best",
-  brawl: "saeculo-brawl-best",
-  pads: "saeculo-pads-best",
+  /** Beat Deck: the highest total score of a run. */
+  deck: "saeculo-deck-best",
+  /** Beat Deck: the furthest round reached (9 = won). */
+  deckRound: "saeculo-deck-round",
+  /** Beat Deck: runs won. */
+  deckWins: "saeculo-deck-wins",
 } as const;
 
 export type BestKey = keyof typeof BEST_KEYS;

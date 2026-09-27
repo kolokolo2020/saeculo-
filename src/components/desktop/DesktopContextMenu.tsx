@@ -71,7 +71,7 @@ export default function DesktopContextMenu({
       >
         <Item kind="player" label="Open Media Player" onClick={() => open("player")} />
         <Item kind="beatmaker" label="Open Beat Maker" onClick={() => open("beatmaker")} />
-        <Item kind="games" label="Games" onClick={() => open("games")} />
+        <Item kind="beatdeck" label="Play Beat Deck" onClick={() => open("beatdeck")} />
         <li className="my-[3px] ml-8 border-t border-[#d7d7d7]" aria-hidden />
         <Item
           label="Refresh"

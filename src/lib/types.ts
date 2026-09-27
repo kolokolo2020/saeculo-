@@ -1,10 +1,7 @@
 export type WindowKind =
   | "player"
   | "beatmaker"
-  | "games"
-  | "rhythm"
-  | "brawl"
-  | "pads"
+  | "beatdeck"
   | "about"
   | "contact"
   | "recycle"

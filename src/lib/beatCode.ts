@@ -85,7 +85,7 @@ export async function renderBeatWav(beat: SharedBeat, bars = 4): Promise<Blob> {
   return encodeWav(await ctx.startRendering());
 }
 
-function encodeWav(buffer: AudioBuffer): Blob {
+export function encodeWav(buffer: AudioBuffer): Blob {
   const channels = buffer.numberOfChannels;
   const frames = buffer.length;
   const bytesPerSample = 2;

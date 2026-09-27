@@ -32,11 +32,6 @@ try {
     await desktop.getByRole("button", { name: label, exact: true }).click();
     await page.waitForTimeout(250);
   };
-  const openFromStart = async (label) => {
-    await page.getByRole("button", { name: "Start", exact: true }).click();
-    await page.getByRole("navigation", { name: "Start menu" }).getByRole("button", { name: new RegExp(`^${label}`) }).first().click();
-    await page.waitForTimeout(250);
-  };
   const win = (title) => page.getByRole("region", { name: title, exact: true });
   const close = async (title) => {
     await page.getByRole("button", { name: `Close ${title}`, exact: true }).click();
@@ -112,35 +107,41 @@ try {
   await page.waitForTimeout(200);
   check("sidebar gadget pauses the global player", (await audioPaused()) === true);
 
-  // ---- start menu search ----
+  // ---- start menu search → Beat Deck ----
   await page.getByRole("button", { name: "Start", exact: true }).click();
-  await page.keyboard.type("pad");
+  await page.keyboard.type("deck");
   await page.keyboard.press("Enter");
+  await page.waitForTimeout(1200); // the game loads on demand
+  const deck = win("Beat Deck");
+  check("start search + Enter launches Beat Deck", await deck.getByRole("button", { name: "New run" }).isVisible());
+  await deck.getByRole("button", { name: "New run" }).click();
   await page.waitForTimeout(300);
-  const pads = win("Pad Recall");
-  check("start search + Enter launches Pad Recall", await pads.isVisible());
-
-  // ---- Pad Recall: actually play round 1 ----
-  // Pads only flash for ~350ms, so record every light-up with a
-  // MutationObserver armed before Start instead of polling for it.
-  await page.evaluate(() => {
-    window.__litPads = [];
-    const btns = [...document.querySelectorAll('[aria-label="Drum pads"] button')];
-    const obs = new MutationObserver(() => {
-      btns.forEach((b, i) => {
-        const lit = b.style.background.includes("radial-gradient") && !b.style.background.includes("217, 65, 47");
-        if (lit && window.__litPads.at(-1) !== i) window.__litPads.push(i);
-      });
-    });
-    btns.forEach((b) => obs.observe(b, { attributes: true, attributeFilter: ["style"] }));
-  });
-  await pads.getByRole("button", { name: "Start" }).click();
-  await pads.getByText("Your turn").waitFor({ timeout: 4000 });
-  const padIndex = await page.evaluate(() => window.__litPads[0]);
-  await page.keyboard.press(["q", "w", "e", "r", "a", "s", "d", "f"][padIndex]);
-  await pads.getByText("ROUND 2").waitFor({ timeout: 3000 }).catch(() => {});
-  check("Pad Recall: repeating the pattern advances to round 2", await pads.getByText("ROUND 2").isVisible());
-  await close("Pad Recall");
+  const handCards = deck.getByLabel("Your hand").getByRole("button", { name: / card$/ });
+  check("Beat Deck deals a hand of 8", (await handCards.count()) === 8);
+  for (let i = 0; i < 3; i++) await handCards.nth(i).click();
+  check(
+    "selecting cards previews the beat type",
+    (await deck.getByRole("button", { name: /^Play take \(3\/5\)/ }).isVisible()) && (await deck.getByText(/groove × \d+ hype base/).isVisible()),
+  );
+  await deck.getByRole("button", { name: /^Play take/ }).click();
+  await deck.getByLabel("Groove").waitFor({ timeout: 3000 });
+  await page.waitForTimeout(1500);
+  check("a take plays and counts up groove", Number((await deck.getByLabel("Groove").innerText()).replace(/,/g, "")) > 0);
+  await deck.getByRole("button", { name: "Skip ›" }).click();
+  await page.waitForTimeout(300);
+  check(
+    "the take's score lands in the round",
+    Number((await deck.getByLabel("Round score").innerText()).replace(/,/g, "")) > 0 && (await deck.getByLabel("Takes: 3 of 4 left").isVisible()),
+  );
+  await handCards.first().click();
+  await deck.getByRole("button", { name: /^Redraw selected/ }).click();
+  check("redraw swaps cards and uses a redraw", await deck.getByLabel("Redraws: 2 of 3 left").isVisible());
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(300);
+  await openFromDesktop("Beat Deck");
+  await page.waitForTimeout(1000);
+  check("a run survives a reload (Continue)", await win("Beat Deck").getByRole("button", { name: /^Continue — round 1\/8/ }).isVisible());
+  await close("Beat Deck");
 
   // ---- Beat Maker ----
   await openFromDesktop("Beat Maker");
@@ -235,44 +236,6 @@ try {
     "the chosen look survives a reload",
     (await root.getAttribute("data-glass")) === "violet" && (await root.getAttribute("data-wall")) === "dusk",
   );
-
-  // ---- Games Explorer → Rhythm Rush ----
-  await openFromDesktop("Games");
-  check("Games Explorer lists 3 games", (await win("Games").getByRole("list", { name: "Games" }).getByRole("button").count()) === 3);
-  await page.getByRole("button", { name: "Play Rhythm Rush" }).click();
-  await page.waitForTimeout(300);
-  const rr = win("Rhythm Rush");
-  await rr.getByRole("button", { name: "Hard", exact: true }).click();
-  check("Rhythm Rush difficulty can be chosen", (await rr.getByRole("button", { name: "Hard", exact: true }).getAttribute("aria-pressed")) === "true");
-  await rr.getByRole("button", { name: "Normal", exact: true }).click();
-  await rr.getByRole("button", { name: "Start" }).click();
-  const sawGo = await rr
-    .getByText("GO", { exact: true })
-    .waitFor({ timeout: 6000 })
-    .then(() => true)
-    .catch(() => false);
-  check("Rhythm Rush counts in 3-2-1-GO", sawGo);
-  for (let i = 0; i < 40; i++) {
-    for (const k of ["d", "f", "j", "k"]) await page.keyboard.press(k);
-    await page.waitForTimeout(70);
-  }
-  const scoreText = await rr.getByText(/^SCORE \d+/).innerText();
-  check("Rhythm Rush registers hits on the beat grid", /SCORE [1-9]/.test(scoreText), scoreText);
-  await close("Rhythm Rush");
-  await close("Games");
-
-  // ---- Beat Brawl ----
-  await openFromStart("Beat Brawl");
-  const brawl = win("Beat Brawl");
-  await brawl.getByRole("button", { name: "Fight" }).click();
-  await page.waitForTimeout(2600);
-  for (let i = 0; i < 40; i++) {
-    for (const k of ["d", "f", "j", "k"]) await page.keyboard.press(k);
-    await page.waitForTimeout(70);
-  }
-  const bossWidth = await brawl.locator(".aero-progress-fill-red").evaluate((el) => el.style.width);
-  check("Beat Brawl: landed notes damage the boss", parseFloat(bossWidth) < 100, `boss hp ${bossWidth}`);
-  await close("Beat Brawl");
 
   // ---- content apps ----
   await openFromDesktop("about.txt");
@@ -385,35 +348,29 @@ try {
     }, null, { timeout: 5000 }).then(() => true, () => false),
   );
 
-  // ---- games polish: pause on tab switch, calibration ----
-  await openFromStart("Rhythm Rush");
-  const rush = win("Rhythm Rush");
-  await rush.getByRole("button", { name: "Start" }).click();
-  await page.waitForTimeout(2500);
-  const setHidden = (hidden) =>
-    page.evaluate((h) => {
-      Object.defineProperty(document, "hidden", { configurable: true, get: () => h });
-      document.dispatchEvent(new Event("visibilitychange"));
-    }, hidden);
-  await setHidden(true);
+  // ---- Beat Deck: beating the first boss, the shop ----
+  await page.evaluate(() => {
+    const run = JSON.parse(localStorage.getItem("saeculo-beatdeck-run"));
+    Object.assign(run, { phase: "won", round: 3, score: 1000, target: 1000, reward: { base: 6, takes: 1, interest: 0, chain: 0, total: 7 }, money: 20 });
+    run.plan[2] = "label";
+    localStorage.setItem("saeculo-beatdeck-run", JSON.stringify(run));
+  });
+  await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(300);
-  const frozenAt = await rush.getByText(/^\d+s$/).innerText();
-  await page.waitForTimeout(2200);
-  const stillAt = await rush.getByText(/^\d+s$/).innerText();
-  await setHidden(false);
-  await page.waitForTimeout(2200);
-  const resumedAt = await rush.getByText(/^\d+s$/).innerText();
-  check("switching tabs pauses a run and coming back resumes it", frozenAt === stillAt && resumedAt !== stillAt, `${frozenAt} → ${stillAt} → ${resumedAt}`);
-  await close("Rhythm Rush");
-
-  await openFromDesktop("Games");
-  await win("Games").getByRole("button", { name: "Calibrate…" }).first().click();
-  const cal = page.getByRole("dialog", { name: "Calibrate audio timing" });
-  await cal.getByRole("button", { name: "Start" }).click();
-  await page.waitForTimeout(300);
-  check("the audio calibration runs a tap test", await cal.getByRole("button", { name: "Tap on the beat" }).isVisible());
-  await cal.getByRole("button", { name: "Close" }).click();
-  await close("Games");
+  await openFromDesktop("Beat Deck");
+  await page.waitForTimeout(1000);
+  await win("Beat Deck").getByRole("button", { name: /^Continue/ }).click();
+  const won = page.getByRole("dialog", { name: "Round complete" });
+  check("beating the first boss drops the vault's word 2", (await won.innerText()).includes("SCRAP OF PAPER") && (await balloon.innerText().catch(() => "")).includes("Word 2 is NIGHT"));
+  await won.getByRole("button", { name: "Visit the shop ›" }).click();
+  const shop = win("Beat Deck").getByLabel("Shop");
+  const gearBuy = shop.getByRole("button", { name: /^Buy .* for \$/ }).first();
+  const gearName = (await gearBuy.getAttribute("aria-label")).replace(/^Buy (.*) for .*$/, "$1");
+  await gearBuy.click();
+  check("the shop sells gear", await win("Beat Deck").getByLabel("Gear").getByRole("button", { name: gearName }).isVisible(), gearName);
+  await shop.getByRole("button", { name: "Next client ›" }).click();
+  check("the next client starts round 4", await win("Beat Deck").getByText("ROUND 4/8").isVisible());
+  await close("Beat Deck");
 
   // ---- lock / restart ----
   const saver = page.getByRole("status", { name: /Screensaver active/ });
@@ -458,13 +415,13 @@ try {
   const m = await mContext.newPage();
   await m.goto(BASE, { waitUntil: "networkidle" });
   await m.getByLabel("Skip boot sequence").click({ force: true });
-  await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Games", exact: true }).tap();
-  await m.waitForTimeout(500); // let the 160ms open animation (scale .94→1) settle before measuring
-  const gBox = await m.getByRole("region", { name: "Games", exact: true }).boundingBox();
+  await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Beat Deck", exact: true }).tap();
+  await m.waitForTimeout(1200); // the game loads on demand; the open animation (scale .94→1) settles
+  const gBox = await m.getByRole("region", { name: "Beat Deck", exact: true }).boundingBox();
   check("mobile: windows open full-screen", gBox.width >= 389, `w=${gBox?.width}`);
-  await m.getByRole("list", { name: "Games" }).getByRole("button", { name: "Pad Recall" }).tap();
-  await m.waitForTimeout(200);
-  check("mobile: a single tap opens a game", await m.getByRole("region", { name: "Pad Recall", exact: true }).isVisible());
+  await m.getByRole("button", { name: "New run" }).tap();
+  await m.getByLabel("Your hand").getByRole("button", { name: / card$/ }).first().tap();
+  check("mobile: Beat Deck plays with taps", await m.getByRole("button", { name: /^Play take \(1\/5\)/ }).isVisible());
   await m.getByLabel("Taskbar").getByRole("button", { name: "Start", exact: true }).tap();
   await m.getByRole("textbox", { name: "Start Search" }).fill("up up down down left right left right b a");
   await m.waitForTimeout(200);
@@ -472,7 +429,7 @@ try {
     "mobile: the cheat code typed into Start Search reveals word 3",
     (await m.getByRole("status").filter({ hasText: "Hidden word found" }).innerText().catch(() => "")).includes("LOOPS"),
   );
-  for (const title of ["Pad Recall", "Games"]) {
+  for (const title of ["Beat Deck"]) {
     await m.getByRole("button", { name: `Close ${title}`, exact: true }).tap().catch(() => {});
   }
   await m.waitForTimeout(200);

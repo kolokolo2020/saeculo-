@@ -9,7 +9,7 @@ import StartMark from "@/components/ui/StartMark";
 import { useNow } from "@/hooks/useNow";
 import type { WindowKind } from "@/lib/types";
 
-const QUICK_LAUNCH: WindowKind[] = ["player", "beatmaker", "games"];
+const QUICK_LAUNCH: WindowKind[] = ["player", "beatmaker", "beatdeck"];
 
 function TrayClock() {
   const now = useNow();
