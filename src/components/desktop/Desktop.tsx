@@ -157,6 +157,9 @@ export default function Desktop() {
       className="aero-wallpaper relative h-dvh w-full overflow-clip text-ink"
     >
       <AudioEngine />
+      <h1 className="sr-only">
+        {PROFILE.artistName}: {PROFILE.tagline}
+      </h1>
       {booting && <BootScreen onDone={finishBoot} force={forceBoot} />}
 
       {/* wallpaper: drifting aurora ribbons + a quiet wordmark */}

@@ -170,7 +170,7 @@ export default function Table() {
 
           {/* the hand */}
           <div className="border-t border-black/60 bg-black/25 px-3 pt-4 pb-2">
-            <div className="dark-scroll flex gap-2 overflow-x-auto pt-3 pb-2" aria-label="Your hand" data-tour="hand">
+            <div className="dark-scroll flex gap-2 overflow-x-auto pt-3 pb-2" role="group" aria-label="Your hand" data-tour="hand">
               {hand.map(({ uid, inst, def }, i) => (
                 <DeckCard
                   key={uid}

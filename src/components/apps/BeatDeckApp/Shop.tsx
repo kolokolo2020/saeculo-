@@ -44,7 +44,7 @@ export default function Shop({ onShowDeck }: { onShowDeck: () => void }) {
   const key = runKeyFor(run.seed);
 
   return (
-    <div className="dark-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3" aria-label="Shop">
+    <div className="dark-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3" role="region" aria-label="Shop">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-pixel text-[12px] text-white">THE SHOP</h2>
         <p className="text-[12px] text-[#9fb2c9]">

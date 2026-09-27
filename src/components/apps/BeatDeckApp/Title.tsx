@@ -70,7 +70,7 @@ export default function Title() {
         <p className="text-[12.5px] text-[#9fb2c9]">a beatmaking card game by saeculo</p>
       </div>
 
-      <div className="flex -space-x-6 py-2" aria-hidden>
+      <div className="flex -space-x-6 py-2" aria-hidden inert>
         {FAN.map((id, i) => (
           <div key={id} style={{ transform: `rotate(${(i - 1) * 9}deg) translateY(${i === 1 ? -8 : 0}px)` }}>
             <DeckCard def={CARD_BY_ID[id]} compact />

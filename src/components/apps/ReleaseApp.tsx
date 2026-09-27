@@ -50,7 +50,7 @@ export default function ReleaseApp() {
           <dt className="text-mute">Transfer rate:</dt>
           <dd>{progress?.done ? "done" : "1 beat per second"}</dd>
         </dl>
-        <p className="mt-2 h-4 text-[11.5px] text-[#a0782c]" aria-live="polite">
+        <p className="mt-2 h-4 text-[11.5px] text-[#86621d]" aria-live="polite">
           {note}
         </p>
       </div>

@@ -120,10 +120,11 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   progressions, step scheduling, the offline render and share codes.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (86 checks: windows,
+- `scripts/verify.mjs` — a Playwright smoke test (87 checks: windows,
   global audio, the player, gadgets, the Beat Maker, Beat Deck played, the
-  secret hunt, lock/restart, idle screensaver, mobile, iPhone playback). Not part of the build — run it against a dev
-  server on port 3210 after `npm i --no-save playwright-core`.
+  secret hunt, lock/restart, idle screensaver, an axe accessibility audit,
+  mobile, iPhone playback). Not part of the build: run it against a dev
+  server on port 3210 after `npm i --no-save playwright-core axe-core`.
 
 ## Mobile
 

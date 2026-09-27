@@ -95,7 +95,7 @@ export default function RecycleBinApp() {
               className={`cursor-default ${selected === VAULT.name ? "aero-row-selected" : "hover:bg-[#eef5fd]"}`}
             >
               <td className="px-2 py-1">
-                {VAULT.name} <span className="text-[10.5px] text-[#a0782c]">(password protected)</span>
+                {VAULT.name} <span className="text-[10.5px] text-[#86621d]">(password protected)</span>
               </td>
               <td className="px-2 py-1 text-mute max-sm:hidden">{VAULT.from}</td>
               <td className="px-2 py-1 text-mute">{VAULT.deleted}</td>

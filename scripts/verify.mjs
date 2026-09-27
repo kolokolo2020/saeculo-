@@ -1,8 +1,17 @@
 // Browser smoke test for the desktop. Run against a local dev server:
-//   npm i --no-save playwright-core && npm run dev -- -p 3210
+//   npm i --no-save playwright-core axe-core && npm run dev -- -p 3210
 //   node scripts/verify.mjs
+// (axe-core is optional: without it the accessibility check is skipped.)
 import { chromium } from "playwright-core";
 import { readFileSync } from "fs";
+import { createRequire } from "module";
+
+let axeSource = null;
+try {
+  axeSource = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
+} catch {
+  console.log("(axe-core not installed: skipping the accessibility audit)");
+}
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3210";
 const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
@@ -480,6 +489,27 @@ try {
       (await win("Beat Deck").getByRole("button", { name: "New run · Mixtape" }).isVisible()),
   );
   await close("Beat Deck");
+
+  // ---- accessibility: axe over the desktop and the main windows ----
+  if (axeSource) {
+    await page.addScriptTag({ content: axeSource });
+    const problems = [];
+    const audit = async (label) => {
+      const found = await page.evaluate(async () => {
+        const r = await window.axe.run(document, { resultTypes: ["violations"] });
+        return r.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => `${v.id} (${v.nodes[0]?.target.join(" ")})`);
+      });
+      problems.push(...found.map((f) => `${label}: ${f}`));
+    };
+    await audit("desktop");
+    for (const app of ["Media Player", "Beat Maker", "Beat Deck"]) {
+      await openFromDesktop(app);
+      await page.waitForTimeout(900);
+      await audit(app);
+      await close(app === "Media Player" ? "saeculo Media Player" : app);
+    }
+    check("no serious accessibility violations (axe)", problems.length === 0, problems.slice(0, 4).join("; "));
+  }
 
   // ---- lock / restart ----
   const saver = page.getByRole("status", { name: /Screensaver active/ });

@@ -10,7 +10,7 @@ import { useCountUp } from "./useCountUp";
 
 function Pips({ label, left, total }: { label: string; left: number; total: number }) {
   return (
-    <span className="flex items-center gap-1.5" aria-label={`${label}: ${left} of ${total} left`}>
+    <span className="flex items-center gap-1.5" role="img" aria-label={`${label}: ${left} of ${total} left`}>
       <span className="text-[10px] tracking-wide text-[#9fb2c9] uppercase">{label}</span>
       <span className="flex gap-[3px]" aria-hidden>
         {Array.from({ length: total }, (_, i) => (
@@ -57,7 +57,7 @@ export default function Hud({ run, runKey }: { run: RunState; runKey: RunKey }) 
         <p className="flex items-baseline justify-between text-[11px] text-[#9fb2c9]">
           <span>Score</span>
           <span>
-            <span className="font-mono text-[15px] text-white" aria-label="Round score">
+            <span className="font-mono text-[15px] text-white" role="group" aria-label="Round score">
               {fmt(shownScore)}
             </span>{" "}
             / {fmt(run.target)}
@@ -72,7 +72,7 @@ export default function Hud({ run, runKey }: { run: RunState; runKey: RunKey }) 
         <Pips label="Redraws" left={run.redrawsLeft} total={Math.max(redrawsFor(run), run.redrawsLeft)} />
       </div>
       <div className="flex items-center">
-        <span className="rounded-[4px] border border-black bg-[#03070f] px-2 py-1 font-mono text-[15px] text-[#9fffb0] shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)]" aria-label="Money">
+        <span className="rounded-[4px] border border-black bg-[#03070f] px-2 py-1 font-mono text-[15px] text-[#9fffb0] shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)]" role="group" aria-label="Money">
           ${Math.round(money)}
         </span>
       </div>
