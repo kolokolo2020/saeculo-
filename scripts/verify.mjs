@@ -180,11 +180,39 @@ try {
   check("Beat Maker plays", await bm.getByRole("button", { name: "Stop sequencer" }).isVisible());
   await bm.getByRole("button", { name: "Stop sequencer" }).click();
 
+  // painting: a drag lights a run of steps, and undoes as one edit
+  await bm.getByRole("button", { name: "Clear pattern" }).click();
+  const percOn = () => bm.getByRole("group", { name: "perc steps" }).locator('[aria-pressed="true"]').count();
+  const p1 = await bm.getByLabel("perc step 1", { exact: true }).boundingBox();
+  const p6 = await bm.getByLabel("perc step 6", { exact: true }).boundingBox();
+  await page.mouse.move(p1.x + p1.width / 2, p1.y + p1.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(p6.x + p6.width / 2, p6.y + p6.height / 2, { steps: 12 });
+  await page.mouse.up();
+  const painted = await percOn();
+  await bm.getByRole("button", { name: "Undo" }).click();
+  check("Beat Maker: a drag paints steps and undoes in one go", painted === 6 && (await percOn()) === 0, `${painted} painted`);
+  await bm.getByLabel("keys step 1", { exact: true }).click({ button: "right" });
+  check("Beat Maker: right-click accents a step", (await bm.getByLabel("keys step 1", { exact: true }).getAttribute("data-accent")) === "true");
+  const swingKnob = bm.getByRole("slider", { name: "Swing" });
+  const swing0 = Number(await swingKnob.getAttribute("aria-valuenow"));
+  await swingKnob.focus();
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  check("Beat Maker: the swing knob turns with the keyboard", Number(await swingKnob.getAttribute("aria-valuenow")) === swing0 + 2);
+  await bm.getByRole("combobox", { name: "Key" }).selectOption({ label: "A minor" });
+  check(
+    "Beat Maker: the chord display follows the key and progression",
+    (await bm.getByRole("list", { name: "Chord progression" }).getByRole("listitem").first().textContent()) === "Am7",
+  );
+
   await bm.getByRole("combobox", { name: "Load preset" }).selectOption("House");
+  await bm.getByLabel("kick step 1", { exact: true }).click({ button: "right" });
+  await bm.getByRole("button", { name: "Mute Rim" }).click();
   await bm.getByRole("button", { name: "Copy share link" }).click();
   const shareLink = await bm.getByRole("textbox", { name: "Share link" }).inputValue();
-  // House @124: kick 0/4/8/12 → 1111, snare 4/12 → 1010, hat 2/6/10/14 → 4444, bass → 4c4c
-  check("share link encodes the loop", shareLink.endsWith("#beat=124-1111101044444c4c"), shareLink);
+  // House: 124 bpm, swing 20, A♭ minor (8), progression 4, filter open
+  check("share link encodes the loop", /#beat=2\.124\.20\.8\.4\.100\.[A-Za-z0-9_-]{44}$/.test(shareLink), shareLink);
 
   const [download] = await Promise.all([
     page.waitForEvent("download"),
@@ -209,8 +237,15 @@ try {
       (await sharedBm.getByText("124 bpm").count()) === 1 &&
       (await sharedBm.getByLabel("bass step 4").getAttribute("aria-pressed")) === "true",
   );
+  check(
+    "a share link carries accents, swing and mutes",
+    (await sharedBm.getByLabel("kick step 1", { exact: true }).getAttribute("data-accent")) === "true" &&
+      (await sharedBm.getByRole("slider", { name: "Swing" }).getAttribute("aria-valuenow")) === "20" &&
+      (await sharedBm.getByRole("button", { name: "Mute Rim" }).getAttribute("aria-pressed")) === "true",
+  );
   check("share hash is cleared after import", (await shared.evaluate(() => location.hash)) === "");
-  // a link pasted into a tab that already has the site open only changes the hash
+  // a link pasted into a tab that already has the site open only changes
+  // the hash (old four-lane links still load)
   await shared.evaluate(() => (location.hash = "#beat=90-0001000000000000"));
   await shared.waitForTimeout(300);
   check(

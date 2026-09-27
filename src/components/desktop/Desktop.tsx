@@ -19,7 +19,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { PROFILE } from "@/data/profile";
-import { decodeBeat, setPendingBeat } from "@/lib/beatCode";
+import { decodeGroove, setPendingGroove } from "@/lib/groove";
 import { trackIndexFromHash } from "@/lib/trackLink";
 import MediaPlayerApp from "@/components/apps/MediaPlayerApp";
 import AboutApp from "@/components/apps/AboutApp";
@@ -119,10 +119,10 @@ export default function Desktop() {
   useEffect(() => {
     const importFromHash = () => {
       const { hash } = window.location;
-      const beat = decodeBeat(hash);
+      const beat = decodeGroove(hash);
       const trackIndex = trackIndexFromHash(hash);
       if (beat) {
-        setPendingBeat(beat);
+        setPendingGroove(beat);
         useWindowStore.getState().openWindow("beatmaker");
       } else if (trackIndex >= 0) {
         // a track link: cue it up in the player (browsers only allow

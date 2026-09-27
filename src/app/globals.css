@@ -220,6 +220,26 @@
   }
 }
 
+/* Beat Maker: a lit step pops as the playhead crosses it */
+@keyframes bm-hit {
+  from {
+    scale: 1.14;
+    filter: brightness(1.7);
+  }
+  to {
+    scale: 1;
+    filter: brightness(1);
+  }
+}
+.bm-hit {
+  animation: bm-hit 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bm-hit {
+    animation: none;
+  }
+}
+
 @keyframes deck-deal {
   from {
     opacity: 0;

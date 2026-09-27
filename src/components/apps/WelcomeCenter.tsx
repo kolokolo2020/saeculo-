@@ -15,7 +15,7 @@ export const WELCOME_KEY = "saeculo-welcome";
 const TASKS: { kind: WindowKind; title: string; text: string }[] = [
   { kind: "player", title: "Listen to the beats", text: "Every track, with visualizers made from its cover." },
   { kind: "beatdeck", title: "Play Beat Deck", text: "A card game where every hand is a beat. Beat the bosses." },
-  { kind: "beatmaker", title: "Make a beat", text: "A 16-step drum machine. Share the loop with a link." },
+  { kind: "beatmaker", title: "Make a beat", text: "An 8-lane groovebox with chords. Share the loop with a link." },
   { kind: "release", title: "Next single", text: "The countdown to what's coming." },
   { kind: "about", title: "About saeculo", text: "Who's behind the beats." },
   { kind: "contact", title: "Booking & collabs", text: "Send a message straight to saeculo." },

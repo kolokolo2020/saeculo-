@@ -33,11 +33,11 @@ export const APPS: AppMeta[] = [
     kind: "beatmaker",
     title: "Beat Maker",
     label: "Beat Maker",
-    description: "Build a 16-step drum loop",
+    description: "An 8-lane groovebox with chords, swing and a filter",
     category: "app",
     surface: "dark",
     onDesktop: true,
-    defaultSize: { width: 640, height: 430 },
+    defaultSize: { width: 840, height: 650 },
   },
   {
     kind: "beatdeck",

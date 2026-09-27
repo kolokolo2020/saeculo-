@@ -5,8 +5,9 @@
 import type { CardDef, Hit } from "@/lib/beatdeck/cards";
 import { TRACKS, gridTempo } from "@/data/tracks";
 import { loadBuffer } from "@/lib/audioBuffers";
-import { encodeWav } from "@/lib/beatCode";
+import { encodeWav } from "@/lib/wav";
 import { playHat, playKick, playSnare } from "@/lib/synth";
+import { hz, noiseBuffer, noiseBurst, play808, tone } from "@/lib/voices";
 
 // ---- keys: a run is in the key of one of saeculo's tracks, so that
 // track's chops play untouched and the others are re-pitched to fit.
@@ -28,7 +29,6 @@ export const runKeyFor = (seed: number) => RUN_KEYS[Math.abs(seed) % RUN_KEYS.le
 
 const TRACK_PC: Record<string, number> = { care4me: 5, elbtunnel: 8, "dull-knife": 2 };
 
-const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
 /** The relative-minor tonic in the given octave range. */
 function tonic(key: RunKey, low: number) {
   const minorPc = (key.pc + 9) % 12;
@@ -75,95 +75,6 @@ function playChop(ctx: BaseAudioContext, dest: AudioNode, time: number, chop: No
 }
 
 // ---- synthesized voices
-
-let noise: AudioBuffer | null = null;
-function noiseBuffer(ctx: BaseAudioContext) {
-  if (noise && noise.sampleRate === ctx.sampleRate) return noise;
-  noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-  const d = noise.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-  return noise;
-}
-
-function noiseBurst(
-  ctx: BaseAudioContext,
-  dest: AudioNode,
-  time: number,
-  opts: { type: BiquadFilterType; freq: number; q?: number; gain: number; decay: number },
-) {
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer(ctx);
-  const f = ctx.createBiquadFilter();
-  f.type = opts.type;
-  f.frequency.value = opts.freq;
-  f.Q.value = opts.q ?? 0.7;
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(opts.gain, time);
-  g.gain.exponentialRampToValueAtTime(0.001, time + opts.decay);
-  src.connect(f).connect(g).connect(dest);
-  src.start(time, Math.random() * 1.5);
-  src.stop(time + opts.decay + 0.02);
-}
-
-function tone(
-  ctx: BaseAudioContext,
-  dest: AudioNode,
-  time: number,
-  opts: { type: OscillatorType; freq: number; gain: number; attack?: number; decay: number; toFreq?: number; glideTime?: number; lowpass?: number },
-) {
-  const osc = ctx.createOscillator();
-  osc.type = opts.type;
-  osc.frequency.setValueAtTime(opts.freq, time);
-  if (opts.toFreq) osc.frequency.exponentialRampToValueAtTime(opts.toFreq, time + (opts.glideTime ?? 0.1));
-  const g = ctx.createGain();
-  const attack = opts.attack ?? 0.005;
-  g.gain.setValueAtTime(0.0001, time);
-  g.gain.exponentialRampToValueAtTime(opts.gain, time + attack);
-  g.gain.exponentialRampToValueAtTime(0.001, time + attack + opts.decay);
-  let node: AudioNode = osc;
-  if (opts.lowpass) {
-    const f = ctx.createBiquadFilter();
-    f.type = "lowpass";
-    f.frequency.setValueAtTime(opts.lowpass, time);
-    f.frequency.exponentialRampToValueAtTime(Math.max(200, opts.lowpass / 6), time + attack + opts.decay);
-    node = osc.connect(f);
-  }
-  node.connect(g).connect(dest);
-  osc.start(time);
-  osc.stop(time + attack + opts.decay + 0.05);
-}
-
-let drive: Float32Array<ArrayBuffer> | null = null;
-function driveCurve() {
-  if (drive) return drive;
-  drive = new Float32Array(1024);
-  for (let i = 0; i < drive.length; i++) {
-    const x = (i / (drive.length - 1)) * 2 - 1;
-    drive[i] = Math.tanh(x * 2.5);
-  }
-  return drive;
-}
-
-function play808(ctx: BaseAudioContext, dest: AudioNode, time: number, freq: number, glideTo: number | undefined, stepDur: number, gain: number) {
-  const osc = ctx.createOscillator();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(freq * 2.2, time);
-  osc.frequency.exponentialRampToValueAtTime(freq, time + 0.03);
-  if (glideTo) {
-    osc.frequency.setValueAtTime(freq, time + stepDur * 1.5);
-    osc.frequency.exponentialRampToValueAtTime(glideTo, time + stepDur * 3);
-  }
-  const shaper = ctx.createWaveShaper();
-  shaper.curve = driveCurve();
-  const g = ctx.createGain();
-  const len = Math.max(0.5, stepDur * 5);
-  g.gain.setValueAtTime(gain, time);
-  g.gain.setValueAtTime(gain, time + len * 0.5);
-  g.gain.exponentialRampToValueAtTime(0.001, time + len);
-  osc.connect(shaper).connect(g).connect(dest);
-  osc.start(time);
-  osc.stop(time + len + 0.02);
-}
 
 function playRiser(ctx: BaseAudioContext, dest: AudioNode, time: number, length: number) {
   const src = ctx.createBufferSource();
@@ -236,7 +147,14 @@ function playHit(
       noiseBurst(ctx, dest, time, { type: "highpass", freq: 6500, gain: 0.2 * gainScale, decay: 0.28 });
       break;
     case "808":
-      play808(ctx, dest, time, semi(bassRoot, hit.note), hit.glide !== undefined ? semi(bassRoot, hit.glide) : undefined, stepDur, 0.55 * gainScale);
+      play808(ctx, dest, time, {
+        freq: semi(bassRoot, hit.note),
+        length: Math.max(0.5, stepDur * 5),
+        gain: 0.55 * gainScale,
+        glideTo: hit.glide !== undefined ? semi(bassRoot, hit.glide) : undefined,
+        glideAt: stepDur * 1.5,
+        glideTime: stepDur * 1.5,
+      });
       break;
     case "sub":
       tone(ctx, dest, time, { type: "triangle", freq: semi(bassRoot * 2, hit.note), gain: 0.5 * gainScale, attack: 0.01, decay: stepDur * 2.5, lowpass: 900 });
