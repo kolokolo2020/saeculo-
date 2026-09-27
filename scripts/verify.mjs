@@ -345,6 +345,76 @@ try {
   await close("vault.zip");
   await close("Recycle Bin");
 
+  // ---- player polish: track links, saved volume, lock-screen info ----
+  await page.goto(`${BASE}/#track=elbtunnel`, { waitUntil: "networkidle" });
+  await page.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
+  await page.waitForTimeout(400);
+  const linked = win("saeculo Media Player");
+  check(
+    "a #track= link opens the player on that track",
+    (await linked.isVisible()) && (await linked.getByText("elbtunnel", { exact: true }).first().isVisible()),
+  );
+  check("the track hash is cleared after opening", (await page.evaluate(() => location.hash)) === "");
+  await linked.getByRole("tab", { name: "Library" }).click();
+  await linked.getByRole("button", { name: "Copy link to elbtunnel" }).click();
+  check(
+    "Copy link copies a direct track link",
+    (await page.evaluate(() => navigator.clipboard.readText())).endsWith("/#track=elbtunnel"),
+  );
+  await linked.getByRole("slider", { name: "Volume" }).fill("0.35");
+  await linked.getByRole("button", { name: "Play", exact: true }).click();
+  await page.waitForTimeout(600);
+  check(
+    "lock-screen controls show the track and cover",
+    await page.evaluate(
+      () => navigator.mediaSession.metadata?.title === "elbtunnel" && /covers\/elbtunnel\.jpg$/.test(navigator.mediaSession.metadata?.artwork[0]?.src ?? ""),
+    ),
+  );
+  await linked.getByRole("button", { name: "Pause", exact: true }).click();
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(300);
+  check(
+    "the volume setting survives a reload",
+    Math.abs((await page.getByTestId("player-audio").evaluate((a) => a.volume)) - 0.35) < 0.01,
+  );
+  check(
+    "the player shows the track length before playing",
+    await page.waitForFunction(() => {
+      const a = document.querySelector("[data-testid=player-audio]");
+      return a && Number.isFinite(a.duration) && a.duration > 60;
+    }, null, { timeout: 5000 }).then(() => true, () => false),
+  );
+
+  // ---- games polish: pause on tab switch, calibration ----
+  await openFromStart("Rhythm Rush");
+  const rush = win("Rhythm Rush");
+  await rush.getByRole("button", { name: "Start" }).click();
+  await page.waitForTimeout(2500);
+  const setHidden = (hidden) =>
+    page.evaluate((h) => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => h });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, hidden);
+  await setHidden(true);
+  await page.waitForTimeout(300);
+  const frozenAt = await rush.getByText(/^\d+s$/).innerText();
+  await page.waitForTimeout(2200);
+  const stillAt = await rush.getByText(/^\d+s$/).innerText();
+  await setHidden(false);
+  await page.waitForTimeout(2200);
+  const resumedAt = await rush.getByText(/^\d+s$/).innerText();
+  check("switching tabs pauses a run and coming back resumes it", frozenAt === stillAt && resumedAt !== stillAt, `${frozenAt} → ${stillAt} → ${resumedAt}`);
+  await close("Rhythm Rush");
+
+  await openFromDesktop("Games");
+  await win("Games").getByRole("button", { name: "Calibrate…" }).first().click();
+  const cal = page.getByRole("dialog", { name: "Calibrate audio timing" });
+  await cal.getByRole("button", { name: "Start" }).click();
+  await page.waitForTimeout(300);
+  check("the audio calibration runs a tap test", await cal.getByRole("button", { name: "Tap on the beat" }).isVisible());
+  await cal.getByRole("button", { name: "Close" }).click();
+  await close("Games");
+
   // ---- lock / restart ----
   const saver = page.getByRole("status", { name: /Screensaver active/ });
   await page.getByRole("button", { name: "Start", exact: true }).click();
@@ -402,7 +472,47 @@ try {
     "mobile: the cheat code typed into Start Search reveals word 3",
     (await m.getByRole("status").filter({ hasText: "Hidden word found" }).innerText().catch(() => "")).includes("LOOPS"),
   );
+  for (const title of ["Pad Recall", "Games"]) {
+    await m.getByRole("button", { name: `Close ${title}`, exact: true }).tap().catch(() => {});
+  }
+  await m.waitForTimeout(200);
+  await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Beat Maker", exact: true }).tap();
+  await m.waitForTimeout(500);
+  const cell = await m.getByRole("button", { name: "kick step 1", exact: true }).boundingBox();
+  check("mobile: Beat Maker steps are big enough to tap", cell.width >= 28, `${Math.round(cell.width)}px`);
   await mContext.close();
+
+  // ---- iPhone: plain <audio> (keeps playing with the screen locked) ----
+  const iContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+  });
+  const ip = await iContext.newPage();
+  await ip.goto(BASE, { waitUntil: "networkidle" });
+  await ip.getByLabel("Skip boot sequence").click({ force: true });
+  await ip.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Media Player", exact: true }).tap();
+  await ip.waitForTimeout(400);
+  await ip.getByRole("button", { name: "Play", exact: true }).tap();
+  await ip.waitForTimeout(800);
+  const canvasHash = () =>
+    ip.evaluate(() => {
+      const c = document.querySelector('section[aria-label="saeculo Media Player"] canvas');
+      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+      let h = 0;
+      for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) >>> 0;
+      return h;
+    });
+  const h1 = await canvasHash();
+  await ip.waitForTimeout(300);
+  const h2 = await canvasHash();
+  check(
+    "iPhone: music plays without the Web Audio graph, and the visualizer still moves",
+    !(await ip.getByTestId("player-audio").evaluate((a) => a.paused)) && h1 !== h2,
+  );
+  await iContext.close();
 } finally {
   await browser.close();
 }

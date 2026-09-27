@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { playBass, playBlip, playHat, playKick, playSnare } from "@/lib/synth";
 import { readBest, submitBest } from "@/lib/bestScores";
 import { usePlayerStore } from "@/components/player/playerStore";
+import { getAudioContext } from "@/lib/audioContext";
 
 export const PAD_KEYS = ["q", "w", "e", "r", "a", "s", "d", "f"] as const;
 export const PAD_NAMES = ["Kick", "Snare", "Hat", "Blip", "Sub", "Low", "Mid", "Bell"];
@@ -90,8 +91,7 @@ export function usePadRecall() {
 
   const start = useCallback(() => {
     usePlayerStore.getState().pause();
-    if (!ctxRef.current) ctxRef.current = new AudioContext();
-    void ctxRef.current.resume();
+    ctxRef.current = getAudioContext();
     clearTimers();
     seqRef.current = [];
     setWrongPad(null);
@@ -135,7 +135,6 @@ export function usePadRecall() {
   useEffect(() => {
     return () => {
       timersRef.current.forEach(clearTimeout);
-      void ctxRef.current?.close();
     };
   }, []);
 

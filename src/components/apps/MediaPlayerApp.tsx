@@ -7,6 +7,7 @@ import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore
 import Visualizer, { VIZ_LABEL, VIZ_MODES } from "@/components/player/Visualizer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import Glyph from "@/components/ui/Glyph";
+import { trackUrl } from "@/lib/trackLink";
 
 type Tab = "now" | "library";
 
@@ -15,6 +16,18 @@ type Tab = "now" | "library";
 export default function MediaPlayerApp() {
   const [tab, setTab] = useState<Tab>("now");
   const [vizIndex, setVizIndex] = useState(0);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copyLink = async (id: string) => {
+    const url = trackUrl(id);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(id);
+      setTimeout(() => setCopied((c) => (c === id ? null : c)), 2000);
+    } catch {
+      window.prompt("Copy this link:", url);
+    }
+  };
   const reducedMotion = usePrefersReducedMotion();
 
   const track = useCurrentTrack();
@@ -30,8 +43,16 @@ export default function MediaPlayerApp() {
 
   const vizMode = VIZ_MODES[vizIndex];
 
+  // Space toggles playback while the player has focus (buttons and sliders
+  // keep their own Space behaviour)
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== " " || (e.target as HTMLElement).closest("button, input, a, select")) return;
+    e.preventDefault();
+    toggle();
+  };
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" onKeyDown={onKeyDown}>
       {/* tabs */}
       <div className="aero-toolbar-dark flex h-9 shrink-0 items-end gap-1 px-2" role="tablist">
         {(
@@ -67,6 +88,7 @@ export default function MediaPlayerApp() {
                 // eslint-disable-next-line @next/next/no-img-element -- a small local cover; no optimizer needed
                 <img
                   src={track.cover}
+                  loading="lazy"
                   alt={`${track.title} cover art`}
                   width={72}
                   height={72}
@@ -110,7 +132,7 @@ export default function MediaPlayerApp() {
                     <span className="flex min-w-0 items-center gap-2">
                       {t.cover && (
                         // eslint-disable-next-line @next/next/no-img-element -- tiny local thumbnail
-                        <img src={t.cover} alt="" width={24} height={24} className="h-6 w-6 shrink-0 rounded-[2px]" />
+                        <img src={t.cover} loading="lazy" alt="" width={24} height={24} className="h-6 w-6 shrink-0 rounded-[2px]" />
                       )}
                       <span className="truncate">{t.title}</span>
                     </span>
@@ -118,7 +140,7 @@ export default function MediaPlayerApp() {
                     <span className="text-right text-[#9fb2c9]">{t.bpm}</span>
                   </button>
                   {isCurrent && (
-                    <div className="flex gap-3 px-10 pt-0.5 pb-1.5">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 px-10 pt-0.5 pb-1.5">
                       {t.streamingLinks.map((link) => (
                         <a
                           key={link.label}
@@ -130,6 +152,13 @@ export default function MediaPlayerApp() {
                           {link.label} ↗
                         </a>
                       ))}
+                      <button
+                        onClick={() => void copyLink(t.id)}
+                        aria-label={`Copy link to ${t.title}`}
+                        className="text-[12px] text-[#9fb2c9] hover:text-white hover:underline"
+                      >
+                        {copied === t.id ? "Link copied ✓" : "Copy link"}
+                      </button>
                     </div>
                   )}
                 </li>

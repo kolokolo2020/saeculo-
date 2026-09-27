@@ -9,6 +9,7 @@ import { useNow } from "@/hooks/useNow";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { PROFILE } from "@/data/profile";
 import { formatLeft, releaseProgress } from "@/lib/release";
+import { readWaveform } from "@/components/player/spectrum";
 
 // Trig results can differ in the last float digit between the server's
 // and the browser's JS engines, which breaks hydration — round them.
@@ -88,7 +89,7 @@ function NowPlayingGadget() {
       <div className="mt-1.5 flex items-center gap-2">
         {track.cover && (
           // eslint-disable-next-line @next/next/no-img-element -- tiny local thumbnail
-          <img src={track.cover} alt="" width={30} height={30} className="h-[30px] w-[30px] shrink-0 rounded-[2px] border border-white/25" />
+          <img src={track.cover} loading="lazy" alt="" width={30} height={30} className="h-[30px] w-[30px] shrink-0 rounded-[2px] border border-white/25" />
         )}
         <div className="min-w-0 flex-1">
           <button
@@ -158,10 +159,8 @@ function MeterGadget() {
     let raf = 0;
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      const { analyser, playing } = usePlayerStore.getState();
       let target = 0;
-      if (analyser && playing) {
-        analyser.getByteTimeDomainData(buf);
+      if (readWaveform(buf)) {
         let sum = 0;
         for (let i = 0; i < buf.length; i++) {
           const v = (buf[i] - 128) / 128;

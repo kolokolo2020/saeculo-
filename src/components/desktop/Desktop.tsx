@@ -19,6 +19,7 @@ import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { PROFILE } from "@/data/profile";
 import { decodeBeat, setPendingBeat } from "@/lib/beatCode";
+import { trackIndexFromHash } from "@/lib/trackLink";
 import MediaPlayerApp from "@/components/apps/MediaPlayerApp";
 import AboutApp from "@/components/apps/AboutApp";
 import ContactApp from "@/components/apps/ContactApp";
@@ -106,10 +107,20 @@ export default function Desktop() {
   // so listen for that too.
   useEffect(() => {
     const importFromHash = () => {
-      const beat = decodeBeat(window.location.hash);
-      if (!beat) return;
-      setPendingBeat(beat);
-      useWindowStore.getState().openWindow("beatmaker");
+      const { hash } = window.location;
+      const beat = decodeBeat(hash);
+      const trackIndex = trackIndexFromHash(hash);
+      if (beat) {
+        setPendingBeat(beat);
+        useWindowStore.getState().openWindow("beatmaker");
+      } else if (trackIndex >= 0) {
+        // a track link: cue it up in the player (browsers only allow
+        // playback to start from a tap, so the visitor presses play)
+        usePlayerStore.getState().selectTrack(trackIndex, false);
+        useWindowStore.getState().openWindow("player");
+      } else {
+        return;
+      }
       history.replaceState(null, "", window.location.pathname + window.location.search);
     };
     importFromHash();

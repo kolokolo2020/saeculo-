@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playBass, playHat, playKick, playSnare } from "@/lib/synth";
+import { getAudioContext } from "@/lib/audioContext";
 import { usePlayerStore } from "@/components/player/playerStore";
 import {
   bassFreqForStep,
@@ -131,9 +132,17 @@ export function useStepSequencer() {
   const scheduler = useCallback(() => {
     const ctx = ctxRef.current;
     if (!ctx) return;
+    // Background tabs throttle timers to ~1/s; skip the steps that went by
+    // instead of firing them all at once when the tab comes back.
+    const stepDur = 60 / bpmRef.current / 4;
+    const behind = ctx.currentTime - nextTimeRef.current;
+    if (behind > stepDur) {
+      const missed = Math.ceil(behind / stepDur);
+      nextTimeRef.current += missed * stepDur;
+      nextStepRef.current = (nextStepRef.current + missed) % STEP_COUNT;
+    }
     while (nextTimeRef.current < ctx.currentTime + SCHEDULE_AHEAD_S) {
       scheduleStep(nextStepRef.current, nextTimeRef.current);
-      const stepDur = 60 / bpmRef.current / 4;
       nextTimeRef.current += stepDur;
       nextStepRef.current = (nextStepRef.current + 1) % STEP_COUNT;
     }
@@ -157,8 +166,7 @@ export function useStepSequencer() {
   const play = useCallback(() => {
     // one soundtrack at a time: the media player steps aside
     usePlayerStore.getState().pause();
-    if (!ctxRef.current) ctxRef.current = new AudioContext();
-    else if (ctxRef.current.state === "suspended") void ctxRef.current.resume();
+    ctxRef.current = getAudioContext();
     nextStepRef.current = 0;
     nextTimeRef.current = ctxRef.current.currentTime + 0.05;
     scheduledRef.current = [];
@@ -233,7 +241,6 @@ export function useStepSequencer() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       cancelAnimationFrame(rafRef.current);
-      void ctxRef.current?.close();
     };
   }, []);
 

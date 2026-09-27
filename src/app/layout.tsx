@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Open_Sans, Press_Start_2P } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
+import { TRACKS } from "@/data/tracks";
 import "./globals.css";
 
 // Segoe UI is the real Vista face, but it can't be served from Google
@@ -64,6 +65,13 @@ const jsonLd = {
   description,
   email: PROFILE.bookingEmail,
   sameAs: PROFILE.socials.map((social) => social.url),
+  track: TRACKS.map((t) => ({
+    "@type": "MusicRecording",
+    name: t.title,
+    url: `${siteUrl}/#track=${t.id}`,
+    byArtist: { "@type": "MusicGroup", name: PROFILE.artistName },
+    ...(t.cover ? { image: `${siteUrl}${t.cover}` } : {}),
+  })),
 };
 
 export const viewport: Viewport = {
