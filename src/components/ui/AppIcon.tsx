@@ -237,6 +237,50 @@ export default function AppIcon({ kind, size = 48 }: { kind: WindowKind; size?: 
         </>
       );
       break;
+    case "footage":
+      // a typed page gone yellow, with a strip of film and a stain
+      body = (
+        <>
+          <defs>
+            <linearGradient id={`${id}-old`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#f3ead2" />
+              <stop offset="1" stopColor="#d6c7a0" />
+            </linearGradient>
+          </defs>
+          <path d="M10 5h20l8 8v30H10z" fill={u("old")} stroke="#7a6a48" strokeWidth="1" strokeLinejoin="round" />
+          <path d="M30 5v8h8" fill="#e6dab8" stroke="#7a6a48" strokeWidth="1" strokeLinejoin="round" />
+          {[0, 1, 2, 3].map((i) => (
+            <line key={i} x1="14" y1={17 + i * 4.5} x2={i === 3 ? 25 : 32} y2={17 + i * 4.5} stroke="#4a3f2c" strokeWidth="1.1" strokeDasharray="2 1" />
+          ))}
+          <circle cx="31" cy="34" r="5" fill="#8e1b1b" opacity="0.28" />
+          <rect x="5" y="30" width="22" height="11" fill="#141414" stroke="#000" strokeWidth="0.8" transform="rotate(-12 16 35)" />
+          {[0, 1, 2, 3].map((i) => (
+            <rect key={i} x={6.5 + i * 5.3} y="31.2" width="2.4" height="1.8" fill="#d8d0b8" transform="rotate(-12 16 35)" />
+          ))}
+          <rect x="9" y="34" width="13" height="4" fill="#5a2a2a" opacity="0.9" transform="rotate(-12 16 35)" />
+        </>
+      );
+      break;
+    case "pictures":
+      // a folder with a photo sticking out of it
+      body = (
+        <>
+          <defs>
+            <linearGradient id={`${id}-folder`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#ffe28a" />
+              <stop offset="1" stopColor="#e0a525" />
+            </linearGradient>
+          </defs>
+          <path d="M4 12h14l3 3h23v25H4z" fill="#c98d14" stroke="#8a5a06" strokeWidth="1" strokeLinejoin="round" />
+          <rect x="12" y="8" width="24" height="20" fill="#fff" stroke="#8d8d8d" strokeWidth="0.8" transform="rotate(-6 24 18)" />
+          <rect x="14.5" y="10.5" width="19" height="13" fill="#1a0f14" transform="rotate(-6 24 18)" />
+          <circle cx="24" cy="17" r="3.4" fill="#e7dcc3" transform="rotate(-6 24 18)" />
+          <circle cx="24" cy="17" r="1.6" fill="#7e1414" transform="rotate(-6 24 18)" />
+          <path d="M4 19h40l-2 21H6z" fill={u("folder")} stroke="#8a5a06" strokeWidth="1" strokeLinejoin="round" />
+          <path d="M6 21h36" stroke="#fff" strokeOpacity="0.6" strokeWidth="1" />
+        </>
+      );
+      break;
   }
 
   return (

@@ -8,7 +8,7 @@ import AppIcon from "@/components/ui/AppIcon";
 import { useAmbienceStore } from "./ambienceStore";
 import Glyph from "@/components/ui/Glyph";
 import StartMark from "@/components/ui/StartMark";
-import { useNow } from "@/hooks/useNow";
+import { useClockNow } from "./hauntStore";
 import type { WindowKind } from "@/lib/types";
 import { paletteFor } from "@/components/player/analysis";
 
@@ -70,15 +70,17 @@ function TrayRoomTone() {
 }
 
 function TrayClock() {
-  const now = useNow();
+  // seconds only show while a haunt runs the clock backwards
+  const { now, reversed } = useClockNow();
   if (!now) return <span className="w-14" />;
   const d = new Date(now);
   return (
     <span
-      className="px-2 text-center text-[12px] leading-tight text-white"
+      className={`px-2 text-center text-[12px] leading-tight ${reversed ? "haunt-clock" : "text-white"}`}
+      data-testid="tray-clock"
       title={d.toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
     >
-      {d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+      {d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", ...(reversed && { second: "2-digit" }) })}
     </span>
   );
 }

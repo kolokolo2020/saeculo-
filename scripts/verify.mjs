@@ -82,7 +82,7 @@ try {
   const desktop = page.getByRole("navigation", { name: "Desktop" });
   const openFromDesktop = async (label) => {
     await desktop.getByRole("button", { name: label, exact: true }).click();
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(700); // the CRT switch-on settles
   };
   const win = (title) => page.getByRole("region", { name: title, exact: true });
   const close = async (title) => {
@@ -98,7 +98,7 @@ try {
   check("boot screen appears", await page.getByLabel("Skip boot sequence").isVisible().catch(() => false));
   await page.getByLabel("Skip boot sequence").click({ force: true });
   await page.waitForTimeout(300);
-  check("desktop shows 7 icons", (await desktop.getByRole("button").count()) === 7);
+  check("desktop shows 9 icons", (await desktop.getByRole("button").count()) === 9);
   const welcome = win("Welcome Center");
   check("the Welcome Center greets a first visit", await welcome.getByRole("button", { name: "Play care4me" }).isVisible());
   await welcome.getByRole("checkbox", { name: "Show at startup" }).uncheck();
@@ -107,7 +107,7 @@ try {
   // ---- media player + global audio ----
   await desktop.getByRole("button", { name: "Media Player", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(800); // the CRT switch-on settles
   const player = win("saeculo Media Player");
   check("player opens via keyboard Enter on icon", await player.isVisible());
 
@@ -176,7 +176,7 @@ try {
   await page.waitForTimeout(200);
   check("audio survives minimize", (await audioPaused()) === false);
   await page.getByRole("button", { name: "Taskbar saeculo Media Player" }).click();
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(400);
   check("taskbar button restores the window", await player.isVisible());
 
   await close("saeculo Media Player");
@@ -404,6 +404,74 @@ try {
   );
   await close("Recycle Bin");
 
+  // ---- mystique: the lore file, Pictures, tube windows, the haunts ----
+  await openFromDesktop("found_footage.txt");
+  const footage = win("found_footage.txt - Notepad");
+  check(
+    "found_footage.txt is a typed log from the night the tapes were made",
+    (await footage.innerText()).includes("REEL ONE") && (await footage.locator("dt").count()) >= 8,
+  );
+  check("on a Tape desktop, windows switch on like a CRT", (await footage.evaluate((el) => getComputedStyle(el).animationName)) === "crt-on");
+  const trueTitle = await footage.locator("h2").innerText();
+  check("a haunt can change a window title", (await page.evaluate(() => window.__saeculoHaunt("title"))) === true);
+  await page.waitForTimeout(100);
+  check(
+    "the haunted title shows something else, but the window keeps its name",
+    (await footage.locator("h2 [aria-hidden]").innerText()) !== trueTitle && (await footage.count()) === 1,
+  );
+  await page.waitForTimeout(2700);
+  check("…and goes back a moment later", (await footage.locator("h2").innerText()) === trueTitle);
+  await page.getByRole("button", { name: "Close found_footage.txt - Notepad" }).click();
+  await page.waitForTimeout(80);
+  check("closing a window collapses it like a tube switching off", (await footage.evaluate((el) => getComputedStyle(el).animationName).catch(() => "gone")) === "crt-off");
+  await footage.waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+
+  await openFromDesktop("Pictures");
+  const pics = win("Pictures");
+  await pics.getByRole("list", { name: "Pictures" }).waitFor({ timeout: 4000 }).catch(() => {});
+  check("Pictures holds the Room's poster and three flyers", (await pics.getByRole("button", { name: /^Open .*\.jpg$/ }).count()) === 4);
+  await pics.getByRole("button", { name: "Open poster.jpg" }).click();
+  check("a picture opens with a description", await pics.getByRole("img", { name: /THE SAECULO TAPES/ }).isVisible());
+  await page.keyboard.press("ArrowRight");
+  check("the arrow keys step to the next picture", await pics.getByRole("img", { name: /WAREHOUSE/ }).isVisible());
+  await page.keyboard.press("Escape");
+  check("Escape goes back to the folder", await pics.getByRole("list", { name: "Pictures" }).isVisible());
+  await close("Pictures");
+
+  await openFromDesktop("Recycle Bin");
+  await page.evaluate(() => window.__saeculoHaunt("bin"));
+  await page.waitForTimeout(150);
+  const ghostRow = win("Recycle Bin").getByTestId("haunt-row");
+  check("a file flickers into the Recycle Bin…", (await ghostRow.isVisible()) && (await page.getByTestId("haunt-ghost").count()) === 1);
+  await page.waitForTimeout(2900);
+  check("…and vanishes", (await ghostRow.count()) === 0 && (await page.getByTestId("haunt-ghost").count()) === 0);
+  await close("Recycle Bin");
+
+  const trayClock = page.getByTestId("tray-clock");
+  const clockSecs = async () => {
+    const [h, m, sec] = (await trayClock.innerText()).match(/\d+/g).map(Number);
+    return h * 3600 + m * 60 + (sec ?? 0);
+  };
+  await page.evaluate(() => window.__saeculoHaunt("clock"));
+  await page.waitForTimeout(1100);
+  const c1 = await clockSecs();
+  await page.waitForTimeout(1100);
+  const c2 = await clockSecs();
+  check("the clock ticks backwards", c2 < c1, `${c1} → ${c2}`);
+  await page.waitForTimeout(2200);
+  check("…then the clock is right again", !/\d+:\d+:\d+/.test(await trayClock.innerText()));
+
+  await page.evaluate(() => window.__saeculoHaunt("cat"));
+  await page.waitForTimeout(300);
+  const cat = page.getByTestId("haunt-cat");
+  check(
+    "the cat walks along the taskbar without blocking anything",
+    (await cat.isVisible()) && (await cat.evaluate((el) => getComputedStyle(el).pointerEvents)) === "none",
+  );
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  check("the taskbar still works while the cat walks", await page.getByRole("navigation", { name: "Start menu" }).isVisible());
+  await page.keyboard.press("Escape");
+
   // ---- release countdown ----
   await openFromDesktop("next_single.exe");
   const release = win("Downloading next_single.exe");
@@ -561,11 +629,12 @@ try {
       problems.push(...found.map((f) => `${label}: ${f}`));
     };
     await audit("desktop");
-    for (const app of ["Media Player", "Beat Maker", "Beat Deck"]) {
+    const titles = { "Media Player": "saeculo Media Player", "found_footage.txt": "found_footage.txt - Notepad" };
+    for (const app of ["Media Player", "Beat Maker", "Beat Deck", "Pictures", "found_footage.txt"]) {
       await openFromDesktop(app);
       await page.waitForTimeout(900);
       await audit(app);
-      await close(app === "Media Player" ? "saeculo Media Player" : app);
+      await close(titles[app] ?? app);
     }
     check("no serious accessibility violations (axe)", problems.length === 0, problems.slice(0, 4).join("; "));
   }
@@ -610,6 +679,36 @@ try {
   check("idle screensaver dismisses on activity", !(await idleSaver.isVisible().catch(() => false)));
   await ssContext.close();
 
+  // ---- haunts on their own: Midnight always gets one, Clean never ----
+  for (const atmosphere of ["midnight", "clean"]) {
+    const hc = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await hc.addInitScript(noWelcome);
+    await hc.addInitScript(
+      (a) => localStorage.setItem("saeculo-look", JSON.stringify({ glass: "sky", wallpaper: "aurora", transparency: true, atmosphere: a })),
+      atmosphere,
+    );
+    const hp = await hc.newPage();
+    await hp.clock.install();
+    await hp.goto(BASE, { waitUntil: "networkidle" });
+    await hp.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
+    await hp.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "about.txt", exact: true }).click();
+    await hp.waitForTimeout(100);
+    const anim = await hp.getByRole("region", { name: "about.txt - Notepad" }).evaluate((el) => getComputedStyle(el).animationName);
+    // in 40 s steps, moving the mouse so the idle screensaver stays away
+    for (let i = 0; i < 12; i++) {
+      await hp.mouse.move(600 + i * 5, 400);
+      await hp.clock.fastForward("00:40");
+    }
+    await hp.waitForTimeout(150);
+    const haunted = await hp.evaluate(() => sessionStorage.getItem("saeculo-haunted"));
+    if (atmosphere === "midnight") {
+      check("Midnight: a haunt happens within a few minutes, once per visit", haunted === "1");
+    } else {
+      check("Clean: no haunts, and windows keep the Vista animation", haunted === null && anim === "aero-open", anim);
+    }
+    await hc.close();
+  }
+
   // ---- mobile ----
   const mContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await mContext.addInitScript(noWelcome);
@@ -651,7 +750,7 @@ try {
   }
   await m.waitForTimeout(200);
   await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Beat Maker", exact: true }).tap();
-  await m.waitForTimeout(500);
+  await m.waitForTimeout(900);
   const cell = await m.getByRole("button", { name: "kick step 1", exact: true }).boundingBox();
   check("mobile: Beat Maker steps are big enough to tap", cell.width >= 28, `${Math.round(cell.width)}px`);
   await mContext.close();
