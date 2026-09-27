@@ -29,7 +29,7 @@ const pixelFont = Press_Start_2P({
 
 const title = "saeculo — instrumentals & beats";
 const description =
-  "The desktop of saeculo: a glassy mid-2000s desktop where you can play instrumentals, build a loop in the beat maker, and play rhythm games synced to the beats.";
+  "The desktop of saeculo: a glassy mid-2000s desktop where you can play the instrumentals, build a loop in the groovebox, and play Beat Deck, a card game where every hand is a beat.";
 const siteUrl = "https://saeculo.vercel.app";
 
 export const metadata: Metadata = {

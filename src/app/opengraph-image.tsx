@@ -1,15 +1,27 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { PROFILE } from "@/data/profile";
+import { TRACKS } from "@/data/tracks";
+import { paletteFor } from "@/components/player/analysis";
 
 // The preview card shown when the link is shared: the aurora desktop with
-// one glass window, drawn at build time.
-export const alt = `${PROFILE.artistName}: instrumentals, a beat maker and rhythm games on a glassy retro desktop`;
+// one glass window holding the name and the real cover art, drawn at
+// build time.
+export const alt = `${PROFILE.artistName}: instrumentals, a groovebox and a beatmaking card game on a glassy retro desktop`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const BARS = [38, 64, 92, 70, 120, 150, 110, 84, 132, 168, 124, 96, 140, 104, 72, 118, 88, 56, 80, 44];
+const BARS = [22, 38, 54, 42, 70, 88, 64, 50, 78, 96, 72, 56, 82, 60, 42, 68, 52, 34];
 
-export default function Image() {
+export default async function Image() {
+  const covers = await Promise.all(
+    TRACKS.map(async (t) => {
+      if (!t.cover) return null;
+      const data = await readFile(join(process.cwd(), "public", t.cover));
+      return `data:image/jpeg;base64,${data.toString("base64")}`;
+    }),
+  );
   return new ImageResponse(
     (
       <div
@@ -19,7 +31,9 @@ export default function Image() {
           display: "flex",
           flexDirection: "column",
           background:
-            "radial-gradient(ellipse at 20% 110%, rgba(64,220,170,0.55), transparent 55%), radial-gradient(ellipse at 90% -10%, rgba(80,160,255,0.55), transparent 55%), linear-gradient(160deg, #031633 0%, #06306b 45%, #0a4a8f 70%, #042455 100%)",
+            // vertical only: rows of one colour compress to almost nothing in
+            // a PNG, keeping the card small enough for every chat app's preview
+            "linear-gradient(to bottom, #031633 0%, #06306b 45%, #0a4a8f 75%, #0b5a8f 100%)",
           fontFamily: "sans-serif",
         }}
       >
@@ -27,7 +41,7 @@ export default function Image() {
           {/* the glass window */}
           <div
             style={{
-              width: 900,
+              width: 1060,
               display: "flex",
               flexDirection: "column",
               borderRadius: 14,
@@ -55,27 +69,53 @@ export default function Image() {
                 borderRadius: 6,
                 border: "1px solid #000",
                 background: "linear-gradient(to bottom, #1b2533, #03070f)",
-                padding: "36px 44px 30px",
+                padding: "34px 40px 28px",
               }}
             >
-              <div style={{ display: "flex", color: "#ffffff", fontSize: 112, fontWeight: 700, letterSpacing: -3, lineHeight: 1 }}>
-                {PROFILE.artistName}
+              <div style={{ display: "flex", gap: 40 }}>
+                <div style={{ display: "flex", flexDirection: "column", width: 420 }}>
+                  <div style={{ display: "flex", color: "#ffffff", fontSize: 104, fontWeight: 700, letterSpacing: -3, lineHeight: 1 }}>
+                    {PROFILE.artistName}
+                  </div>
+                  <div style={{ display: "flex", color: "#7fe0ff", fontSize: 32, marginTop: 10 }}>{PROFILE.tagline}</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 100, marginTop: 30 }}>
+                    {BARS.map((h, i) => (
+                      <div
+                        key={i}
+                        style={{ width: 17, height: h, borderRadius: 2, background: "linear-gradient(to top, #1f6fd1, #6fd7ff 70%, #d9fbff)" }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {/* the tracks, as the Welcome Center shows them */}
+                <div style={{ display: "flex", gap: 18, alignItems: "flex-start", marginTop: 6 }}>
+                  {TRACKS.map((t, i) => (
+                    <div key={t.id} style={{ display: "flex", flexDirection: "column", width: 150 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          borderRadius: 6,
+                          overflow: "hidden",
+                          border: "1px solid rgba(255,255,255,0.25)",
+                          boxShadow: "0 10px 24px rgba(0,0,0,0.6)",
+                        }}
+                      >
+                        {covers[i] ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- rendered by ImageResponse, not the browser
+                          <img src={covers[i]!} width={150} height={150} alt="" style={{ objectFit: "cover" }} />
+                        ) : (
+                          <div style={{ width: 150, height: 150, background: "#0b2a5b" }} />
+                        )}
+                        <div style={{ height: 6, background: paletteFor(t.id).accent }} />
+                      </div>
+                      <div style={{ display: "flex", color: "#ffffff", fontSize: 22, fontWeight: 700, marginTop: 10 }}>{t.title}</div>
+                      <div style={{ display: "flex", color: "#9fb2c9", fontSize: 17, marginTop: 2 }}>{`${t.bpm} bpm`}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div style={{ display: "flex", color: "#7fe0ff", fontSize: 34, marginTop: 10 }}>{PROFILE.tagline}</div>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 170, marginTop: 26 }}>
-                {BARS.map((h, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: 30,
-                      height: h,
-                      borderRadius: 3,
-                      background: "linear-gradient(to top, #1f6fd1, #6fd7ff 70%, #d9fbff)",
-                    }}
-                  />
-                ))}
-              </div>
-              <div style={{ display: "flex", color: "#9fb2c9", fontSize: 26, marginTop: 22 }}>
+              <div style={{ display: "flex", color: "#9fb2c9", fontSize: 25, marginTop: 26 }}>
                 play the beats · build a loop · beat the boss · find the vault
               </div>
             </div>

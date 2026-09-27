@@ -27,7 +27,7 @@ export interface Track {
   /** Tempo as shown to visitors. */
   bpm: number;
   /** Exact tempo of the audio file, measured, when it differs from `bpm` —
-   *  the rhythm games chart notes from this. */
+   *  Beat Deck's chops and the player's beat sync use this. */
   tempo?: number;
   /** Seconds from the start of the file to the first beat. */
   beatOffset?: number;
