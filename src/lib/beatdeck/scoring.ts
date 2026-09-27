@@ -7,7 +7,7 @@
 // animate the exact events it returns and the balance sim can run it
 // thousands of times.
 
-import { CORE_ROLES, rolesOf, type CardDef, type Role } from "./cards";
+import { CORE_ROLES, rolesOf, type CardDef, type CardMod, type Role } from "./cards";
 import type { GearId } from "./gear";
 import type { ModifierId } from "./rounds";
 
@@ -59,6 +59,7 @@ export const BEAT_TYPE_BY_ID = Object.fromEntries(BEAT_TYPES.map((t) => [t.id, t
 export interface PlayedCard {
   uid: string;
   def: CardDef;
+  mod?: CardMod;
 }
 
 export interface ScoreInput {
@@ -71,6 +72,14 @@ export interface ScoreInput {
   usedTypes: BeatTypeId[];
   /** 0..1 from the run's RNG — only the Old Laptop reads it. */
   crashRoll: number;
+  /** Cards in the whole deck. */
+  deckSize: number;
+  /** Takes played earlier in the run. */
+  runTakes: number;
+  /** Counters kept by scaling gear (see run.ts). */
+  gearState: Partial<Record<GearId, number>>;
+  /** This is the round's last take. */
+  lastTake: boolean;
 }
 
 export interface StepEvent {
@@ -87,6 +96,7 @@ export interface BonusEvent {
   groove?: number;
   hype?: number;
   mult?: number;
+  money?: number;
 }
 
 export interface TakeResult {
@@ -100,6 +110,8 @@ export interface TakeResult {
   groove: number;
   hype: number;
   score: number;
+  /** Cash earned by gold cards. */
+  money: number;
   /** Why the take scored nothing, if it did. */
   voided?: string;
 }
@@ -142,7 +154,7 @@ export function scoreTake(input: ScoreInput): TakeResult {
   const soundingSteps = new Set<number>();
   const echo = cards.some((c) => c.def.effect === "echo");
 
-  cards.forEach(({ def }, index) => {
+  cards.forEach(({ def, mod }, index) => {
     for (const hit of def.hits) {
       soundingSteps.add(hit.step);
       if (hit.role === "kick") kickSteps.add(hit.step);
@@ -156,6 +168,8 @@ export function scoreTake(input: ScoreInput): TakeResult {
       if (g.has("hatroller") && hit.role === "hats") groove += 2 * count;
       if (g.has("mpc") && hit.step % 2 === 1) groove += 1;
       if (g.has("fills") && hit.step >= 12) groove += 3;
+      if (g.has("goldenera") && def.genre === "boombap") groove += 3;
+      if (mod === "double") groove *= 2;
       if (banHats && hit.role === "hats") {
         groove = 0;
         tag = "banned";
@@ -188,9 +202,14 @@ export function scoreTake(input: ScoreInput): TakeResult {
   if (cards.length >= 3 && genres.size === 1) {
     bonuses.push({ label: `One genre (${[...genres][0]})`, source: "genre", hype: g.has("purist") ? 6 : 2 });
   }
-  for (const { def } of cards) {
+  for (const { def, mod } of cards) {
     if (def.effect === "lofiHype") bonuses.push({ label: def.name, source: "card", hype: count((d) => d.genre === "lofi") });
     if (def.effect === "hype2") bonuses.push({ label: def.name, source: "card", hype: 2 });
+    if (def.effect === "hype3") bonuses.push({ label: def.name, source: "card", hype: 3 });
+    if (def.effect === "buildUp" && input.takesPlayed) bonuses.push({ label: def.name, source: "card", hype: input.takesPlayed });
+    if (def.effect === "finale" && input.lastTake) bonuses.push({ label: `${def.name}: last take`, source: "card", mult: 2 });
+    if (mod === "tape") bonuses.push({ label: `${def.name} (tape)`, source: "card", hype: 2 });
+    if (mod === "gold") bonuses.push({ label: `${def.name} (gold)`, source: "card", money: 1 });
   }
   switch (modifier) {
     case "hard808":
@@ -221,7 +240,19 @@ export function scoreTake(input: ScoreInput): TakeResult {
     const silent = 16 - soundingSteps.size;
     if (silent) bonuses.push({ label: "Minimalist", source: "gear", hype: silent });
   }
+  const chopsSoFar = (input.gearState.digger ?? 0) + chopCards;
+  if (g.has("digger") && chopsSoFar) bonuses.push({ label: "Crate Digger", source: "gear", hype: chopsSoFar });
+  if (g.has("nightowl") && input.runTakes) bonuses.push({ label: "Night Owl", source: "gear", groove: 3 * input.runTakes });
+  if (g.has("hoarder") && input.deckSize > 20) bonuses.push({ label: "Sample Hoarder", source: "gear", groove: 5 * (input.deckSize - 20) });
+  const genreCount = (genre: CardDef["genre"]) => count((d) => d.genre === genre);
+  if (g.has("mafia") && genreCount("trap")) bonuses.push({ label: "808 Mafia", source: "gear", hype: 2 * genreCount("trap") });
+  if (g.has("lofikid") && genreCount("lofi")) bonuses.push({ label: "Lo-fi Kid", source: "gear", groove: 12 * genreCount("lofi") });
+  if (g.has("clubkid") && genreCount("club")) bonuses.push({ label: "Club Kid", source: "gear", hype: 2 * genreCount("club") });
+  if (g.has("streak") && input.gearState.streak) bonuses.push({ label: "Hot Streak", source: "gear", hype: 2 * input.gearState.streak });
+  for (const { def, mod } of cards) if (mod === "vinyl") bonuses.push({ label: `${def.name} (vinyl)`, source: "card", mult: 1.3 });
   if (g.has("reverb") && fxCards) bonuses.push({ label: "Spring Reverb", source: "gear", mult: 1.5 });
+  if (g.has("lean") && input.deckSize <= 16) bonuses.push({ label: "Lean Deck", source: "gear", mult: 1.5 });
+  if (g.has("headliner") && input.lastTake) bonuses.push({ label: "Headliner", source: "gear", mult: 2 });
   if (g.has("monitors")) bonuses.push({ label: "Studio Monitors", source: "gear", mult: 1.3 });
   if (g.has("ghost") && input.takesPlayed === 0) bonuses.push({ label: "Ghost Producer", source: "gear", mult: 2 });
   if (modifier === "algorithm" && !roles.has("melody")) bonuses.push({ label: "No melody", source: "boss", mult: 0.5 });
@@ -242,5 +273,6 @@ export function scoreTake(input: ScoreInput): TakeResult {
   else if (g.has("laptop") && input.crashRoll < 1 / 6) voided = "The Old Laptop crashed. Nothing saved.";
   if (voided) score = 0;
 
-  return { type, level, roles: [...roles], baseGroove: base.groove, baseHype: base.hype, steps, bonuses, groove, hype, score, voided };
+  const money = voided ? 0 : bonuses.reduce((sum, b) => sum + (b.money ?? 0), 0);
+  return { type, level, roles: [...roles], baseGroove: base.groove, baseHype: base.hype, steps, bonuses, groove, hype, score, money, voided };
 }

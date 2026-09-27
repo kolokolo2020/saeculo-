@@ -114,8 +114,15 @@ try {
   await page.waitForTimeout(1200); // the game loads on demand
   const deck = win("Beat Deck");
   check("start search + Enter launches Beat Deck", await deck.getByRole("button", { name: "New run" }).isVisible());
+  check("locked starting decks can't be picked yet", await deck.getByRole("radio", { name: "Trap House deck (locked)" }).isDisabled());
+  await deck.getByRole("button", { name: "The Crate" }).click();
+  check("the Crate lists every card, hidden until found", (await deck.getByText("???").count()) > 30);
+  await deck.getByRole("button", { name: "Back" }).click();
   await deck.getByRole("button", { name: "New run" }).click();
   await page.waitForTimeout(300);
+  const tour = page.getByRole("dialog", { name: "Tutorial" });
+  check("a first run starts with the tutorial", await tour.isVisible());
+  await tour.getByRole("button", { name: "Skip" }).click();
   const handCards = deck.getByLabel("Your hand").getByRole("button", { name: / card$/ });
   check("Beat Deck deals a hand of 8", (await handCards.count()) === 8);
   for (let i = 0; i < 3; i++) await handCards.nth(i).click();
@@ -133,6 +140,11 @@ try {
     "the take's score lands in the round",
     Number((await deck.getByLabel("Round score").innerText()).replace(/,/g, "")) > 0 && (await deck.getByLabel("Takes: 3 of 4 left").isVisible()),
   );
+  const speedBtn = deck.getByRole("button", { name: /^Scoring speed/ });
+  await speedBtn.click();
+  check("scoring speed can be changed", (await speedBtn.getAttribute("aria-label")) === "Scoring speed: Fast");
+  await speedBtn.click();
+  await speedBtn.click();
   await handCards.first().click();
   await deck.getByRole("button", { name: /^Redraw selected/ }).click();
   check("redraw swaps cards and uses a redraw", await deck.getByLabel("Redraws: 2 of 3 left").isVisible());
@@ -351,7 +363,7 @@ try {
   // ---- Beat Deck: beating the first boss, the shop ----
   await page.evaluate(() => {
     const run = JSON.parse(localStorage.getItem("saeculo-beatdeck-run"));
-    Object.assign(run, { phase: "won", round: 3, score: 1000, target: 1000, reward: { base: 6, takes: 1, interest: 0, chain: 0, total: 7 }, money: 20 });
+    Object.assign(run, { phase: "won", round: 3, score: 1000, target: 1000, reward: { base: 6, takes: 1, interest: 0, chain: 0, register: 0, total: 7, session: null }, money: 20, sessions: ["saturate"] });
     run.plan[2] = "label";
     localStorage.setItem("saeculo-beatdeck-run", JSON.stringify(run));
   });
@@ -370,6 +382,11 @@ try {
   check("the shop sells gear", await win("Beat Deck").getByLabel("Gear").getByRole("button", { name: gearName }).isVisible(), gearName);
   await shop.getByRole("button", { name: "Next client ›" }).click();
   check("the next client starts round 4", await win("Beat Deck").getByText("ROUND 4/8").isVisible());
+  const bd = win("Beat Deck");
+  await bd.getByLabel("Your hand").getByRole("button", { name: / card$/ }).first().click();
+  await bd.getByLabel("Studio sessions").getByRole("button", { name: /Saturator/ }).click();
+  await bd.getByRole("button", { name: "Use", exact: true }).click();
+  check("a studio session upgrades a card", (await bd.getByLabel("Your hand").getByRole("button", { name: /\(Tape-saturated\)$/ }).count()) === 1);
   await close("Beat Deck");
 
   // ---- lock / restart ----
@@ -420,6 +437,7 @@ try {
   const gBox = await m.getByRole("region", { name: "Beat Deck", exact: true }).boundingBox();
   check("mobile: windows open full-screen", gBox.width >= 389, `w=${gBox?.width}`);
   await m.getByRole("button", { name: "New run" }).tap();
+  await m.getByRole("dialog", { name: "Tutorial" }).getByRole("button", { name: "Skip" }).tap();
   await m.getByLabel("Your hand").getByRole("button", { name: / card$/ }).first().tap();
   check("mobile: Beat Deck plays with taps", await m.getByRole("button", { name: /^Play take \(1\/5\)/ }).isVisible());
   await m.getByLabel("Taskbar").getByRole("button", { name: "Start", exact: true }).tap();

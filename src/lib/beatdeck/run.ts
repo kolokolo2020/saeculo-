@@ -2,11 +2,12 @@
 // a state and returns the next one, so the whole run serializes to
 // localStorage (refresh-proof) and replays identically from its seed.
 
-import { CARDS, CARD_BY_ID, RARITY_PRICE, STARTING_DECK, type CardDef, type Rarity } from "./cards";
+import { CARDS, CARD_BY_ID, DECK_BY_ID, RARITY_PRICE, type CardDef, type CardMod, type DeckKind, type Rarity } from "./cards";
 import { GEAR, GEAR_BY_ID, MAX_GEAR, type GearId } from "./gear";
 import { BOSSES, BOSS_ROUNDS, CLIENTS, FINAL_BOSS, ROUNDS, ROUND_BY_ID, TARGETS, type ModifierId, type RoundDef } from "./rounds";
 import { Rng } from "./rng";
 import { BEAT_TYPES, scoreTake, type BeatTypeId, type PlayedCard, type TakeResult } from "./scoring";
+import { MAX_SESSIONS, SESSIONS, SESSION_BY_ID, type SessionId } from "./sessions";
 
 export const TAKES = 4;
 export const REDRAWS = 3;
@@ -19,6 +20,7 @@ export const UPGRADE_PRICE = 4;
 export interface CardInst {
   uid: string;
   id: string;
+  mod?: CardMod;
 }
 
 export type Phase = "play" | "won" | "shop" | "over" | "victory";
@@ -26,6 +28,7 @@ export type Phase = "play" | "won" | "shop" | "over" | "victory";
 export interface ShopState {
   gear: (GearId | null)[];
   cards: (string | null)[];
+  sessions: (SessionId | null)[];
   upgrade: BeatTypeId | null;
   rerollCost: number;
   removed: boolean;
@@ -36,7 +39,10 @@ export interface Reward {
   takes: number;
   interest: number;
   chain: number;
+  register: number;
   total: number;
+  /** A studio session the boss left behind. */
+  session: SessionId | null;
 }
 
 export interface BestTake {
@@ -48,9 +54,12 @@ export interface BestTake {
 }
 
 export interface RunState {
-  version: 1;
+  version: 2;
   seed: number;
   daily: boolean;
+  deckKind: DeckKind;
+  /** Past round 8: the run continues with ever higher targets. */
+  endless: boolean;
   rng: number;
   round: number;
   plan: ModifierId[];
@@ -65,8 +74,12 @@ export interface RunState {
   target: number;
   money: number;
   gear: GearId[];
+  gearState: Partial<Record<GearId, number>>;
+  sessions: SessionId[];
   levels: Partial<Record<BeatTypeId, number>>;
   takesPlayed: number;
+  runTakes: number;
+  lastTakeScore: number;
   usedTypes: BeatTypeId[];
   totalScore: number;
   best: BestTake | null;
@@ -78,7 +91,14 @@ export interface RunState {
 export const roundDef = (s: RunState): RoundDef => ROUND_BY_ID[s.plan[s.round - 1]];
 export const handSize = (s: RunState) => (s.plan[s.round - 1] === "block" ? 6 : HAND_SIZE);
 export const maxPlay = (s: RunState) => (s.plan[s.round - 1] === "noise" ? 3 : MAX_PLAY);
-export const cardOf = (s: RunState, uid: string): CardDef => CARD_BY_ID[s.deck.find((c) => c.uid === uid)!.id];
+export const instOf = (s: RunState, uid: string): CardInst => s.deck.find((c) => c.uid === uid)!;
+export const cardOf = (s: RunState, uid: string): CardDef => CARD_BY_ID[instOf(s, uid).id];
+
+/** The target for a round, including endless rounds past the eighth. */
+export function targetFor(round: number, def: RoundDef): number {
+  const base = round <= ROUNDS ? TARGETS[round] : TARGETS[ROUNDS] * Math.pow(1.6, round - ROUNDS);
+  return Math.round((base * (def.targetScale ?? 1)) / 50) * 50;
+}
 
 /** Draw n cards; an empty draw pile reshuffles the played cards back in. */
 function draw(s: RunState, n: number) {
@@ -94,7 +114,19 @@ function draw(s: RunState, n: number) {
   }
 }
 
+/** Endless rounds are planned as they come: a boss every third round. */
+function ensurePlan(s: RunState, round: number) {
+  const rng = new Rng(s.rng);
+  while (s.plan.length < round) {
+    const r = s.plan.length + 1;
+    const pool = r % 3 === 0 ? [...BOSSES, FINAL_BOSS] : CLIENTS;
+    s.plan.push(rng.pick(pool).id);
+  }
+  s.rng = rng.state;
+}
+
 function startRound(s: RunState) {
+  ensurePlan(s, s.round);
   const rng = new Rng(s.rng);
   s.draw = rng.shuffle(s.deck.map((c) => c.uid));
   s.rng = rng.state;
@@ -104,7 +136,8 @@ function startRound(s: RunState) {
   s.takesLeft = TAKES;
   s.redrawsLeft = REDRAWS;
   s.score = 0;
-  s.target = Math.round((TARGETS[s.round] * (roundDef(s).targetScale ?? 1)) / 50) * 50;
+  s.target = targetFor(s.round, roundDef(s));
+  s.lastTakeScore = 0;
   s.takesPlayed = 0;
   s.usedTypes = [];
   s.phase = "play";
@@ -112,7 +145,8 @@ function startRound(s: RunState) {
   s.reward = null;
 }
 
-export function newRun(seed: number, daily = false): RunState {
+export function newRun(seed: number, daily = false, deckKind: DeckKind = "classic"): RunState {
+  const starter = DECK_BY_ID[deckKind];
   const rng = new Rng(seed);
   const clients = rng.shuffle(CLIENTS);
   const bosses = rng.shuffle(BOSSES);
@@ -125,14 +159,16 @@ export function newRun(seed: number, daily = false): RunState {
     else plan.push(clients[c++].id);
   }
   const s: RunState = {
-    version: 1,
+    version: 2,
     seed,
     daily,
+    deckKind,
+    endless: false,
     rng: rng.state,
     round: 1,
     plan,
     phase: "play",
-    deck: STARTING_DECK.map((id, i) => ({ uid: `c${i}`, id })),
+    deck: starter.cards.map((id, i) => ({ uid: `c${i}`, id })),
     draw: [],
     hand: [],
     discard: [],
@@ -140,16 +176,20 @@ export function newRun(seed: number, daily = false): RunState {
     redrawsLeft: REDRAWS,
     score: 0,
     target: TARGETS[1],
-    money: START_MONEY,
+    money: START_MONEY + (starter.money ?? 0),
     gear: [],
+    gearState: {},
+    sessions: [],
     levels: {},
     takesPlayed: 0,
+    runTakes: 0,
+    lastTakeScore: 0,
     usedTypes: [],
     totalScore: 0,
     best: null,
     shop: null,
     reward: null,
-    nextUid: STARTING_DECK.length,
+    nextUid: starter.cards.length,
   };
   startRound(s);
   return s;
@@ -163,7 +203,10 @@ export function previewTake(s: RunState, uids: string[]): TakeResult {
 }
 
 function takeInput(s: RunState, uids: string[], crashRoll: number) {
-  const cards: PlayedCard[] = uids.map((uid) => ({ uid, def: cardOf(s, uid) }));
+  const cards: PlayedCard[] = uids.map((uid) => {
+    const inst = instOf(s, uid);
+    return { uid, def: CARD_BY_ID[inst.id], mod: inst.mod };
+  });
   return {
     cards,
     gear: s.gear,
@@ -172,6 +215,10 @@ function takeInput(s: RunState, uids: string[], crashRoll: number) {
     takesPlayed: s.takesPlayed,
     usedTypes: s.usedTypes,
     crashRoll,
+    deckSize: s.deck.length,
+    runTakes: s.runTakes,
+    gearState: s.gearState,
+    lastTake: s.takesLeft === 1,
   };
 }
 
@@ -186,8 +233,14 @@ export function playTake(prev: RunState, uids: string[]): { state: RunState; res
 
   s.score += result.score;
   s.totalScore += result.score;
+  s.money += result.money;
   s.takesLeft -= 1;
   s.takesPlayed += 1;
+  s.runTakes += 1;
+  const chops = uids.filter((u) => cardOf(s, u).hits.some((h) => h.voice === "chop")).length;
+  s.gearState.digger = (s.gearState.digger ?? 0) + chops;
+  s.gearState.streak = result.score > s.lastTakeScore ? (s.gearState.streak ?? 0) + 1 : 0;
+  s.lastTakeScore = result.score;
   s.usedTypes.push(result.type.id);
   s.hand = s.hand.filter((u) => !uids.includes(u));
   s.discard.push(...uids);
@@ -210,12 +263,20 @@ export function playTake(prev: RunState, uids: string[]): { state: RunState; res
       takes: s.takesLeft,
       interest: Math.min(4, Math.floor(s.money / 5)),
       chain: s.gear.includes("goldchain") ? 3 : 0,
+      register: s.gear.includes("register") ? s.redrawsLeft : 0,
       total: 0,
+      session: null,
     };
-    reward.total = reward.base + reward.takes + reward.interest + reward.chain;
+    reward.total = reward.base + reward.takes + reward.interest + reward.chain + reward.register;
     s.money += reward.total;
+    if (boss && s.sessions.length < MAX_SESSIONS) {
+      const rng2 = new Rng(s.rng);
+      reward.session = rng2.pick(SESSIONS).id;
+      s.rng = rng2.state;
+      s.sessions.push(reward.session);
+    }
     s.reward = reward;
-    s.phase = s.round === ROUNDS ? "victory" : "won";
+    s.phase = s.round === ROUNDS && !s.endless ? "victory" : "won";
   } else if (s.takesLeft === 0 || s.hand.length === 0) {
     s.phase = "over";
   }
@@ -247,7 +308,7 @@ function weightedPick<T extends { rarity: Rarity }>(rng: Rng, items: T[]): T {
   return items[items.length - 1];
 }
 
-function rollShop(s: RunState, rng: Rng): Pick<ShopState, "gear" | "cards" | "upgrade"> {
+function rollShop(s: RunState, rng: Rng): Pick<ShopState, "gear" | "cards" | "sessions" | "upgrade"> {
   const gearPool = GEAR.filter((g) => !s.gear.includes(g.id));
   const gear: GearId[] = [];
   while (gear.length < 2 && gearPool.length > gear.length) {
@@ -255,8 +316,9 @@ function rollShop(s: RunState, rng: Rng): Pick<ShopState, "gear" | "cards" | "up
     gear.push(pick.id);
   }
   const cards = [0, 1, 2].map(() => weightedPick(rng, CARDS).id);
+  const sessions = [0, 1].map(() => weightedPick(rng, SESSIONS).id);
   const upgradable = BEAT_TYPES.filter((t) => t.id !== "sketch");
-  return { gear, cards, upgrade: rng.pick(upgradable).id };
+  return { gear, cards, sessions, upgrade: rng.pick(upgradable).id };
 }
 
 export function openShop(prev: RunState): RunState {
@@ -265,6 +327,7 @@ export function openShop(prev: RunState): RunState {
   const rng = new Rng(s.rng);
   s.shop = { ...rollShop(s, rng), rerollCost: 2, removed: false };
   s.rng = rng.state;
+  ensurePlan(s, s.round + 1);
   s.phase = "shop";
   return s;
 }
@@ -277,7 +340,7 @@ export function rerollShop(prev: RunState): RunState {
   const rng = new Rng(s.rng);
   const fresh = rollShop(s, rng);
   s.rng = rng.state;
-  s.shop = { ...shop, gear: fresh.gear, cards: fresh.cards, rerollCost: shop.rerollCost + 1 };
+  s.shop = { ...shop, gear: fresh.gear, cards: fresh.cards, sessions: fresh.sessions, rerollCost: shop.rerollCost + 1 };
   return s;
 }
 
@@ -338,6 +401,79 @@ export function nextRound(prev: RunState): RunState {
   return s;
 }
 
+export function buySession(prev: RunState, slot: number): RunState {
+  const id = prev.shop?.sessions[slot];
+  if (!id || prev.sessions.length >= MAX_SESSIONS || prev.money < SESSION_BY_ID[id].price) return prev;
+  const s = clone(prev);
+  s.money -= SESSION_BY_ID[id].price;
+  s.sessions.push(id);
+  s.shop!.sessions[slot] = null;
+  return s;
+}
+
+/** Can the session in `slot` be used right now with these selected cards? */
+export function canUseSession(s: RunState, slot: number, uids: string[]): boolean {
+  const def = SESSION_BY_ID[s.sessions[slot]];
+  if (!def) return false;
+  if (def.inRound && s.phase !== "play") return false;
+  if (!uids.every((u) => s.hand.includes(u))) return false;
+  if (def.id === "mastering") return uids.length >= 1;
+  if (def.targets === 0) return true;
+  if (def.targets === 1) return uids.length === 1;
+  return uids.length >= 1 && uids.length <= 2;
+}
+
+export function applySession(prev: RunState, slot: number, uids: string[]): RunState {
+  if (!canUseSession(prev, slot, uids)) return prev;
+  const s = clone(prev);
+  const def = SESSION_BY_ID[s.sessions[slot]];
+  s.sessions.splice(slot, 1);
+  if (def.mod) {
+    for (const u of uids) instOf(s, u).mod = def.mod;
+  }
+  switch (def.id) {
+    case "splice": {
+      const src = instOf(s, uids[0]);
+      const copy = { uid: `c${s.nextUid++}`, id: src.id, mod: src.mod };
+      s.deck.push(copy);
+      s.discard.push(copy.uid);
+      break;
+    }
+    case "mastering": {
+      const type = previewTake(prev, uids).type.id;
+      s.levels[type] = (s.levels[type] ?? 0) + 1;
+      break;
+    }
+    case "retake":
+      s.takesLeft += 1;
+      break;
+    case "freshcrate":
+      s.redrawsLeft += 2;
+      break;
+    case "royalty":
+      s.money += 6;
+      break;
+  }
+  return s;
+}
+
+export function sellSession(prev: RunState, slot: number): RunState {
+  if (!prev.sessions[slot]) return prev;
+  const s = clone(prev);
+  s.sessions.splice(slot, 1);
+  s.money += 1;
+  return s;
+}
+
+/** After winning round 8: keep going with higher targets. */
+export function goEndless(prev: RunState): RunState {
+  if (prev.phase !== "victory") return prev;
+  const s = clone(prev);
+  s.endless = true;
+  s.phase = "won";
+  return s;
+}
+
 export function isRunState(v: unknown): v is RunState {
-  return !!v && typeof v === "object" && (v as RunState).version === 1 && Array.isArray((v as RunState).deck);
+  return !!v && typeof v === "object" && (v as RunState).version === 2 && Array.isArray((v as RunState).deck);
 }

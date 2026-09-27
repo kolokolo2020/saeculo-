@@ -2,7 +2,7 @@
 // the win rate and where runs end. It tries every take of up to 5 cards,
 // redraws when the best take won't make the target, and shops simply.
 //
-//   node scripts/beatdeck-sim.mjs [runs=300]
+//   node scripts/beatdeck-sim.mjs [runs=300] [deck=classic|trap|lofi|digger]
 //
 // The game rules in src/lib/beatdeck are plain TypeScript with no DOM, so
 // they're transpiled to a temp folder with the project's own TypeScript.
@@ -62,8 +62,9 @@ function playRound(s) {
   return s;
 }
 
+const DECK = process.argv[3] || "classic";
 function run(seed) {
-  let s = newRun(seed);
+  let s = newRun(seed, false, DECK);
   for (;;) {
     s = playRound(s);
     if (s.phase !== "won") return s;
@@ -90,6 +91,6 @@ for (let i = 1; i <= N; i++) {
   ended[key] = (ended[key] || 0) + 1;
   if (s.phase === "victory") wins++;
 }
-console.log(`${N} runs · bot win rate ${((wins / N) * 100).toFixed(1)}%`);
+console.log(`${DECK} deck · ${N} runs · bot win rate ${((wins / N) * 100).toFixed(1)}%`);
 console.log("runs ended at:", ended);
 fs.rmSync(out, { recursive: true, force: true });

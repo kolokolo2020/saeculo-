@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CARD_BY_ID } from "@/lib/beatdeck/cards";
+import { CARD_BY_ID, DECKS, type DeckKind } from "@/lib/beatdeck/cards";
 import { ROUNDS } from "@/lib/beatdeck/rounds";
 import { BEAT_TYPES } from "@/lib/beatdeck/scoring";
 import { useDeckStore } from "./deckStore";
@@ -46,13 +46,14 @@ function HowTo() {
   );
 }
 
-// The game's front door: continue a saved run, start a new or daily one,
-// read the rules, see your bests.
+// The game's front door: continue a saved run, pick a starting deck, start
+// a new or daily run, read the rules, open the Crate, see your stats.
 export default function Title() {
   const run = useDeckStore((s) => s.run);
-  const bests = useDeckStore((s) => s.bests);
-  const { start, resume } = useDeckStore.getState();
+  const progress = useDeckStore((s) => s.progress);
+  const { start, resume, go } = useDeckStore.getState();
   const [rules, setRules] = useState(false);
+  const [deck, setDeck] = useState<DeckKind>("classic");
   const canContinue = run && run.phase !== "over" && run.phase !== "victory";
 
   return (
@@ -68,6 +69,32 @@ export default function Title() {
             <DeckCard def={CARD_BY_ID[id]} compact />
           </div>
         ))}
+      </div>
+
+      <div className="grid w-full max-w-[560px] grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Starting deck">
+        {DECKS.map((d) => {
+          const locked = !progress.unlocked.includes(d.id);
+          const on = deck === d.id;
+          return (
+            <button
+              key={d.id}
+              role="radio"
+              aria-checked={on}
+              aria-label={`${d.name} deck${locked ? " (locked)" : ""}`}
+              disabled={locked}
+              onClick={() => setDeck(d.id)}
+              className={`flex flex-col gap-0.5 rounded-[6px] border p-2 text-left ${
+                on ? "border-[#6fb4ff] bg-[#1f6fd1]/30 shadow-[0_0_12px_rgba(80,170,255,0.4)]" : "border-white/10 bg-black/30"
+              } disabled:opacity-60`}
+            >
+              <span className="text-[12.5px] font-semibold text-white">
+                {locked ? "🔒 " : ""}
+                {d.name}
+              </span>
+              <span className="text-[10.5px] leading-snug text-[#9fb2c9]">{locked ? d.unlock : d.text}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex w-full max-w-[300px] flex-col gap-2">
@@ -86,7 +113,7 @@ export default function Title() {
         <button
           onClick={() => {
             warmUp();
-            start(false);
+            start(false, deck);
           }}
           className={`${canContinue ? "aero-btn-dark" : "aero-btn aero-btn-primary"} py-2 text-[14px]`}
         >
@@ -95,15 +122,20 @@ export default function Title() {
         <button
           onClick={() => {
             warmUp();
-            start(true);
+            start(true, "classic");
           }}
           className="aero-btn-dark py-2 text-[13px]"
         >
           Daily run <span className="text-[#9fb2c9]">· same shuffle for everyone today</span>
         </button>
-        <button onClick={() => setRules((v) => !v)} aria-expanded={rules} className="aero-btn-dark py-1.5 text-[12.5px]">
-          How to play
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setRules((v) => !v)} aria-expanded={rules} className="aero-btn-dark flex-1 py-1.5 text-[12.5px]">
+            How to play
+          </button>
+          <button onClick={() => go("crate")} className="aero-btn-dark flex-1 py-1.5 text-[12.5px]">
+            The Crate
+          </button>
+        </div>
       </div>
 
       {rules && (
@@ -112,9 +144,22 @@ export default function Title() {
         </div>
       )}
 
-      <p className="text-center font-mono text-[11.5px] text-[#7f93ad]">
-        Best score {fmt(bests.score)} · Furthest {bests.round >= 9 ? "album out" : bests.round ? `round ${bests.round}` : "—"} · Wins {bests.wins}
-      </p>
+      <dl className="grid grid-cols-5 gap-x-4 gap-y-0.5 text-center font-mono text-[11px] text-[#7f93ad] max-sm:grid-cols-3" aria-label="Your stats">
+        {(
+          [
+            ["Runs", progress.runs],
+            ["Wins", progress.wins],
+            ["Best run", fmt(progress.bestTotal)],
+            ["Best take", fmt(progress.bestTake)],
+            ["Furthest", progress.furthest >= 9 ? (progress.furthest > 9 ? `R${progress.furthest}` : "album") : progress.furthest ? `R${progress.furthest}` : "—"],
+          ] as const
+        ).map(([k, v]) => (
+          <div key={k}>
+            <dt>{k}</dt>
+            <dd className="text-[13px] text-white">{v}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

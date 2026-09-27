@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useSecretStore } from "@/components/secrets/secretStore";
-import { CARD_BY_ID, rolesOf } from "@/lib/beatdeck/cards";
+import { CARD_BY_ID, DECK_BY_ID, rolesOf } from "@/lib/beatdeck/cards";
+import { SESSION_BY_ID } from "@/lib/beatdeck/sessions";
 import * as R from "@/lib/beatdeck/run";
 import { SECRET_WORDS } from "@/data/secrets";
 import { useDeckStore } from "./deckStore";
@@ -68,11 +69,22 @@ export function RoundWon() {
             <span>${r.chain}</span>
           </li>
         )}
+        {r.register > 0 && (
+          <li className="flex justify-between">
+            <span>Cash Register</span>
+            <span>${r.register}</span>
+          </li>
+        )}
         <li className="mt-1 flex justify-between border-t border-white/15 pt-1 font-bold text-[#9fffb0]">
           <span>Total</span>
           <span>+${r.total}</span>
         </li>
       </ul>
+      {r.session && (
+        <p className="mt-3 rounded-[4px] border border-[#ffd27a]/30 bg-[#ffd27a]/5 p-2 text-[12px] text-[#ffe7a3]">
+          ◆ {round.who} left a studio session behind: <b>{SESSION_BY_ID[r.session].name}</b>. It&apos;s in your rack.
+        </p>
+      )}
       {firstBoss && (
         <p className="mt-3 rounded-[4px] border border-[#ffd27a]/40 bg-[#ffd27a]/10 p-2 font-pixel text-[8.5px] leading-relaxed text-[#ffd27a]">
           {round.who.toUpperCase()} DROPPED A SCRAP OF PAPER: &quot;{NIGHT}&quot;
@@ -87,8 +99,9 @@ export function RoundWon() {
 
 export function Summary() {
   const run = useDeckStore((s) => s.run)!;
-  const bests = useDeckStore((s) => s.bests);
-  const { start, toTitle } = useDeckStore.getState();
+  const progress = useDeckStore((s) => s.progress);
+  const newUnlocks = useDeckStore((s) => s.newUnlocks);
+  const { start, go, goEndless } = useDeckStore.getState();
   const [status, setStatus] = useState<string | null>(null);
   const won = run.phase === "victory";
   const best = run.best;
@@ -126,18 +139,31 @@ export function Summary() {
 
   return (
     <Panel label={won ? "Run won" : "Run over"}>
-      <p className={`font-pixel text-[12px] ${won ? "text-[#9fffb0]" : "text-[#ff9a8a]"}`}>{won ? "ALBUM OUT!" : "DROPPED BY THE LABEL"}</p>
+      <p className={`font-pixel text-[12px] ${won ? "text-[#9fffb0]" : "text-[#ff9a8a]"}`}>
+        {won ? "ALBUM OUT!" : run.endless ? "THE TOUR IS OVER" : "DROPPED BY THE LABEL"}
+      </p>
       <p className="mt-1 text-[13px] text-[#c9d6e6]">
-        {won ? "All eight clients signed off, Metro Nome included." : `${R.roundDef(run).who} wasn't convinced. You reached round ${run.round} of 8.`}
+        {won
+          ? "All eight clients signed off, Metro Nome included."
+          : run.endless
+            ? `You kept going to round ${run.round}. ${R.roundDef(run).who} finally said no.`
+            : `${R.roundDef(run).who} wasn't convinced. You reached round ${run.round} of 8.`}
         {run.daily && " (Daily run)"}
       </p>
+      {newUnlocks.length > 0 && (
+        <p className="mt-2 rounded-[4px] border border-[#9fffb0]/40 bg-[#9fffb0]/10 p-2 text-[12px] text-[#c9ffd6]">
+          Unlocked: {newUnlocks.map((d) => `${DECK_BY_ID[d].name} deck`).join(", ")}. Pick it on the title screen.
+        </p>
+      )}
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-0.5 font-mono text-[12px]">
         <dt className="text-[#9fb2c9]">Total score</dt>
         <dd className="text-right text-white">{fmt(run.totalScore)}</dd>
-        <dt className="text-[#9fb2c9]">Your best ever</dt>
-        <dd className="text-right text-white">{fmt(bests.score)}</dd>
+        <dt className="text-[#9fb2c9]">Your best run</dt>
+        <dd className="text-right text-white">{fmt(progress.bestTotal)}</dd>
         <dt className="text-[#9fb2c9]">Runs won</dt>
-        <dd className="text-right text-white">{bests.wins}</dd>
+        <dd className="text-right text-white">
+          {progress.wins} of {progress.runs}
+        </dd>
       </dl>
       {best && (
         <div className="mt-3 rounded-[5px] border border-white/10 bg-white/5 p-2">
@@ -161,14 +187,19 @@ export function Summary() {
           {status}
         </p>
       )}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button onClick={() => start(false)} className="aero-btn aero-btn-primary flex-1 py-1.5 text-[13px]">
+      {won && (
+        <button onClick={goEndless} className="aero-btn aero-btn-primary mt-4 w-full py-1.5 text-[13px]">
+          Keep going: Endless mode ›
+        </button>
+      )}
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button onClick={() => start(false, run.deckKind)} className={`${won ? "aero-btn-dark" : "aero-btn aero-btn-primary"} flex-1 py-1.5 text-[13px]`}>
           New run
         </button>
         <button onClick={() => void share()} className="aero-btn-dark px-3 py-1.5 text-[12px]">
           Share result
         </button>
-        <button onClick={toTitle} className="aero-btn-dark px-3 py-1.5 text-[12px]">
+        <button onClick={() => go("title")} className="aero-btn-dark px-3 py-1.5 text-[12px]">
           Title
         </button>
       </div>
@@ -215,7 +246,7 @@ export function DeckViewer({ onClose }: { onClose: () => void }) {
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         {cards.map((c) => (
-          <DeckCard key={c.uid} def={CARD_BY_ID[c.id]} compact onClick={canRemove ? () => setConfirm(c.uid) : undefined} />
+          <DeckCard key={c.uid} def={CARD_BY_ID[c.id]} mod={c.mod} compact onClick={canRemove ? () => setConfirm(c.uid) : undefined} />
         ))}
       </div>
     </Panel>

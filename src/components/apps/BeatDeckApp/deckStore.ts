@@ -1,10 +1,10 @@
 import { create } from "zustand";
 import * as R from "@/lib/beatdeck/run";
-import { CARD_BY_ID, type CardDef } from "@/lib/beatdeck/cards";
+import { CARD_BY_ID, type CardDef, type DeckKind } from "@/lib/beatdeck/cards";
 import type { GearId } from "@/lib/beatdeck/gear";
 import { dailySeed } from "@/lib/beatdeck/rng";
 import type { TakeResult } from "@/lib/beatdeck/scoring";
-import { readBest, submitBest } from "@/lib/bestScores";
+import { DEFAULT_PROGRESS, loadProgress, noteSeen, saveProgress, unlocksFor, type Progress, type Speed } from "./progress";
 
 const SAVE_KEY = "saeculo-beatdeck-run";
 
@@ -18,53 +18,72 @@ export interface Scoring {
   next: R.RunState;
 }
 
-export interface Bests {
-  score: number;
-  round: number;
-  wins: number;
-}
+export type Screen = "title" | "table" | "crate";
 
 interface DeckState {
   run: R.RunState | null;
-  screen: "title" | "table";
+  screen: Screen;
   selected: string[];
   scoring: Scoring | null;
-  bests: Bests;
+  progress: Progress;
+  /** Decks this run just unlocked (shown on the summary). */
+  newUnlocks: DeckKind[];
+  /** First-run coach marks: the step showing, or null. */
+  tutorial: number | null;
   hydrated: boolean;
   hydrate: () => void;
-  start: (daily: boolean) => void;
+  start: (daily: boolean, deck: DeckKind) => void;
   resume: () => void;
-  toTitle: () => void;
+  go: (screen: Screen) => void;
   toggle: (uid: string) => void;
   play: () => void;
   finishScoring: () => void;
   redraw: () => void;
+  applySession: (slot: number) => void;
+  sellSession: (slot: number) => void;
   openShop: () => void;
   buyGear: (slot: number) => void;
   buyCard: (slot: number) => void;
+  buySession: (slot: number) => void;
   buyUpgrade: () => void;
   removeCard: (uid: string) => void;
   sellGear: (id: GearId) => void;
   reroll: () => void;
   nextRound: () => void;
+  goEndless: () => void;
+  setSpeed: (speed: Speed) => void;
+  toggleSfx: () => void;
+  nextTip: () => void;
+  endTutorial: () => void;
 }
 
-function save(run: R.RunState | null) {
+function saveRun(run: R.RunState | null) {
   try {
-    if (run && run.phase !== "over" && run.phase !== "victory") localStorage.setItem(SAVE_KEY, JSON.stringify(run));
+    if (run && run.phase !== "over") localStorage.setItem(SAVE_KEY, JSON.stringify(run));
     else localStorage.removeItem(SAVE_KEY);
   } catch {
     // storage unavailable — the run lasts for this visit only
   }
 }
 
-const readBests = (): Bests => ({ score: readBest("deck"), round: readBest("deckRound"), wins: readBest("deckWins") });
-
 export const useDeckStore = create<DeckState>((set, get) => {
-  /** Commit a new run state: persist it and keep the selection valid. */
+  const setProgress = (p: Progress) => {
+    if (p !== get().progress) {
+      saveProgress(p);
+      set({ progress: p });
+    }
+  };
+
+  /** Commit a new run state: persist it, keep the selection valid, log discoveries. */
   const commit = (run: R.RunState) => {
-    save(run);
+    saveRun(run);
     set((s) => ({ run, selected: s.selected.filter((u) => run.hand.includes(u)) }));
+    setProgress(noteSeen(get().progress, run));
+  };
+
+  const act = (fn: (run: R.RunState) => R.RunState) => () => {
+    const { run } = get();
+    if (run) commit(fn(run));
   };
 
   return {
@@ -72,7 +91,9 @@ export const useDeckStore = create<DeckState>((set, get) => {
     screen: "title",
     selected: [],
     scoring: null,
-    bests: { score: 0, round: 0, wins: 0 },
+    progress: DEFAULT_PROGRESS,
+    newUnlocks: [],
+    tutorial: null,
     hydrated: false,
 
     hydrate: () => {
@@ -83,17 +104,19 @@ export const useDeckStore = create<DeckState>((set, get) => {
       } catch {
         // corrupted save — start fresh
       }
-      set({ run, bests: readBests(), hydrated: true });
+      set({ run, progress: loadProgress(), hydrated: true });
     },
 
-    start: (daily) => {
+    start: (daily, deck) => {
       const seed = daily ? dailySeed() : Math.floor(Math.random() * 2 ** 31);
-      const run = R.newRun(seed, daily);
-      save(run);
-      set({ run, screen: "table", selected: [], scoring: null });
+      const run = R.newRun(seed, daily, deck);
+      const progress = get().progress;
+      set({ screen: "table", selected: [], scoring: null, newUnlocks: [], tutorial: progress.tutorialDone ? null : 0 });
+      setProgress({ ...progress, runs: progress.runs + 1 });
+      commit(run);
     },
     resume: () => set({ screen: "table" }),
-    toTitle: () => set({ screen: "title", scoring: null, selected: [], bests: readBests() }),
+    go: (screen) => set({ screen, scoring: null, selected: [] }),
 
     toggle: (uid) => {
       const { run, selected, scoring } = get();
@@ -112,16 +135,24 @@ export const useDeckStore = create<DeckState>((set, get) => {
     },
 
     finishScoring: () => {
-      const { scoring } = get();
+      const { scoring, progress } = get();
       if (!scoring) return;
       const next = scoring.next;
+      let p: Progress = { ...progress, bestTake: Math.max(progress.bestTake, scoring.result.score) };
+      let newUnlocks: DeckKind[] = [];
       if (next.phase === "over" || next.phase === "victory") {
-        submitBest("deck", next.totalScore);
-        submitBest("deckRound", next.phase === "victory" ? 9 : next.round);
-        if (next.phase === "victory") submitBest("deckWins", readBest("deckWins") + 1);
+        newUnlocks = unlocksFor(p, next);
+        p = {
+          ...p,
+          bestTotal: Math.max(p.bestTotal, next.totalScore),
+          furthest: Math.max(p.furthest, next.phase === "victory" ? 9 : next.endless ? next.round : next.round),
+          wins: p.wins + (next.phase === "victory" ? 1 : 0),
+          unlocked: [...p.unlocked, ...newUnlocks],
+        };
       }
-      save(next);
-      set({ run: next, scoring: null, selected: [], bests: readBests() });
+      set({ scoring: null, selected: [], newUnlocks });
+      setProgress(p);
+      commit(next);
     },
 
     redraw: () => {
@@ -129,42 +160,44 @@ export const useDeckStore = create<DeckState>((set, get) => {
       if (!run || scoring || !selected.length) return;
       const next = R.redraw(run, selected);
       if (next !== run) {
-        save(next);
-        set({ run: next, selected: [] });
+        set({ selected: [] });
+        commit(next);
       }
     },
 
-    openShop: () => {
-      const { run } = get();
-      if (run) commit(R.openShop(run));
+    applySession: (slot) => {
+      const { run, selected, scoring } = get();
+      if (!run || scoring) return;
+      const next = R.applySession(run, slot, selected);
+      if (next !== run) {
+        set({ selected: [] });
+        commit(next);
+      }
     },
-    buyGear: (slot) => {
+    sellSession: (slot) => get().run && commit(R.sellSession(get().run!, slot)),
+
+    openShop: act(R.openShop),
+    buyGear: (slot) => get().run && commit(R.buyGear(get().run!, slot)),
+    buyCard: (slot) => get().run && commit(R.buyCard(get().run!, slot)),
+    buySession: (slot) => get().run && commit(R.buySession(get().run!, slot)),
+    buyUpgrade: act(R.buyUpgrade),
+    removeCard: (uid) => get().run && commit(R.removeCard(get().run!, uid)),
+    sellGear: (id) => get().run && commit(R.sellGear(get().run!, id)),
+    reroll: act(R.rerollShop),
+    nextRound: act(R.nextRound),
+    goEndless: () => {
       const { run } = get();
-      if (run) commit(R.buyGear(run, slot));
+      if (!run) return;
+      set({ newUnlocks: [] });
+      commit(R.openShop(R.goEndless(run)));
     },
-    buyCard: (slot) => {
-      const { run } = get();
-      if (run) commit(R.buyCard(run, slot));
-    },
-    buyUpgrade: () => {
-      const { run } = get();
-      if (run) commit(R.buyUpgrade(run));
-    },
-    removeCard: (uid) => {
-      const { run } = get();
-      if (run) commit(R.removeCard(run, uid));
-    },
-    sellGear: (id) => {
-      const { run } = get();
-      if (run) commit(R.sellGear(run, id));
-    },
-    reroll: () => {
-      const { run } = get();
-      if (run) commit(R.rerollShop(run));
-    },
-    nextRound: () => {
-      const { run } = get();
-      if (run) commit(R.nextRound(run));
+
+    setSpeed: (speed) => setProgress({ ...get().progress, speed }),
+    toggleSfx: () => setProgress({ ...get().progress, sfx: !get().progress.sfx }),
+    nextTip: () => set((s) => ({ tutorial: s.tutorial === null ? null : s.tutorial + 1 })),
+    endTutorial: () => {
+      set({ tutorial: null });
+      setProgress({ ...get().progress, tutorialDone: true });
     },
   };
 });

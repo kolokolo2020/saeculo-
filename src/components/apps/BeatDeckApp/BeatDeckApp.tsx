@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useDeckStore } from "./deckStore";
+import Crate from "./Crate";
 import Table from "./Table";
 import Title from "./Title";
 
@@ -18,5 +19,6 @@ export default function BeatDeckApp() {
   }, []);
 
   if (!hydrated) return null;
+  if (screen === "crate") return <Crate />;
   return screen === "table" && run ? <Table /> : <Title />;
 }

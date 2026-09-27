@@ -1,24 +1,31 @@
 "use client";
 
-import { rolesOf, type CardDef } from "@/lib/beatdeck/cards";
+import { MODS, rolesOf, type CardDef, type CardMod } from "@/lib/beatdeck/cards";
 import Glyph from "@/components/ui/Glyph";
 import { GENRE_LABEL, RARITY_COLOR, ROLE_COLOR, ROLE_LABEL } from "./look";
 
 // One sound card: role colours along the top, the card's one-bar pattern
 // drawn per role, groove per hit, and any special text.
+const MOD_BADGE: Record<CardMod, string> = { tape: "TAPE", gold: "GOLD", double: "2×", vinyl: "VINYL" };
+
 export default function DeckCard({
   def,
+  mod,
   selected = false,
   dimmed = false,
   compact = false,
+  deal,
   onClick,
   onAudition,
   label,
 }: {
   def: CardDef;
+  mod?: CardMod;
   selected?: boolean;
   dimmed?: boolean;
   compact?: boolean;
+  /** Animate in as a freshly dealt card, staggered by this index. */
+  deal?: number;
   onClick?: () => void;
   onAudition?: () => void;
   /** Accessible name override (defaults to the card's name). */
@@ -32,14 +39,33 @@ export default function DeckCard({
   const w = compact ? "w-[92px]" : "w-[104px]";
 
   return (
-    <div className={`relative shrink-0 ${w} transition-transform duration-150 ${selected ? "-translate-y-3" : ""}`}>
+    <div
+      className={`group/card relative shrink-0 ${w} transition-transform duration-150 ${selected ? "-translate-y-3" : onClick ? "hover:-translate-y-1" : ""} ${
+        deal !== undefined ? "animate-[deck-deal_0.38s_cubic-bezier(.2,.8,.3,1.2)_both] motion-reduce:animate-none" : ""
+      }`}
+      style={deal !== undefined ? { animationDelay: `${deal * 55}ms` } : undefined}
+    >
       <button
         onClick={onClick}
         aria-pressed={onClick ? selected : undefined}
-        aria-label={label ?? `${def.name} card`}
+        aria-label={label ?? `${def.name} card${mod ? ` (${MODS[mod].name})` : ""}`}
         className={`flex w-full flex-col overflow-hidden rounded-[7px] border text-left shadow-[0_4px_10px_rgba(0,0,0,0.5)] ${
           selected ? "border-[#9fe0ff] ring-2 ring-[#6fb4ff]" : "border-black/80"
         } ${dimmed ? "opacity-45" : ""} bg-gradient-to-b from-[#26303e] to-[#0e131b]`}
+        style={
+          mod && !selected
+            ? {
+                borderColor: MODS[mod].color,
+                boxShadow: `0 0 10px ${MODS[mod].color}66, 0 4px 10px rgba(0,0,0,0.5)`,
+                backgroundImage:
+                  mod === "vinyl"
+                    ? "repeating-radial-gradient(circle at 50% 120%, rgba(255,255,255,0.05) 0 1px, transparent 1px 4px), linear-gradient(to bottom, #2b2640, #0e0b18)"
+                    : mod === "gold"
+                      ? "linear-gradient(to bottom, #3a3120, #14100a)"
+                      : undefined,
+              }
+            : undefined
+        }
       >
         <span className="block h-[7px]" style={{ background: stripe }} />
         <span className={`flex flex-col gap-1 ${compact ? "px-1.5 pt-1 pb-1.5" : "px-2 pt-1.5 pb-2"}`}>
@@ -69,6 +95,11 @@ export default function DeckCard({
             {def.groove ? `+${def.groove} groove/hit` : "no hits"}
           </span>
           {def.text && !compact && <span className="text-[10px] leading-snug text-[#c9d6e6]">{def.text}</span>}
+          {mod && (
+            <span className="mt-0.5 self-start rounded-[3px] px-1 py-[1px] font-pixel text-[7px] text-black" style={{ background: MODS[mod].color }} title={MODS[mod].text}>
+              {MOD_BADGE[mod]}
+            </span>
+          )}
         </span>
       </button>
       {onAudition && (

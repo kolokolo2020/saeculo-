@@ -269,6 +269,70 @@ function playHit(
     case "tapestop":
       tone(ctx, dest, time, { type: "sawtooth", freq: semi(melRoot, 0), toFreq: 45, glideTime: stepDur * 2, gain: 0.14 * gainScale, decay: stepDur * 2, lowpass: 2000 });
       break;
+    case "shaker":
+      noiseBurst(ctx, dest, time, { type: "bandpass", freq: 5200, q: 1.4, gain: 0.16 * gainScale, decay: 0.06 });
+      break;
+    case "horn":
+      // the air horn: three detuned saws, a blast then two stabs
+      [0, 0.18, 0.28].forEach((d, i) =>
+        [0, 0.07, -0.05].forEach((det) =>
+          tone(ctx, dest, time + d, { type: "sawtooth", freq: semi(melRoot, 7) * (1 + det / 12), gain: 0.07 * gainScale, decay: i ? 0.07 : 0.14, lowpass: 3800 }),
+        ),
+      );
+      break;
+    case "rev": {
+      // reverse cymbal: noise swelling up into the next downbeat
+      const length = stepDur * (16 - hit.step);
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuffer(ctx);
+      src.loop = true;
+      const f = ctx.createBiquadFilter();
+      f.type = "highpass";
+      f.frequency.value = 4000;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.exponentialRampToValueAtTime(0.3 * gainScale, time + length * 0.97);
+      g.gain.linearRampToValueAtTime(0.0001, time + length);
+      src.connect(f).connect(g).connect(dest);
+      src.start(time);
+      src.stop(time + length);
+      break;
+    }
+    case "flute": {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = semi(melRoot * 2, hit.note);
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 5.5;
+      const vibAmt = ctx.createGain();
+      vibAmt.gain.value = osc.frequency.value * 0.012;
+      vib.connect(vibAmt).connect(osc.frequency);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.exponentialRampToValueAtTime(0.14 * gainScale, time + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, time + stepDur * 3);
+      osc.connect(g).connect(dest);
+      noiseBurst(ctx, dest, time, { type: "bandpass", freq: osc.frequency.value * 2, q: 2, gain: 0.03 * gainScale, decay: 0.06 });
+      osc.start(time);
+      vib.start(time);
+      osc.stop(time + stepDur * 3 + 0.05);
+      vib.stop(time + stepDur * 3 + 0.05);
+      break;
+    }
+    case "pad":
+      for (const n of [0, 3, 7, 10, 14]) {
+        for (const det of [-0.08, 0.08]) {
+          tone(ctx, dest, time, {
+            type: "triangle",
+            freq: semi(melRoot, (hit.note ?? 0) + n + det),
+            gain: 0.045 * gainScale,
+            attack: stepDur * 2,
+            decay: stepDur * 12,
+            lowpass: 2200,
+          });
+        }
+      }
+      break;
     case "tag":
       [0, 7, 12].forEach((n, i) =>
         tone(ctx, dest, time + i * 0.07, { type: "sine", freq: semi(melRoot * 2, n), gain: 0.12 * gainScale, decay: 0.35 }),

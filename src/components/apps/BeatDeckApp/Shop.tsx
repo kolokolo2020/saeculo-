@@ -5,6 +5,8 @@ import { GEAR_BY_ID, MAX_GEAR } from "@/lib/beatdeck/gear";
 import * as R from "@/lib/beatdeck/run";
 import { ROUND_BY_ID } from "@/lib/beatdeck/rounds";
 import { BEAT_TYPE_BY_ID, typeLevelStats } from "@/lib/beatdeck/scoring";
+import { MAX_SESSIONS, SESSION_BY_ID } from "@/lib/beatdeck/sessions";
+import { sfx } from "./sfx";
 import { useDeckStore } from "./deckStore";
 import { runKeyFor } from "./deckAudio";
 import { playTakeLive } from "./sound";
@@ -23,7 +25,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // beat type), or cut a card from your deck. Then meet the next client.
 export default function Shop({ onShowDeck }: { onShowDeck: () => void }) {
   const run = useDeckStore((s) => s.run)!;
-  const { buyGear, buyCard, buyUpgrade, reroll, nextRound } = useDeckStore.getState();
+  const store = useDeckStore.getState();
+  const buy = (fn: () => void) => () => {
+    fn();
+    sfx("cash");
+  };
+  const buyGear = (i: number) => buy(() => store.buyGear(i))();
+  const buyCard = (i: number) => buy(() => store.buyCard(i))();
+  const buySession = (i: number) => buy(() => store.buySession(i))();
+  const buyUpgrade = buy(store.buyUpgrade);
+  const { reroll, nextRound } = store;
   const shop = run.shop!;
   const next = ROUND_BY_ID[run.plan[run.round]];
   const upgrade = shop.upgrade ? BEAT_TYPE_BY_ID[shop.upgrade] : null;
@@ -110,6 +121,32 @@ export default function Shop({ onShowDeck }: { onShowDeck: () => void }) {
         </Section>
       </div>
 
+      <Section title="STUDIO SESSIONS · ONE USE">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {shop.sessions.map((id, i) => {
+            if (!id) return <p key={i} className="text-[12px] text-[#7f93ad]">Booked.</p>;
+            const def = SESSION_BY_ID[id];
+            const full = run.sessions.length >= MAX_SESSIONS;
+            return (
+              <div key={i} className="flex items-center gap-2 rounded-[4px] border border-[#ffd27a]/25 bg-[#ffd27a]/5 p-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12.5px] font-semibold text-[#ffe7a3]">◆ {def.name}</p>
+                  <p className="text-[11.5px] leading-snug text-[#c9d6e6]">{def.text}</p>
+                </div>
+                <button
+                  onClick={() => buySession(i)}
+                  disabled={full || run.money < def.price}
+                  aria-label={`Buy ${def.name} for $${def.price}`}
+                  className="aero-btn aero-btn-primary shrink-0 px-3 py-1 text-[12px] disabled:opacity-45"
+                >
+                  {full ? "Full" : `$${def.price}`}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
       <Section title="SOUNDS">
         <div className="dark-scroll flex gap-3 overflow-x-auto pt-1 pb-1">
           {shop.cards.map((id, i) =>
@@ -142,6 +179,7 @@ export default function Shop({ onShowDeck }: { onShowDeck: () => void }) {
         <div className="min-w-0 flex-1">
           <p className="text-[11px] text-[#9fb2c9]">
             Next: round {run.round + 1} {next.boss && <b className="text-[#ff9a8a]">· BOSS</b>}
+            {run.endless && <b className="text-[#d9c6ff]"> · endless</b>}
           </p>
           <p className="text-[13px] font-semibold text-white">{next.who}</p>
           <p className="text-[11.5px] text-[#ffd27a]">{next.rule}</p>
