@@ -7,14 +7,28 @@ desktop icon to open it.
 
 What's on the desktop:
 
-- **Media Player** — plays the beats with three live visualizers (Aurora,
-  Bars & Waves, Scope). Music lives in a global player, so it keeps
-  playing when the window closes; the sidebar Now Playing gadget and the
-  taskbar tray control it too.
-- **Beat Maker** — a 16-step drum sequencer with genre presets and a
-  randomizer; every sound is synthesized live. **Share link** copies a URL
-  that opens the site with that exact loop loaded (`#beat=<bpm>-<hex>`),
-  and **Export .wav** renders 4 bars offline and downloads them.
+- **Welcome Center** — opens once per visit after boot: the latest
+  tracks one click from playing, where to start, and the socials. Untick
+  "Show at startup" to stop it; share links skip it.
+- **Media Player** — plays the beats with four live visualizers. The
+  default, **Cover Art**, rebuilds the track's cover out of dots that pulse
+  on the measured beat; Aurora, Bars and Scope follow. Each track has its
+  own palette (pulled from its cover) that tints the whole window, a
+  waveform seek bar drawn from the real audio (with bar ticks, drag, hover
+  time and arrow-key seeking), a beat LED synced to the measured tempo, and
+  a fullscreen mode. Music lives in a global player, so it keeps playing
+  when the window closes; the sidebar Now Playing gadget, the taskbar tray
+  and the taskbar hover preview control or show it too.
+- **Beat Maker** — an 8-lane groovebox (kick, snare, clap, hat, open hat,
+  rim, 808, keys). Every step is off, on or accented; the 808 and keys
+  follow a four-bar chord progression in any minor key, so any pattern
+  (and every Randomize) stays musical. Swing, a resonant master filter and
+  tempo sit on rotary knobs, with tap tempo, mute/solo, an LCD that lights
+  the progression bar by bar, and a live output scope. Drag to paint,
+  right-click / Shift-click / long-press for accents, Ctrl+Z to undo.
+  **Share link** copies a URL that opens the site with that exact groove
+  loaded (older four-lane links still load), and **Export .wav** renders
+  the four bars offline and downloads them.
 - **Beat Deck** — the game: a roguelike deckbuilder where every hand is a
   beat. Cards are one-bar patterns (kicks, hats, 808s, chords, chops from
   saeculo's tracks); play up to 5 as a take and the loop actually plays
@@ -52,10 +66,12 @@ Open [http://localhost:3000](http://localhost:3000).
 Real: the three tracks (`public/audio/*.mp3`) and their cover art
 (`public/covers/`), the booking email, and the social links.
 
-- **Tracks**: `src/data/tracks.ts`. `bpm` is what visitors see; `tempo` and
-  `beatOffset` are measured from the audio file (the rhythm games chart
-  notes from them), so re-measure them if a file is replaced. Tracks above
-  125 BPM are charted on the half-time grid.
+- **Tracks**: `src/data/tracks.ts`. `bpm` is what visitors see. Everything
+  measured from the audio lives in `src/data/trackAnalysis.json`: the exact
+  tempo and first-beat offset (Beat Deck's chops and the player's beat
+  sync use them), the waveform peaks, and the palette from the cover. After
+  adding or replacing a track or cover, regenerate it with
+  `node scripts/analyze-tracks.mjs` (needs `playwright-core` and `sharp`).
 - **Bio, socials, booking email, next release date**: `src/data/profile.ts`.
   The bio and the next release are still placeholders.
 - **Vault words, password and unreleased snippets**: `src/data/secrets.ts`.
@@ -75,7 +91,11 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
 - `src/components/window-manager/` — windows: zustand store, drag and
   resize hooks, maximize, the glass `WindowFrame`, and the app registry.
 - `src/components/player/` — the global audio player store, the single
-  `<audio>` element (`AudioEngine`), and the visualizer.
+  `<audio>` element (`AudioEngine`), the visualizers, the waveform seek
+  bar and the beat clock (`spectrum.ts`).
+- `scripts/analyze-tracks.mjs` — decodes each track in Chromium to measure
+  tempo, phase and the waveform, and k-means-clusters each cover for its
+  palette; writes `src/data/trackAnalysis.json`.
 - `src/lib/beatdeck/` — Beat Deck's rules as pure TypeScript (no DOM):
   cards, gear, clients and bosses, the scoring engine, and the run's state
   transitions, all seeded so a run replays from its seed. Balanced by
@@ -87,14 +107,16 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
 - `src/components/ui/` — `AppIcon` (the glossy SVG icon set), `Glyph`
   (monochrome control glyphs — unicode ▶ ⏭ ✕ render as colour emoji on
   some platforms), and the start-orb mark.
-- `src/lib/synth.ts` — real-time drum synthesis used by the Beat Maker and
-  Beat Deck.
-- `src/lib/beatCode.ts` — share-link encoding and the offline WAV render.
+- `src/lib/synth.ts`, `src/lib/voices.ts` — real-time synthesis (drums,
+  noise bursts, enveloped tones, a driven 808) shared by the Beat Maker
+  and Beat Deck; `src/lib/wav.ts` encodes the WAV exports.
+- `src/lib/groove.ts` — the Beat Maker's model: lanes, keys, chord
+  progressions, step scheduling, the offline render and share codes.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (68 checks: windows,
-  global audio, gadgets, Beat Deck played, the secret hunt, lock/restart,
-  idle screensaver, mobile, iPhone playback). Not part of the build — run it against a dev
+- `scripts/verify.mjs` — a Playwright smoke test (81 checks: windows,
+  global audio, the player, gadgets, the Beat Maker, Beat Deck played, the
+  secret hunt, lock/restart, idle screensaver, mobile, iPhone playback). Not part of the build — run it against a dev
   server on port 3210 after `npm i --no-save playwright-core`.
 
 ## Mobile

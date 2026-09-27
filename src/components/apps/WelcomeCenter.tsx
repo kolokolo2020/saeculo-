@@ -50,7 +50,7 @@ export default function WelcomeCenter() {
           <div className="min-w-0">
             <h3 className="text-[20px] font-light text-[#1e3287]">Welcome to {PROFILE.artistName}</h3>
             <p className="text-[12.5px] text-[#3b4a5c]">
-              {PROFILE.tagline}. Everything here is live: the beats, a card game built out of them, and a drum machine. Some things are hidden.
+              {PROFILE.tagline}. Everything here is live: the beats, a card game built out of them, and a groovebox to make your own. Some things are hidden.
             </p>
           </div>
         </div>
