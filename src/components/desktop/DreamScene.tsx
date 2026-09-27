@@ -5,12 +5,17 @@ import { TRACKS } from "@/data/tracks";
 import { usePlayerStore } from "@/components/player/playerStore";
 import { paletteFor } from "@/components/player/analysis";
 import { beatInfo, readFrequencies } from "@/components/player/spectrum";
+import type { Atmosphere } from "./personalizeStore";
 
 // DreamScene: Vista Ultimate's moving wallpaper, redone as a live one. The
 // sky takes the playing track's cover palette; aurora curtains sway and
 // brighten with the low end, a glow breathes up from the horizon on every
 // beat, and motes of light rise faster when the hats are busy. Paused, it
 // drifts slowly in the last track's colours.
+//
+// In Midnight it's projected, like the player's Projector: the lamp
+// flickers and flares on the beat, the frame weaves, and dust and
+// scratches cross the print (on a sharp layer above the soft sky).
 
 type HSL = [number, number, number];
 
@@ -50,13 +55,24 @@ function raySprite(c: HSL) {
   return rayCanvas;
 }
 
-export default function DreamScene() {
+interface Scratch {
+  x: number;
+  life: number;
+  alpha: number;
+  drift: number;
+}
+
+export default function DreamScene({ atmosphere = "clean" }: { atmosphere?: Atmosphere }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const fxRef = useRef<HTMLCanvasElement>(null);
+  const projected = atmosphere === "midnight";
 
   useEffect(() => {
     const canvas = ref.current;
     const g = canvas?.getContext("2d");
     if (!canvas || !g) return;
+    let scratches: Scratch[] = [];
+    let weaveY = 0;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const freq = new Uint8Array(256);
     const target = () => {
@@ -160,7 +176,62 @@ export default function DreamScene() {
         g.fill();
       }
 
+      // the layer only exists in Midnight
+      const fx = fxRef.current;
+      const f = fx?.getContext("2d");
+      if (fx && f) projector(f, fx, pulse);
+
       if (!reduced) raf = requestAnimationFrame(frame);
+    };
+
+    /** The print's flicker, dust and scratches, drawn sharp at half size. */
+    const projector = (f: CanvasRenderingContext2D, fx: HTMLCanvasElement, pulse: number) => {
+      const fw = Math.max(1, Math.round(fx.clientWidth * 0.5));
+      const fh = Math.max(1, Math.round(fx.clientHeight * 0.5));
+      if (fx.width !== fw || fx.height !== fh) {
+        fx.width = fw;
+        fx.height = fh;
+      }
+      f.clearRect(0, 0, fw, fh);
+      // the lamp: a dip now and then, a flare on the beat
+      const dip = reduced ? 0.04 : Math.random() * 0.09;
+      f.fillStyle = `rgba(0, 0, 0, ${dip})`;
+      f.fillRect(0, 0, fw, fh);
+      if (pulse > 0.05) {
+        f.fillStyle = `rgba(255, 226, 190, ${pulse * 0.07})`;
+        f.fillRect(0, 0, fw, fh);
+      }
+      // burnt-in edges
+      const burn = f.createRadialGradient(fw / 2, fh / 2, Math.min(fw, fh) * 0.35, fw / 2, fh / 2, Math.hypot(fw, fh) * 0.55);
+      burn.addColorStop(0, "rgba(0, 0, 0, 0)");
+      burn.addColorStop(1, "rgba(24, 8, 0, 0.55)");
+      f.fillStyle = burn;
+      f.fillRect(0, 0, fw, fh);
+      if (reduced) return;
+      // the frame weaves, a hair
+      weaveY += (Math.random() - 0.5) * 0.6 - weaveY * 0.1;
+      fx.style.transform = `translateY(${weaveY.toFixed(2)}px)`;
+      if (Math.random() < 0.02 && scratches.length < 3) {
+        scratches.push({ x: Math.random(), life: 20 + Math.random() * 60, alpha: 0.08 + Math.random() * 0.18, drift: (Math.random() - 0.5) * 0.001 });
+      }
+      f.lineWidth = 1;
+      for (const sc of scratches) {
+        sc.life--;
+        sc.x += sc.drift;
+        f.strokeStyle = `rgba(255, 246, 228, ${sc.alpha})`;
+        f.beginPath();
+        f.moveTo(sc.x * fw, 0);
+        f.lineTo(sc.x * fw + (Math.random() - 0.5) * 2, fh);
+        f.stroke();
+      }
+      scratches = scratches.filter((sc) => sc.life > 0);
+      const specks = Math.random() < 0.4 ? Math.floor(Math.random() * 4) : 0;
+      for (let i = 0; i < specks; i++) {
+        f.fillStyle = Math.random() < 0.7 ? `rgba(0, 0, 0, ${0.35 + Math.random() * 0.4})` : `rgba(255, 246, 228, ${0.25 + Math.random() * 0.35})`;
+        f.beginPath();
+        f.arc(Math.random() * fw, Math.random() * fh, 0.5 + Math.random() * 1.8, 0, Math.PI * 2);
+        f.fill();
+      }
     };
 
     raf = requestAnimationFrame(frame);
@@ -172,5 +243,10 @@ export default function DreamScene() {
     };
   }, []);
 
-  return <canvas ref={ref} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full blur-[3px]" />;
+  return (
+    <>
+      <canvas ref={ref} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full blur-[3px]" />
+      {projected && <canvas ref={fxRef} aria-hidden data-testid="dreamscene-projector" className="pointer-events-none absolute inset-0 h-full w-full" />}
+    </>
+  );
 }

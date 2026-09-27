@@ -26,9 +26,15 @@ What's on the desktop:
 - **Welcome Center** — opens once per visit after boot: the latest
   tracks one click from playing, where to start, and the socials. Untick
   "Show at startup" to stop it; share links skip it.
-- **Media Player** — plays the beats with four live visualizers. The
+- **Media Player** — plays the beats with live visualizers. The
   default, **Cover Art**, rebuilds the track's cover out of dots that pulse
-  on the measured beat; Aurora, Bars and Scope follow. Each track has its
+  on the measured beat. **Projector** throws the cover onto a dark wall as a
+  worn 16 mm print (gate weave, dust, scratches, burnt edges, a lamp that
+  flares on the beat) and is the default after dark; Aurora, Bars and Scope
+  follow, and **Film** plays a track's video if it has one. The **Tape**
+  button plays any of them off a VHS: colour slip, a tracking band that
+  tears on bass hits, head-switching noise and a PLAY / tape-counter
+  display. It's on by default when the desktop is on Tape or Midnight. Each track has its
   own palette (pulled from its cover) that tints the whole window, a
   waveform seek bar drawn from the real audio (with bar ticks, drag, hover
   time and arrow-key seeking), a beat LED synced to the measured tempo, and
@@ -64,7 +70,8 @@ What's on the desktop:
   six glass colors, five wallpapers, and a transparency toggle, saved in
   the browser. **DreamScene** is a live wallpaper: it takes the playing
   track's cover palette and its aurora sways with the low end and
-  brightens on every beat.
+  brightens on every beat. In Midnight it's projected too: it flickers,
+  and dust and scratches cross it.
 - **next_single.exe** — the countdown to the next release, as a download
   dialog that's taking its time (also a sidebar gadget).
 - **The vault** — `vault.zip` sits in the Recycle Bin and can't be deleted.
@@ -101,6 +108,12 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   `scripts/generate-audio.mjs`).
 - **Link preview image**: generated from the profile by
   `src/app/opengraph-image.tsx`.
+- **Track videos (optional)**: add `video: "/video/<id>.mp4"` to a track in
+  `src/data/tracks.ts` and put the file in `public/video/`. The Film
+  visualizer shows up for that track: muted, looping, cropped to fill,
+  with the projector treatment, and paused with the music. Use MP4 (H.264)
+  or WebM, a 10–20 s seamless loop, 720p, under ~6 MB.
+  `docs/aura-plan.md` (section 7) has prompts for a video generator.
 
 ## Project structure
 
@@ -136,8 +149,8 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   progressions, step scheduling, the offline render and share codes.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (96 checks: the Room intro, windows,
-  global audio, the player, gadgets, the Beat Maker, Beat Deck played, the
+- `scripts/verify.mjs` — a Playwright smoke test (101 checks: the Room intro, windows,
+  global audio, the player and its Projector / Tape looks, gadgets, the Beat Maker, Beat Deck played, the
   secret hunt, lock/restart, idle screensaver, an axe accessibility audit,
   mobile, iPhone playback). Not part of the build: run it against a dev
   server on port 3210 after `npm i --no-save playwright-core axe-core`.

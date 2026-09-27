@@ -29,7 +29,7 @@ cards. The Vista UI keeps Segoe / Open Sans.
 
 ---
 
-## Phase 1: Foundations (a shared FX and sound layer)
+## Phase 1: Foundations (a shared FX and sound layer) (done)
 
 1. **`AuraLayer` component**: one full-screen, pointer-transparent overlay
    drawn with CSS and a small canvas:
@@ -58,7 +58,7 @@ when idle, the tests pass, and axe still finds no problems.
 
 ---
 
-## Phase 2: The Room (the intro)
+## Phase 2: The Room (the intro) (done)
 
 The entrance to the site: a comic-style, animated scene.
 
@@ -139,7 +139,7 @@ takes one click or tap.
 
 ---
 
-## Phase 3: Media, visualizers and AI video slots
+## Phase 3: Media, visualizers and AI video slots (done)
 
 1. **"Projector" visualizer** (new default in Midnight). The cover is
    thrown onto the screen like a worn 16 mm print: gate weave, dust,

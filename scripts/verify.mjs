@@ -149,6 +149,22 @@ try {
   check("the waveform seek bar moves playback", tAfter - tBefore >= 4, `${tBefore.toFixed(1)} → ${tAfter.toFixed(1)}`);
   await vizBtn.click();
   check("visualizer mode cycles", (await vizBtn.innerText()) !== m1);
+  check("the Projector is next in the cycle", (await vizBtn.innerText()).includes("Projector"));
+  const pf1 = await canvas.evaluate((c) => c.toDataURL());
+  await page.waitForTimeout(300);
+  check("the Projector flickers and weaves", pf1 !== (await canvas.evaluate((c) => c.toDataURL())));
+  const labels = [];
+  for (let i = 0; i < 6; i++) {
+    labels.push(await vizBtn.innerText());
+    await vizBtn.click();
+  }
+  check("Film only appears for tracks with a video", !labels.some((l) => l.includes("Film")), labels.join(", "));
+  const tapeBtn = player.getByRole("button", { name: "Tape effect" });
+  const tapeWas = await tapeBtn.getAttribute("aria-pressed");
+  check("the Tape look is on by default on a Tape desktop", tapeWas === "true");
+  await tapeBtn.click();
+  check("Tape toggles off", (await tapeBtn.getAttribute("aria-pressed")) === "false");
+  await tapeBtn.click();
 
   await page.getByRole("button", { name: "Maximize saeculo Media Player" }).click();
   await page.waitForTimeout(200);
