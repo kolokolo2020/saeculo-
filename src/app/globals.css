@@ -1343,3 +1343,66 @@ main[data-atmo="midnight"] .desk-icon:focus-visible > svg {
     opacity: 0.8;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Night Radio (RadioApp.tsx)                                           */
+/* ------------------------------------------------------------------ */
+
+.radio-body {
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(255, 210, 150, 0.08), transparent 60%),
+    linear-gradient(180deg, #3b2416 0%, #26160c 60%, #1a0e07 100%);
+}
+.radio-grille {
+  background-color: #150d08;
+  background-image: radial-gradient(circle, #6b4a2c 1.4px, transparent 1.8px);
+  background-size: 8px 8px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8), 0 0 0 2px #0d0704;
+}
+.radio-lcd {
+  color: #ffcf6a;
+  background: #120a05;
+  box-shadow: inset 0 0 14px rgba(255, 170, 60, 0.18), 0 0 0 2px #0d0704;
+  text-shadow: 0 0 6px rgba(255, 180, 80, 0.55);
+}
+.radio-lcd-off {
+  color: #5a4630;
+  text-shadow: none;
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.6), 0 0 0 2px #0d0704;
+}
+.radio-dial {
+  background: linear-gradient(180deg, #1c120a, #0e0804);
+  box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.8), 0 0 0 2px #0d0704, 0 1px 0 2px rgba(255, 220, 170, 0.08);
+}
+.radio-needle {
+  background: #e0402e;
+  box-shadow: 0 0 6px rgba(255, 70, 40, 0.8);
+  transition: left 60ms linear;
+}
+.radio-power {
+  color: #d9c9a8;
+  background: radial-gradient(circle at 40% 35%, #5a3a24, #1e120a);
+  box-shadow: 0 0 0 2px #0d0704, inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.radio-power-on {
+  color: #ffcf6a;
+  text-shadow: 0 0 6px #ffae3a;
+}
+.radio-preset {
+  color: #ffcf6a;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #4a2e1c, #26160c);
+  box-shadow: 0 0 0 1px #0d0704, inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  font-family: var(--font-type);
+}
+.radio-preset:hover {
+  background: linear-gradient(180deg, #5c3a24, #2e1a0e);
+}
+.radio-caret {
+  animation: haunt-flicker 0.8s steps(1, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .radio-needle {
+    transition: none;
+  }
+}

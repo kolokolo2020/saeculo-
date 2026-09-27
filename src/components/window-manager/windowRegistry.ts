@@ -50,6 +50,16 @@ export const APPS: AppMeta[] = [
     defaultSize: { width: 960, height: 680 },
   },
   {
+    kind: "radio",
+    title: "Night Radio",
+    label: "Night Radio",
+    description: "Pirate radio: tune through the static",
+    category: "app",
+    surface: "dark",
+    onDesktop: true,
+    defaultSize: { width: 560, height: 310 },
+  },
+  {
     kind: "about",
     title: "about.txt - Notepad",
     label: "about.txt",

@@ -24,6 +24,16 @@ function check(name, ok, extra = "") {
 
 // Sandboxed/CI environments often can't reach Vercel's analytics script;
 // that's the network, not the site.
+// windows switch on like a CRT in Tape; wait until none is mid-animation
+const settle = (p) =>
+  p
+    .waitForFunction(
+      () => !document.getAnimations().some((a) => a.playState === "running" && a.effect?.target?.classList?.contains("aero-window")),
+      null,
+      { timeout: 3000 },
+    )
+    .catch(() => {});
+
 const isEnvNoise = (text) => /vercel-scripts|ERR_TUNNEL|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED/.test(text);
 
 const browser = await chromium.launch({ executablePath: CHROME, args: ["--autoplay-policy=no-user-gesture-required"] });
@@ -82,7 +92,8 @@ try {
   const desktop = page.getByRole("navigation", { name: "Desktop" });
   const openFromDesktop = async (label) => {
     await desktop.getByRole("button", { name: label, exact: true }).click();
-    await page.waitForTimeout(700); // the CRT switch-on settles
+    await page.waitForTimeout(100);
+    await settle(page);
   };
   const win = (title) => page.getByRole("region", { name: title, exact: true });
   const close = async (title) => {
@@ -98,7 +109,7 @@ try {
   check("boot screen appears", await page.getByLabel("Skip boot sequence").isVisible().catch(() => false));
   await page.getByLabel("Skip boot sequence").click({ force: true });
   await page.waitForTimeout(300);
-  check("desktop shows 9 icons", (await desktop.getByRole("button").count()) === 9);
+  check("desktop shows 10 icons", (await desktop.getByRole("button").count()) === 10);
   const welcome = win("Welcome Center");
   check("the Welcome Center greets a first visit", await welcome.getByRole("button", { name: "Play care4me" }).isVisible());
   await welcome.getByRole("checkbox", { name: "Show at startup" }).uncheck();
@@ -107,7 +118,8 @@ try {
   // ---- media player + global audio ----
   await desktop.getByRole("button", { name: "Media Player", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await page.waitForTimeout(800); // the CRT switch-on settles
+  await page.waitForTimeout(100);
+  await settle(page);
   const player = win("saeculo Media Player");
   check("player opens via keyboard Enter on icon", await player.isVisible());
 
@@ -193,6 +205,7 @@ try {
   await page.keyboard.type("deck");
   await page.keyboard.press("Enter");
   await page.waitForTimeout(1200); // the game loads on demand
+  await settle(page);
   const deck = win("Beat Deck");
   check("start search + Enter launches Beat Deck", await deck.getByRole("button", { name: "New run" }).isVisible());
   check("locked starting decks can't be picked yet", await deck.getByRole("radio", { name: "Trap House deck (locked)" }).isDisabled());
@@ -472,6 +485,44 @@ try {
   check("the taskbar still works while the cat walks", await page.getByRole("navigation", { name: "Start menu" }).isVisible());
   await page.keyboard.press("Escape");
 
+  // ---- Night Radio ----
+  await openFromDesktop("Night Radio");
+  const radio = win("Night Radio");
+  const dial = radio.getByRole("slider", { name: "Tuning dial" });
+  const dialSays = () => dial.getAttribute("aria-valuetext");
+  check("Night Radio starts switched off", (await dialSays()).includes("radio off"));
+  await radio.getByRole("button", { name: "Power" }).click();
+  await radio.getByRole("button", { name: /^Preset 2/ }).click();
+  await page.waitForTimeout(800);
+  check(
+    "a station plays its track through the global player",
+    (await dialSays()).includes("playing care4me") &&
+      (await audioPaused()) === false &&
+      (await page.getByRole("button", { name: "Now playing: care4me" }).isVisible()),
+    await dialSays(),
+  );
+  check("the DJ types out the station's line", (await radio.getByTestId("radio-dj").textContent()).includes("somebody asked for care4me"));
+  await dial.focus();
+  for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight");
+  check("the arrow keys tune off the station, into static", (await dialSays()) === "95.2 FM, static");
+  await page.keyboard.press("End");
+  for (let i = 0; i < 7; i++) await page.keyboard.press("ArrowLeft");
+  await page.waitForTimeout(300);
+  check(
+    "past the end of the scale there's an unlisted station with a clue",
+    (await dialSays()).includes("unlisted station") &&
+      (await radio.getByTestId("radio-dj").textContent()).includes("three words open the bin") &&
+      (await audioPaused()) === true,
+  );
+  await page.keyboard.press("Home");
+  await radio.getByRole("button", { name: /^Preset 1/ }).click();
+  await page.waitForTimeout(600);
+  check("leaving it hands back to the music", (await audioPaused()) === false && (await dialSays()).includes("elbtunnel"));
+  await radio.getByRole("button", { name: "Power" }).click();
+  check("switching off goes quiet on the dial", (await radio.getByTestId("radio-readout").innerText()) === "—");
+  await close("Night Radio");
+  await page.getByRole("button", { name: "Gadget pause" }).click();
+
   // ---- release countdown ----
   await openFromDesktop("next_single.exe");
   const release = win("Downloading next_single.exe");
@@ -630,7 +681,7 @@ try {
     };
     await audit("desktop");
     const titles = { "Media Player": "saeculo Media Player", "found_footage.txt": "found_footage.txt - Notepad" };
-    for (const app of ["Media Player", "Beat Maker", "Beat Deck", "Pictures", "found_footage.txt"]) {
+    for (const app of ["Media Player", "Beat Maker", "Beat Deck", "Pictures", "found_footage.txt", "Night Radio"]) {
       await openFromDesktop(app);
       await page.waitForTimeout(900);
       await audit(app);
@@ -750,7 +801,8 @@ try {
   }
   await m.waitForTimeout(200);
   await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Beat Maker", exact: true }).tap();
-  await m.waitForTimeout(900);
+  await m.waitForTimeout(300);
+  await settle(m);
   const cell = await m.getByRole("button", { name: "kick step 1", exact: true }).boundingBox();
   check("mobile: Beat Maker steps are big enough to tap", cell.width >= 28, `${Math.round(cell.width)}px`);
   await mContext.close();

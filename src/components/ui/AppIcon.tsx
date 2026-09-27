@@ -261,6 +261,30 @@ export default function AppIcon({ kind, size = 48 }: { kind: WindowKind; size?: 
         </>
       );
       break;
+    case "radio":
+      // a portable receiver: wood-brown case, grille, a lit dial
+      body = (
+        <>
+          <defs>
+            <linearGradient id={`${id}-case`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#7a4a2a" />
+              <stop offset="1" stopColor="#3a1f10" />
+            </linearGradient>
+            {gloss}
+          </defs>
+          <line x1="30" y1="12" x2="40" y2="3" stroke="#9aa3ad" strokeWidth="1.4" strokeLinecap="round" />
+          <rect x="4" y="12" width="40" height="30" rx="5" fill={u("case")} stroke="#1e0f06" strokeWidth="1.1" />
+          <circle cx="16" cy="28" r="8.5" fill="#1b120c" stroke="#c9a46a" strokeWidth="1" />
+          {[0, 1, 2].flatMap((r) =>
+            [0, 1, 2].map((c) => <circle key={`${r}-${c}`} cx={12 + c * 4} cy={24 + r * 4} r="0.9" fill="#c9a46a" opacity="0.7" />),
+          )}
+          <rect x="27" y="18" width="13" height="8" rx="1" fill="#ffcf6a" stroke="#1e0f06" strokeWidth="0.8" />
+          <line x1="34" y1="18.5" x2="34" y2="25.5" stroke="#b3402e" strokeWidth="1.2" />
+          <circle cx="33.5" cy="34" r="4" fill="#d9c9a8" stroke="#1e0f06" strokeWidth="0.8" />
+          <rect x="6" y="13.5" width="36" height="8" rx="3" fill={u("gloss")} opacity="0.5" />
+        </>
+      );
+      break;
     case "pictures":
       // a folder with a photo sticking out of it
       body = (

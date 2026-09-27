@@ -10,7 +10,8 @@ export type WindowKind =
   | "release"
   | "welcome"
   | "footage"
-  | "pictures";
+  | "pictures"
+  | "radio";
 
 export interface WindowState {
   kind: WindowKind;

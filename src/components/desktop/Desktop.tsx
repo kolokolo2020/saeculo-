@@ -37,6 +37,7 @@ import WelcomeCenter, { WELCOME_KEY } from "@/components/apps/WelcomeCenter";
 import VaultApp from "@/components/apps/VaultApp";
 import ReleaseApp from "@/components/apps/ReleaseApp";
 import FootageApp from "@/components/apps/FootageApp";
+import RadioApp from "@/components/apps/RadioApp";
 import TrayBalloon from "./TrayBalloon";
 import { useSecretStore } from "@/components/secrets/secretStore";
 import { createKonamiListener } from "@/components/secrets/konami";
@@ -64,6 +65,7 @@ const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   welcome: WelcomeCenter,
   footage: FootageApp,
   pictures: PicturesApp,
+  radio: RadioApp,
 };
 
 export default function Desktop() {

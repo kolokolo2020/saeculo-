@@ -54,3 +54,6 @@ export const VAULT_LETTER = [
   "don't tell everyone how you got in. tell them there's a way.",
   "— saeculo",
 ];
+
+/** What Night Radio's hidden station plays (a vault snippet, muffled). */
+export const RADIO_SNIPPET = VAULT_ITEMS[0].src;
