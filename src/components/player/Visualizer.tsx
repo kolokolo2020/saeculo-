@@ -1,31 +1,69 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { readFrequencies, readWaveform } from "./spectrum";
+import { readFrequencies, readWaveform, beatInfo } from "./spectrum";
+import { DEFAULT_PALETTE, type TrackPalette } from "./analysis";
 
-export const VIZ_MODES = ["aurora", "bars", "scope"] as const;
+export const VIZ_MODES = ["art", "aurora", "bars", "scope"] as const;
 export type VizMode = (typeof VIZ_MODES)[number];
 export const VIZ_LABEL: Record<VizMode, string> = {
+  art: "Cover Art",
   aurora: "Aurora",
   bars: "Bars & Waves",
   scope: "Scope",
 };
 
 const BAR_COUNT = 32;
+/** Dots per side of the Cover Art grid. */
+const ART_GRID = 44;
+
+interface ArtDots {
+  n: number;
+  color: string[];
+  lum: Float32Array;
+}
+
+/** Sample the cover into an N×N grid of colours. */
+function sampleCover(img: HTMLImageElement, n: number): ArtDots {
+  const c = document.createElement("canvas");
+  c.width = n;
+  c.height = n;
+  const g = c.getContext("2d")!;
+  g.drawImage(img, 0, 0, n, n);
+  const px = g.getImageData(0, 0, n, n).data;
+  const color: string[] = [];
+  const lum = new Float32Array(n * n);
+  for (let i = 0; i < n * n; i++) {
+    const [r, gg, b] = [px[i * 4], px[i * 4 + 1], px[i * 4 + 2]];
+    color.push(`rgb(${r},${gg},${b})`);
+    lum[i] = (0.2126 * r + 0.7152 * gg + 0.0722 * b) / 255;
+  }
+  return { n, color, lum };
+}
 
 // Live visualizer for whatever the global player is playing. It reads the
-// analyser straight off the store inside its own rAF loop, so it never
-// re-renders React per frame; `mode` and `playing` only restart the loop.
+// spectrum and the beat clock straight off the store inside its own rAF
+// loop, so React never re-renders per frame. Colours come from the track's
+// cover palette; every mode breathes on the beat.
+//
+// Cover Art mode rebuilds the cover as a grid of dots: each dot keeps its
+// pixel's colour, swells with the frequency band at its distance from the
+// centre (bass in the middle, treble at the edges), and a ripple rolls out
+// from the centre on every beat, harder on every bar.
 export default function Visualizer({
   mode,
   playing,
   reducedMotion,
   className = "h-40",
+  palette = DEFAULT_PALETTE,
+  cover,
 }: {
   mode: VizMode;
   playing: boolean;
   reducedMotion: boolean;
   className?: string;
+  palette?: TrackPalette;
+  cover?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -53,9 +91,18 @@ export default function Visualizer({
     const peaks = new Float32Array(BAR_COUNT);
     let t = 0;
     let raf = 0;
+    let dots: ArtDots | null = null;
+    let cancelled = false;
+    if (mode === "art" && cover) {
+      const img = new Image();
+      img.onload = () => {
+        if (!cancelled) dots = sampleCover(img, ART_GRID);
+      };
+      img.src = cover;
+    }
 
-    // Returns 0..1 band energies. When nothing is playing, a slow synthetic
-    // swell stands in so the canvas breathes instead of sitting dead.
+    const pulseNow = () => (playing ? (beatInfo()?.pulse ?? 0) : 0);
+
     const bands = () => {
       if (playing && readFrequencies(freq)) {
         const avg = (from: number, to: number) => {
@@ -63,24 +110,68 @@ export default function Visualizer({
           for (let i = from; i < to; i++) sum += freq[i];
           return sum / (to - from) / 255;
         };
-        return { bass: avg(1, 8), mid: avg(8, 40), high: avg(40, 120), live: true };
+        return { bass: avg(1, 8), mid: avg(8, 40), high: avg(40, 120) };
       }
       const s = (Math.sin(t * 0.02) + 1) / 2;
-      return { bass: 0.12 + s * 0.1, mid: 0.08 + s * 0.06, high: 0.05, live: false };
+      return { bass: 0.12 + s * 0.1, mid: 0.08 + s * 0.06, high: 0.05 };
+    };
+
+    const drawArt = () => {
+      ctx.clearRect(0, 0, w, h);
+      const live = playing && readFrequencies(freq);
+      const beat = playing ? beatInfo() : null;
+      const pulse = beat?.pulse ?? 0;
+      const barHit = beat && beat.beat % 4 === 0 ? 1 : 0.55;
+      const size = Math.min(w, h) * 0.94;
+      const x0 = (w - size) / 2;
+      const y0 = (h - size) / 2;
+      // a glow of the accent behind the grid, on the beat
+      const glow = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, size * 0.7);
+      glow.addColorStop(0, palette.accent);
+      glow.addColorStop(1, "transparent");
+      ctx.globalAlpha = 0.12 + pulse * 0.25 * barHit;
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalAlpha = 1;
+      if (!dots) return;
+      const { n, color, lum } = dots;
+      const sp = size / n;
+      const ripple = beat ? beat.phase * 1.25 : -1;
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          const k = j * n + i;
+          const dx = (i + 0.5) / n - 0.5;
+          const dy = (j + 0.5) / n - 0.5;
+          const d = Math.sqrt(dx * dx + dy * dy) * 1.414; // 0 centre … 1 corner
+          const energy = live ? freq[Math.min(250, 2 + Math.floor(d * 110))] / 255 : 0.1 + 0.07 * Math.sin(t * 0.025 + d * 7);
+          const ring = ripple < 0 ? 0 : Math.exp(-((d - ripple) ** 2) / 0.006) * (1 - (beat?.phase ?? 0)) * barHit;
+          const r = Math.min(sp * 0.62, sp * (0.14 + 0.3 * lum[k] + 0.42 * energy + 0.5 * ring));
+          const push = ring * sp * 0.9;
+          const len = d || 1;
+          const cx = x0 + (i + 0.5) * sp + (dx / len) * push;
+          const cy = y0 + (j + 0.5) * sp + (dy / len) * push;
+          ctx.globalAlpha = Math.min(1, 0.3 + 0.45 * lum[k] + 0.55 * energy + ring);
+          ctx.fillStyle = color[k];
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
     };
 
     const drawAurora = () => {
       ctx.fillStyle = "rgba(3, 10, 22, 0.22)";
       ctx.fillRect(0, 0, w, h);
       const { bass, mid, high } = bands();
+      const pulse = pulseNow();
       ctx.globalCompositeOperation = "lighter";
       const ribbons = [
-        { color: [80, 255, 180], amp: 0.22 + bass * 0.5, speed: 0.011, freq: 0.006, y: 0.55, width: 10 + bass * 26 },
-        { color: [70, 180, 255], amp: 0.18 + mid * 0.6, speed: 0.016, freq: 0.009, y: 0.45, width: 8 + mid * 22 },
-        { color: [160, 120, 255], amp: 0.12 + high * 0.7, speed: 0.023, freq: 0.014, y: 0.6, width: 5 + high * 16 },
+        { color: palette.second, amp: 0.22 + bass * 0.5 + pulse * 0.08, speed: 0.011, freq: 0.006, y: 0.55, width: 10 + bass * 26 + pulse * 8 },
+        { color: palette.accent, amp: 0.18 + mid * 0.6, speed: 0.016, freq: 0.009, y: 0.45, width: 8 + mid * 22 },
+        { color: "hsl(260 80% 72%)", amp: 0.12 + high * 0.7, speed: 0.023, freq: 0.014, y: 0.6, width: 5 + high * 16 },
       ];
       for (const r of ribbons) {
-        const [cr, cg, cb] = r.color;
         for (let layer = 0; layer < 3; layer++) {
           ctx.beginPath();
           for (let x = 0; x <= w; x += 6) {
@@ -91,11 +182,13 @@ export default function Visualizer({
             if (x === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
           }
-          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.16 - layer * 0.04})`;
+          ctx.strokeStyle = r.color;
+          ctx.globalAlpha = 0.16 - layer * 0.04;
           ctx.lineWidth = r.width * (1 + layer * 0.9);
           ctx.stroke();
         }
       }
+      ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
     };
 
@@ -115,13 +208,14 @@ export default function Visualizer({
       } else {
         levels = Array.from({ length: BAR_COUNT }, (_, i) => 0.04 + ((Math.sin(t * 0.03 + i * 0.4) + 1) / 2) * 0.05);
       }
+      const pulse = pulseNow();
       const floor = h * 0.72;
       const gap = 2;
       const barW = (w - gap * (BAR_COUNT + 1)) / BAR_COUNT;
       const grad = ctx.createLinearGradient(0, floor, 0, 0);
-      grad.addColorStop(0, "#0b4fb3");
-      grad.addColorStop(0.55, "#39a6ff");
-      grad.addColorStop(1, "#d8f1ff");
+      grad.addColorStop(0, palette.second);
+      grad.addColorStop(0.6, palette.accent);
+      grad.addColorStop(1, "#ffffff");
       for (let i = 0; i < BAR_COUNT; i++) {
         const x = gap + i * (barW + gap);
         const bh = Math.max(2, levels[i] * (floor - 6));
@@ -131,11 +225,20 @@ export default function Visualizer({
         ctx.fillStyle = "rgba(255,255,255,0.18)";
         ctx.fillRect(x, floor - bh, barW * 0.45, bh);
         // mirrored reflection on the "glass floor"
-        ctx.fillStyle = "rgba(57,166,255,0.18)";
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = grad;
         ctx.fillRect(x, floor + 2, barW, bh * 0.35);
+        ctx.globalAlpha = 1;
         peaks[i] = Math.max(peaks[i] - 0.006, levels[i]);
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(x, floor - peaks[i] * (floor - 6) - 3, barW, 2);
+      }
+      // the glass floor flashes on the beat
+      if (pulse > 0.02) {
+        ctx.globalAlpha = pulse * 0.5;
+        ctx.fillStyle = palette.accent;
+        ctx.fillRect(0, floor, w, 2);
+        ctx.globalAlpha = 1;
       }
       const fade = ctx.createLinearGradient(0, floor, 0, h);
       fade.addColorStop(0, "rgba(3,7,15,0)");
@@ -148,11 +251,12 @@ export default function Visualizer({
       ctx.fillStyle = "rgba(3, 10, 22, 0.35)";
       ctx.fillRect(0, 0, w, h);
       const mid = h / 2;
-      ctx.lineWidth = 2;
+      const pulse = pulseNow();
+      ctx.lineWidth = 2 + pulse * 2;
       ctx.lineJoin = "round";
-      ctx.strokeStyle = "#7fe0ff";
-      ctx.shadowColor = "#39a6ff";
-      ctx.shadowBlur = 12;
+      ctx.strokeStyle = palette.accent;
+      ctx.shadowColor = palette.accent;
+      ctx.shadowBlur = 10 + pulse * 14;
       ctx.beginPath();
       if (playing && readWaveform(wave)) {
         const step = w / wave.length;
@@ -174,15 +278,29 @@ export default function Visualizer({
 
     const frame = () => {
       t++;
-      if (mode === "aurora") drawAurora();
+      if (mode === "art") drawArt();
+      else if (mode === "aurora") drawAurora();
       else if (mode === "bars") drawBars();
       else drawScope();
     };
 
     if (reducedMotion) {
-      ctx.fillStyle = "#03070f";
-      ctx.fillRect(0, 0, w, h);
-      for (let i = 0; i < 30; i++) frame();
+      // a still frame, redrawn once the cover has loaded
+      const still = () => {
+        if (mode !== "art") {
+          ctx.fillStyle = "#03070f";
+          ctx.fillRect(0, 0, w, h);
+        }
+        for (let i = 0; i < 30; i++) frame();
+      };
+      still();
+      const poll = setInterval(() => {
+        if (dots) {
+          still();
+          clearInterval(poll);
+        }
+      }, 200);
+      setTimeout(() => clearInterval(poll), 4000);
     } else {
       const loop = () => {
         raf = requestAnimationFrame(loop);
@@ -192,10 +310,11 @@ export default function Visualizer({
     }
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
-  }, [mode, playing, reducedMotion]);
+  }, [mode, playing, reducedMotion, palette, cover]);
 
   return <canvas ref={canvasRef} className={`block w-full ${className}`} aria-label="Audio visualizer" role="img" />;
 }

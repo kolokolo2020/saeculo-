@@ -74,7 +74,7 @@ try {
   await page.waitForTimeout(600);
   check("audio plays", (await audioPaused()) === false);
 
-  const canvas = player.locator("canvas");
+  const canvas = player.getByRole("img", { name: "Audio visualizer" });
   const f1 = await canvas.evaluate((c) => c.toDataURL());
   await page.waitForTimeout(400);
   const f2 = await canvas.evaluate((c) => c.toDataURL());
@@ -82,6 +82,14 @@ try {
 
   const vizBtn = player.getByRole("button", { name: "Cycle visualizer style" });
   const m1 = await vizBtn.innerText();
+  check("the Cover Art visualizer is the default", m1.includes("Cover Art"), m1);
+  const seekBar = player.getByRole("slider", { name: "Seek" });
+  const tBefore = await page.getByTestId("player-audio").evaluate((a) => a.currentTime);
+  await seekBar.focus();
+  await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(200);
+  const tAfter = await page.getByTestId("player-audio").evaluate((a) => a.currentTime);
+  check("the waveform seek bar moves playback", tAfter - tBefore >= 4, `${tBefore.toFixed(1)} → ${tAfter.toFixed(1)}`);
   await vizBtn.click();
   check("visualizer mode cycles", (await vizBtn.innerText()) !== m1);
 

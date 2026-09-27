@@ -9,6 +9,20 @@ import { usePlayerStore } from "./playerStore";
 // snare on the backbeat, hats on the 8ths. It moves on the beat, not on
 // the actual sound, which is plenty for a visualizer.
 
+/** Where the playing track is in its beat grid: `pulse` is 1 on each beat
+ *  and decays to 0 before the next; `beat` counts beats from the first. */
+export function beatInfo(): { pulse: number; phase: number; beat: number; bar: number } | null {
+  const { audio, trackIndex, playing } = usePlayerStore.getState();
+  if (!audio || !playing) return null;
+  const track = TRACKS[trackIndex];
+  const beatLen = 60 / gridTempo(track);
+  const t = audio.currentTime - (track.beatOffset ?? 0);
+  if (t < 0) return null;
+  const beat = Math.floor(t / beatLen);
+  const phase = t / beatLen - beat;
+  return { pulse: Math.exp(-phase * 5), phase, beat, bar: Math.floor(beat / 4) };
+}
+
 function beatClock() {
   const { audio, trackIndex } = usePlayerStore.getState();
   if (!audio) return null;

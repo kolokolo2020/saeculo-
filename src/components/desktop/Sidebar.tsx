@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
 import Visualizer from "@/components/player/Visualizer";
+import { paletteFor } from "@/components/player/analysis";
 import { useWindowStore } from "@/components/window-manager/windowStore";
 import Glyph from "@/components/ui/Glyph";
 import { useNow } from "@/hooks/useNow";
@@ -84,7 +85,7 @@ function NowPlayingGadget() {
   return (
     <div className="aero-gadget overflow-hidden p-2" aria-label="Now Playing gadget">
       <div className="overflow-hidden rounded-[4px] border border-black/60 bg-[#03070f]">
-        <Visualizer mode="bars" playing={playing} reducedMotion={reducedMotion} className="h-12" />
+        <Visualizer mode="bars" playing={playing} reducedMotion={reducedMotion} className="h-12" palette={paletteFor(track.id)} />
       </div>
       <div className="mt-1.5 flex items-center gap-2">
         {track.cover && (
