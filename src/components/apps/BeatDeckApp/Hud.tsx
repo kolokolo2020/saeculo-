@@ -2,10 +2,10 @@
 
 import { DECK_BY_ID } from "@/lib/beatdeck/cards";
 import type { RunState } from "@/lib/beatdeck/run";
-import { REDRAWS, TAKES, roundDef } from "@/lib/beatdeck/run";
+import { CERTS, TAKES, certOf, redrawsFor, roundDef } from "@/lib/beatdeck/run";
 import { ROUNDS } from "@/lib/beatdeck/rounds";
 import type { RunKey } from "./deckAudio";
-import { fmt } from "./look";
+import { CERT_COLOR, fmt } from "./look";
 import { useCountUp } from "./useCountUp";
 
 function Pips({ label, left, total }: { label: string; left: number; total: number }) {
@@ -37,6 +37,15 @@ export default function Hud({ run, runKey }: { run: RunState; runKey: RunKey }) 
           </span>
           {run.endless && <span className="rounded-[3px] bg-[#7a4fd6] px-1.5 py-[1px] text-[9.5px] font-bold text-white uppercase">Endless</span>}
           {round.boss && <span className="rounded-[3px] bg-[#c42b1c] px-1.5 py-[1px] text-[9.5px] font-bold text-white uppercase">Boss</span>}
+          {certOf(run) > 0 && (
+            <span
+              className="rounded-[3px] border px-1.5 py-[1px] text-[9.5px] font-bold uppercase"
+              style={{ borderColor: CERT_COLOR[certOf(run)], color: CERT_COLOR[certOf(run)] }}
+              title={`Certification: ${CERTS[certOf(run)].name}`}
+            >
+              {CERTS[certOf(run)].name}
+            </span>
+          )}
           <span>
             {round.tempo} bpm · {runKey.name} · {DECK_BY_ID[run.deckKind].name} deck
           </span>
@@ -60,7 +69,7 @@ export default function Hud({ run, runKey }: { run: RunState; runKey: RunKey }) 
       </div>
       <div className="flex flex-col justify-center gap-1" data-tour="takes">
         <Pips label="Takes" left={run.takesLeft} total={Math.max(TAKES, run.takesLeft)} />
-        <Pips label="Redraws" left={run.redrawsLeft} total={Math.max(REDRAWS, run.redrawsLeft)} />
+        <Pips label="Redraws" left={run.redrawsLeft} total={Math.max(redrawsFor(run), run.redrawsLeft)} />
       </div>
       <div className="flex items-center">
         <span className="rounded-[4px] border border-black bg-[#03070f] px-2 py-1 font-mono text-[15px] text-[#9fffb0] shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)]" aria-label="Money">

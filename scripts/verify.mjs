@@ -128,6 +128,11 @@ try {
   const deck = win("Beat Deck");
   check("start search + Enter launches Beat Deck", await deck.getByRole("button", { name: "New run" }).isVisible());
   check("locked starting decks can't be picked yet", await deck.getByRole("radio", { name: "Trap House deck (locked)" }).isDisabled());
+  check(
+    "certifications start at Demo, the rest locked",
+    (await deck.getByRole("radio", { name: "Demo certification" }).getAttribute("aria-checked")) === "true" &&
+      (await deck.getByRole("radio", { name: "Mixtape certification (locked)" }).isDisabled()),
+  );
   await deck.getByRole("button", { name: "The Crate" }).click();
   check("the Crate lists every card, hidden until found", (await deck.getByText("???").count()) > 30);
   await deck.getByRole("button", { name: "Back" }).click();
@@ -138,9 +143,11 @@ try {
   await tour.getByRole("button", { name: "Skip" }).click();
   const handCards = deck.getByLabel("Your hand").getByRole("button", { name: / card$/ });
   check("Beat Deck deals a hand of 8", (await handCards.count()) === 8);
-  for (let i = 0; i < 3; i++) await handCards.nth(i).click();
+  // number keys pick cards while Beat Deck is the active window, even with
+  // nothing inside it focused (the tutorial's Skip button just unmounted)
+  for (const k of ["1", "2", "3"]) await page.keyboard.press(k);
   check(
-    "selecting cards previews the beat type",
+    "keys 1–8 pick cards, and the selection previews the beat type",
     (await deck.getByRole("button", { name: /^Play take \(3\/5\)/ }).isVisible()) && (await deck.getByText(/groove × \d+ hype base/).isVisible()),
   );
   await deck.getByRole("button", { name: /^Play take/ }).click();
@@ -446,6 +453,32 @@ try {
   await bd.getByLabel("Studio sessions").getByRole("button", { name: /Saturator/ }).click();
   await bd.getByRole("button", { name: "Use", exact: true }).click();
   check("a studio session upgrades a card", (await bd.getByLabel("Your hand").getByRole("button", { name: /\(Tape-saturated\)$/ }).count()) === 1);
+  await close("Beat Deck");
+
+  // ---- Beat Deck: winning the last round unlocks the next certification ----
+  await page.evaluate(() => {
+    const run = JSON.parse(localStorage.getItem("saeculo-beatdeck-run"));
+    run.plan[7] = "metronome";
+    Object.assign(run, { phase: "play", round: 8, target: 8400, score: 8399, takesLeft: 1, usedTypes: [] });
+    localStorage.setItem("saeculo-beatdeck-run", JSON.stringify(run));
+  });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(300);
+  await openFromDesktop("Beat Deck");
+  await page.waitForTimeout(1000);
+  await win("Beat Deck").getByRole("button", { name: /^Continue/ }).click();
+  await page.keyboard.press("1");
+  await page.keyboard.press("p");
+  await win("Beat Deck").getByRole("button", { name: "Skip ›" }).click();
+  const summary = page.getByRole("dialog", { name: "Run won" });
+  await summary.waitFor({ timeout: 3000 }).catch(() => {});
+  check("winning a run unlocks the Mixtape certification", (await summary.innerText().catch(() => "")).includes("Mixtape certification unlocked"));
+  await summary.getByRole("button", { name: "Title" }).click();
+  check(
+    "the next certification is ready on the title screen",
+    (await win("Beat Deck").getByRole("radio", { name: "Mixtape certification" }).getAttribute("aria-checked")) === "true" &&
+      (await win("Beat Deck").getByRole("button", { name: "New run · Mixtape" }).isVisible()),
+  );
   await close("Beat Deck");
 
   // ---- lock / restart ----

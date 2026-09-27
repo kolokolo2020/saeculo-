@@ -70,11 +70,11 @@ export default function Shop({ onShowDeck }: { onShowDeck: () => void }) {
                   </div>
                   <button
                     onClick={() => buyGear(i)}
-                    disabled={full || run.money < g.price}
-                    aria-label={`Buy ${g.name} for $${g.price}`}
+                    disabled={full || run.money < R.priceFor(run, g.price)}
+                    aria-label={`Buy ${g.name} for $${R.priceFor(run, g.price)}`}
                     className="aero-btn aero-btn-primary shrink-0 px-3 py-1 text-[12px] disabled:opacity-45"
                   >
-                    {full ? "Full" : `$${g.price}`}
+                    {full ? "Full" : `$${R.priceFor(run, g.price)}`}
                   </button>
                 </div>
               );
@@ -96,11 +96,11 @@ export default function Shop({ onShowDeck }: { onShowDeck: () => void }) {
               </div>
               <button
                 onClick={buyUpgrade}
-                disabled={run.money < R.UPGRADE_PRICE}
-                aria-label={`Master ${upgrade.name} for $${R.UPGRADE_PRICE}`}
+                disabled={run.money < R.priceFor(run, R.UPGRADE_PRICE)}
+                aria-label={`Master ${upgrade.name} for $${R.priceFor(run, R.UPGRADE_PRICE)}`}
                 className="aero-btn aero-btn-primary shrink-0 px-3 py-1 text-[12px] disabled:opacity-45"
               >
-                ${R.UPGRADE_PRICE}
+                ${R.priceFor(run, R.UPGRADE_PRICE)}
               </button>
             </div>
           ) : (
@@ -109,10 +109,10 @@ export default function Shop({ onShowDeck }: { onShowDeck: () => void }) {
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               onClick={onShowDeck}
-              disabled={shop.removed || run.money < R.REMOVE_PRICE || run.deck.length <= 10}
+              disabled={shop.removed || run.money < R.priceFor(run, R.REMOVE_PRICE) || run.deck.length <= 10}
               className="aero-btn-dark px-2.5 py-1 text-[11.5px] disabled:opacity-40"
             >
-              {shop.removed ? "Card removed" : `Remove a card ($${R.REMOVE_PRICE})`}
+              {shop.removed ? "Card removed" : `Remove a card ($${R.priceFor(run, R.REMOVE_PRICE)})`}
             </button>
             <button onClick={reroll} disabled={run.money < shop.rerollCost} className="aero-btn-dark px-2.5 py-1 text-[11.5px] disabled:opacity-40">
               Reroll gear & sounds (${shop.rerollCost})
@@ -135,11 +135,11 @@ export default function Shop({ onShowDeck }: { onShowDeck: () => void }) {
                 </div>
                 <button
                   onClick={() => buySession(i)}
-                  disabled={full || run.money < def.price}
-                  aria-label={`Buy ${def.name} for $${def.price}`}
+                  disabled={full || run.money < R.priceFor(run, def.price)}
+                  aria-label={`Buy ${def.name} for $${R.priceFor(run, def.price)}`}
                   className="aero-btn aero-btn-primary shrink-0 px-3 py-1 text-[12px] disabled:opacity-45"
                 >
-                  {full ? "Full" : `$${def.price}`}
+                  {full ? "Full" : `$${R.priceFor(run, def.price)}`}
                 </button>
               </div>
             );
@@ -159,11 +159,11 @@ export default function Shop({ onShowDeck }: { onShowDeck: () => void }) {
                 />
                 <button
                   onClick={() => buyCard(i)}
-                  disabled={run.money < RARITY_PRICE[CARD_BY_ID[id].rarity]}
-                  aria-label={`Buy ${CARD_BY_ID[id].name} for $${RARITY_PRICE[CARD_BY_ID[id].rarity]}`}
+                  disabled={run.money < R.priceFor(run, RARITY_PRICE[CARD_BY_ID[id].rarity])}
+                  aria-label={`Buy ${CARD_BY_ID[id].name} for $${R.priceFor(run, RARITY_PRICE[CARD_BY_ID[id].rarity])}`}
                   className="aero-btn aero-btn-primary px-3 py-0.5 text-[12px] disabled:opacity-45"
                 >
-                  ${RARITY_PRICE[CARD_BY_ID[id].rarity]}
+                  ${R.priceFor(run, RARITY_PRICE[CARD_BY_ID[id].rarity])}
                 </button>
               </div>
             ) : (

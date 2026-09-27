@@ -4,7 +4,7 @@
 // every read falls back to defaults and writes fail silently.
 
 import type { DeckKind } from "@/lib/beatdeck/cards";
-import type { RunState } from "@/lib/beatdeck/run";
+import { MAX_CERT, certOf, type RunState } from "@/lib/beatdeck/run";
 
 const KEY = "saeculo-deck-progress";
 
@@ -12,6 +12,10 @@ export type Speed = "normal" | "fast" | "instant";
 
 export interface Progress {
   unlocked: DeckKind[];
+  /** Highest certification unlocked (0 = Demo). */
+  cert: number;
+  /** Highest certification won, -1 before the first win. */
+  certBest: number;
   runs: number;
   wins: number;
   bestTotal: number;
@@ -26,6 +30,8 @@ export interface Progress {
 
 export const DEFAULT_PROGRESS: Progress = {
   unlocked: ["classic"],
+  cert: 0,
+  certBest: -1,
   runs: 0,
   wins: 0,
   bestTotal: 0,
@@ -72,6 +78,12 @@ export function noteSeen(p: Progress, run: RunState): Progress {
   const seenCards = addAll(p.seenCards, cards);
   const seenGear = addAll(p.seenGear, gear);
   return seenCards === p.seenCards && seenGear === p.seenGear ? p : { ...p, seenCards, seenGear };
+}
+
+/** A won run at the highest unlocked level unlocks the next one. Returns it, or null. */
+export function certUnlockFor(p: Progress, run: RunState): number | null {
+  if (run.phase !== "victory" || certOf(run) < p.cert || p.cert >= MAX_CERT) return null;
+  return p.cert + 1;
 }
 
 /** Unlocks earned by how far a run got. Returns the decks newly unlocked. */

@@ -17,6 +17,18 @@ export const START_MONEY = 4;
 export const REMOVE_PRICE = 3;
 export const UPGRADE_PRICE = 4;
 
+// ---- certifications: the difficulty ladder. Winning a run at one level
+// unlocks the next; each level keeps every rule of the ones before it.
+export const CERTS = [
+  { name: "Demo", rule: "The standard game." },
+  { name: "Mixtape", rule: "Targets are 10% higher." },
+  { name: "EP", rule: "One fewer redraw each round." },
+  { name: "Album", rule: "Rounds pay $1 less, and no interest on savings." },
+  { name: "Gold", rule: "Everything in the shop costs $1 more." },
+  { name: "Platinum", rule: "You hold 7 cards instead of 8." },
+] as const;
+export const MAX_CERT = CERTS.length - 1;
+
 export interface CardInst {
   uid: string;
   id: string;
@@ -57,6 +69,8 @@ export interface RunState {
   version: 2;
   seed: number;
   daily: boolean;
+  /** Certification level (0 = Demo). Missing in saves from before the ladder. */
+  cert?: number;
   deckKind: DeckKind;
   /** Past round 8: the run continues with ever higher targets. */
   endless: boolean;
@@ -89,15 +103,19 @@ export interface RunState {
 }
 
 export const roundDef = (s: RunState): RoundDef => ROUND_BY_ID[s.plan[s.round - 1]];
-export const handSize = (s: RunState) => (s.plan[s.round - 1] === "block" ? 6 : HAND_SIZE);
+export const handSize = (s: RunState) => (s.plan[s.round - 1] === "block" ? 6 : HAND_SIZE - ((s.cert ?? 0) >= 5 ? 1 : 0));
 export const maxPlay = (s: RunState) => (s.plan[s.round - 1] === "noise" ? 3 : MAX_PLAY);
 export const instOf = (s: RunState, uid: string): CardInst => s.deck.find((c) => c.uid === uid)!;
 export const cardOf = (s: RunState, uid: string): CardDef => CARD_BY_ID[instOf(s, uid).id];
+export const certOf = (s: RunState) => s.cert ?? 0;
+export const redrawsFor = (s: RunState) => REDRAWS - (certOf(s) >= 2 ? 1 : 0);
+/** A shop price at this run's certification. */
+export const priceFor = (s: RunState, base: number) => base + (certOf(s) >= 4 ? 1 : 0);
 
 /** The target for a round, including endless rounds past the eighth. */
-export function targetFor(round: number, def: RoundDef): number {
+export function targetFor(round: number, def: RoundDef, cert = 0): number {
   const base = round <= ROUNDS ? TARGETS[round] : TARGETS[ROUNDS] * Math.pow(1.6, round - ROUNDS);
-  return Math.round((base * (def.targetScale ?? 1)) / 50) * 50;
+  return Math.round((base * (def.targetScale ?? 1) * (cert >= 1 ? 1.1 : 1)) / 50) * 50;
 }
 
 /** Draw n cards; an empty draw pile reshuffles the played cards back in. */
@@ -134,9 +152,9 @@ function startRound(s: RunState) {
   s.discard = [];
   draw(s, handSize(s));
   s.takesLeft = TAKES;
-  s.redrawsLeft = REDRAWS;
+  s.redrawsLeft = redrawsFor(s);
   s.score = 0;
-  s.target = targetFor(s.round, roundDef(s));
+  s.target = targetFor(s.round, roundDef(s), certOf(s));
   s.lastTakeScore = 0;
   s.takesPlayed = 0;
   s.usedTypes = [];
@@ -145,7 +163,7 @@ function startRound(s: RunState) {
   s.reward = null;
 }
 
-export function newRun(seed: number, daily = false, deckKind: DeckKind = "classic"): RunState {
+export function newRun(seed: number, daily = false, deckKind: DeckKind = "classic", cert = 0): RunState {
   const starter = DECK_BY_ID[deckKind];
   const rng = new Rng(seed);
   const clients = rng.shuffle(CLIENTS);
@@ -162,6 +180,7 @@ export function newRun(seed: number, daily = false, deckKind: DeckKind = "classi
     version: 2,
     seed,
     daily,
+    cert,
     deckKind,
     endless: false,
     rng: rng.state,
@@ -259,9 +278,9 @@ export function playTake(prev: RunState, uids: string[]): { state: RunState; res
   if (s.score >= s.target) {
     const boss = roundDef(s).boss;
     const reward: Reward = {
-      base: boss ? 6 : s.round >= 4 ? 5 : 4,
+      base: (boss ? 6 : s.round >= 4 ? 5 : 4) - (certOf(s) >= 3 ? 1 : 0),
       takes: s.takesLeft,
-      interest: Math.min(4, Math.floor(s.money / 5)),
+      interest: certOf(s) >= 3 ? 0 : Math.min(4, Math.floor(s.money / 5)),
       chain: s.gear.includes("goldchain") ? 3 : 0,
       register: s.gear.includes("register") ? s.redrawsLeft : 0,
       total: 0,
@@ -325,7 +344,7 @@ export function openShop(prev: RunState): RunState {
   const s = clone(prev);
   if (s.phase !== "won") return prev;
   const rng = new Rng(s.rng);
-  s.shop = { ...rollShop(s, rng), rerollCost: 2, removed: false };
+  s.shop = { ...rollShop(s, rng), rerollCost: priceFor(s, 2), removed: false };
   s.rng = rng.state;
   ensurePlan(s, s.round + 1);
   s.phase = "shop";
@@ -346,9 +365,10 @@ export function rerollShop(prev: RunState): RunState {
 
 export function buyGear(prev: RunState, slot: number): RunState {
   const id = prev.shop?.gear[slot];
-  if (!id || prev.gear.length >= MAX_GEAR || prev.money < GEAR_BY_ID[id].price) return prev;
+  const price = id ? priceFor(prev, GEAR_BY_ID[id].price) : 0;
+  if (!id || prev.gear.length >= MAX_GEAR || prev.money < price) return prev;
   const s = clone(prev);
-  s.money -= GEAR_BY_ID[id].price;
+  s.money -= price;
   s.gear.push(id);
   s.shop!.gear[slot] = null;
   return s;
@@ -366,9 +386,10 @@ export function sellGear(prev: RunState, id: GearId): RunState {
 
 export function buyCard(prev: RunState, slot: number): RunState {
   const id = prev.shop?.cards[slot];
-  if (!id || prev.money < RARITY_PRICE[CARD_BY_ID[id].rarity]) return prev;
+  const price = id ? priceFor(prev, RARITY_PRICE[CARD_BY_ID[id].rarity]) : 0;
+  if (!id || prev.money < price) return prev;
   const s = clone(prev);
-  s.money -= RARITY_PRICE[CARD_BY_ID[id].rarity];
+  s.money -= price;
   s.deck.push({ uid: `c${s.nextUid++}`, id });
   s.shop!.cards[slot] = null;
   return s;
@@ -376,18 +397,18 @@ export function buyCard(prev: RunState, slot: number): RunState {
 
 export function buyUpgrade(prev: RunState): RunState {
   const type = prev.shop?.upgrade;
-  if (!type || prev.money < UPGRADE_PRICE) return prev;
+  if (!type || prev.money < priceFor(prev, UPGRADE_PRICE)) return prev;
   const s = clone(prev);
-  s.money -= UPGRADE_PRICE;
+  s.money -= priceFor(prev, UPGRADE_PRICE);
   s.levels[type] = (s.levels[type] ?? 0) + 1;
   s.shop!.upgrade = null;
   return s;
 }
 
 export function removeCard(prev: RunState, uid: string): RunState {
-  if (!prev.shop || prev.shop.removed || prev.money < REMOVE_PRICE || prev.deck.length <= 10) return prev;
+  if (!prev.shop || prev.shop.removed || prev.money < priceFor(prev, REMOVE_PRICE) || prev.deck.length <= 10) return prev;
   const s = clone(prev);
-  s.money -= REMOVE_PRICE;
+  s.money -= priceFor(prev, REMOVE_PRICE);
   s.deck = s.deck.filter((c) => c.uid !== uid);
   s.shop!.removed = true;
   return s;
@@ -403,9 +424,10 @@ export function nextRound(prev: RunState): RunState {
 
 export function buySession(prev: RunState, slot: number): RunState {
   const id = prev.shop?.sessions[slot];
-  if (!id || prev.sessions.length >= MAX_SESSIONS || prev.money < SESSION_BY_ID[id].price) return prev;
+  const price = id ? priceFor(prev, SESSION_BY_ID[id].price) : 0;
+  if (!id || prev.sessions.length >= MAX_SESSIONS || prev.money < price) return prev;
   const s = clone(prev);
-  s.money -= SESSION_BY_ID[id].price;
+  s.money -= price;
   s.sessions.push(id);
   s.shop!.sessions[slot] = null;
   return s;

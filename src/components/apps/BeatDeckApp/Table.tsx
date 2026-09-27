@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as R from "@/lib/beatdeck/run";
 import { rolesOf, type Role } from "@/lib/beatdeck/cards";
 import { nextTypeHint } from "@/lib/beatdeck/scoring";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { useWindowStore } from "@/components/window-manager/windowStore";
 import { useDeckStore } from "./deckStore";
 import { runKeyFor } from "./deckAudio";
 import { playTakeLive } from "./sound";
@@ -35,6 +36,8 @@ export default function Table() {
   const reducedMotion = usePrefersReducedMotion();
   const [sorted, setSorted] = useState(true);
   const [showDeck, setShowDeck] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   const runKey = runKeyFor(run.seed);
   const round = R.roundDef(run);
   const max = R.maxPlay(run);
@@ -76,7 +79,7 @@ export default function Table() {
   };
 
   // keyboard play: 1–8 pick cards, P plays the take, R redraws
-  const onKeyDown = (e: React.KeyboardEvent) => {
+  const onKeyDown = (e: KeyboardEvent) => {
     if (busy || run.phase !== "play" || e.metaKey || e.ctrlKey || e.altKey) return;
     const n = Number(e.key);
     if (n >= 1 && n <= hand.length) {
@@ -90,9 +93,28 @@ export default function Table() {
       redraw();
     }
   };
+  useEffect(() => {
+    keyRef.current = onKeyDown;
+  });
+  // The keys work whenever Beat Deck is the active window, not only when
+  // something inside it has focus (the button that started a round
+  // unmounts, and focus falls back to the page). Typing into a field, or
+  // keys aimed at another window, are left alone.
+  useEffect(() => {
+    const listener = (e: KeyboardEvent) => {
+      if (useWindowStore.getState().focusedKind !== "beatdeck") return;
+      const t = e.target as HTMLElement;
+      if (t.closest("input, textarea, select, [contenteditable=true]")) return;
+      const inside = rootRef.current?.contains(t);
+      if (!inside && t !== document.body) return;
+      keyRef.current(e);
+    };
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, []);
 
   return (
-    <div className="relative flex h-full flex-col text-[#e6eef8]" onKeyDown={onKeyDown}>
+    <div ref={rootRef} className="relative flex h-full flex-col text-[#e6eef8]">
       <Hud run={run} runKey={runKey} />
       <Rack />
 

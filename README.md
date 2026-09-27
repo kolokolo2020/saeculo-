@@ -38,7 +38,10 @@ What's on the desktop:
   Block, and Metro Nome). Between rounds a shop sells gear that bends the
   rules, new sounds, studio time (level up a beat type) and card removal.
   Runs save after every move; there's a Daily Run with the same shuffle
-  for everyone; the best take of a run exports as a WAV.
+  for everyone; the best take of a run exports as a WAV. Winning a run
+  unlocks the next **certification**, a difficulty ladder from Demo through
+  Mixtape, EP, Album and Gold to Platinum, each adding a rule (higher
+  targets, fewer redraws, leaner pay, pricier shop, a smaller hand).
 - **about.txt** (Notepad), **Contact** (a compose-mail form that opens the
   visitor's mail app), and a **Recycle Bin** of beats that didn't make it.
 - **Right-click the desktop** for a context menu, including **Personalize**:
@@ -101,7 +104,8 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
 - `src/lib/beatdeck/` — Beat Deck's rules as pure TypeScript (no DOM):
   cards, gear, clients and bosses, the scoring engine, and the run's state
   transitions, all seeded so a run replays from its seed. Balanced by
-  simulating a few hundred bot runs per change (the bot wins about a third).
+  simulating a few hundred bot runs per change (the bot wins about a third
+  at Demo, under a tenth at Platinum).
 - `src/components/apps/BeatDeckApp/` — the game's UI and its sound: card
   voices, chops sliced from the tracks and re-pitched to the run's key, and
   the take playback that times every score pop off the audio clock.
@@ -116,7 +120,7 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   progressions, step scheduling, the offline render and share codes.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (83 checks: windows,
+- `scripts/verify.mjs` — a Playwright smoke test (86 checks: windows,
   global audio, the player, gadgets, the Beat Maker, Beat Deck played, the
   secret hunt, lock/restart, idle screensaver, mobile, iPhone playback). Not part of the build — run it against a dev
   server on port 3210 after `npm i --no-save playwright-core`.
