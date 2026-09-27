@@ -26,10 +26,53 @@ function check(name, ok, extra = "") {
 // that's the network, not the site.
 const isEnvNoise = (text) => /vercel-scripts|ERR_TUNNEL|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED/.test(text);
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await chromium.launch({ executablePath: CHROME, args: ["--autoplay-policy=no-user-gesture-required"] });
 const consoleErrors = [];
 
+// The Room intro plays once per visit; every context skips it except the
+// one that tests it. (The desktop marks it seen in sessionStorage.)
+const rawNewContext = browser.newContext.bind(browser);
+browser.newContext = async (opts) => {
+  const ctx = await rawNewContext(opts);
+  await ctx.addInitScript(() => sessionStorage.setItem("saeculo-room", "1"));
+  return ctx;
+};
+
 try {
+  // ---- the Room intro ----
+  {
+    const rc = await rawNewContext({ viewport: { width: 1366, height: 800 } });
+    await rc.addInitScript(() => localStorage.setItem("saeculo-welcome", "off"));
+    const rp = await rc.newPage();
+    rp.on("pageerror", (err) => consoleErrors.push(String(err)));
+    await rp.goto(BASE, { waitUntil: "networkidle" });
+    const room = rp.getByRole("dialog", { name: "The room" });
+    await room.waitFor({ timeout: 5000 }).catch(() => {});
+    check("a first visit opens on the Room's title card", await room.getByText("click to enter").isVisible().catch(() => false));
+    await rp.mouse.click(683, 400);
+    await rp.waitForTimeout(1500);
+    check(
+      "entering the room starts the music (muffled) and shows the scene",
+      (await rp.getByText("click to step inside").isVisible()) && (await rp.evaluate(() => !document.querySelector("audio")?.paused)),
+    );
+    await rp.mouse.click(683, 400);
+    await rp.getByLabel("Skip boot sequence").waitFor({ timeout: 8000 }).catch(() => {});
+    check("the camera push lands on the boot screen, music still playing", (await room.count()) === 0 && (await rp.evaluate(() => !document.querySelector("audio")?.paused)));
+    await rp.reload({ waitUntil: "networkidle" });
+    await rp.waitForTimeout(500);
+    check("the Room plays once per visit", (await room.count()) === 0);
+    const rp2 = await rc.newPage();
+    await rp2.goto(BASE + "/#track=elbtunnel", { waitUntil: "networkidle" });
+    await rp2.waitForTimeout(600);
+    check("a track link skips the Room", (await rp2.getByRole("dialog", { name: "The room" }).count()) === 0);
+    const rp3 = await (await rawNewContext({ viewport: { width: 1366, height: 800 } })).newPage();
+    await rp3.goto(BASE, { waitUntil: "networkidle" });
+    await rp3.getByRole("button", { name: "Skip intro ›" }).click();
+    await rp3.waitForTimeout(500);
+    check("Skip intro goes straight to the desktop", await rp3.getByRole("navigation", { name: "Desktop" }).isVisible());
+    await rc.close();
+  }
+
   const context = await browser.newContext({ viewport: { width: 1366, height: 800 }, acceptDownloads: true });
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(BASE).origin });
   const page = await context.newPage();

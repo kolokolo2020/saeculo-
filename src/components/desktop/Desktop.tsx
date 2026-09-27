@@ -41,6 +41,10 @@ import { createKonamiListener } from "@/components/secrets/konami";
 import type { WindowKind } from "@/lib/types";
 
 // the game is the heaviest window, so it only downloads when first opened
+const RoomIntro = dynamic(() => import("@/components/room/RoomIntro"), {
+  ssr: false,
+  loading: () => <div className="fixed inset-0 z-[10000] bg-black" />,
+});
 const BeatDeckApp = dynamic(() => import("@/components/apps/BeatDeckApp/BeatDeckApp"), { ssr: false });
 
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
@@ -58,6 +62,7 @@ const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
 
 export default function Desktop() {
   const [booting, setBooting] = useState(true);
+  const [room, setRoom] = useState(false);
   const [forceBoot, setForceBoot] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -92,6 +97,20 @@ export default function Desktop() {
       useWindowStore.getState().openWindow("welcome");
     }
   }, []);
+  // leaving the room lands on the boot screen, which the laptop was showing
+  const leaveRoom = useCallback(() => {
+    setRoom(false);
+    setBooting(true);
+  }, []);
+  const skipRoom = useCallback(() => {
+    try {
+      sessionStorage.setItem("saeculo-booted", "1");
+    } catch {
+      // storage blocked
+    }
+    setRoom(false);
+    finishBoot();
+  }, [finishBoot]);
   const closeStart = useCallback(() => setStartOpen(false), []);
   const unlock = useCallback(() => setLocked(false), []);
   const restart = useCallback(() => {
@@ -102,6 +121,21 @@ export default function Desktop() {
   }, []);
   const closeMenu = useCallback(() => setMenu(null), []);
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+
+  // The Room plays once per visit, before the boot screen. Links to a beat
+  // or a track go straight to what they point at.
+  useEffect(() => {
+    let show = false;
+    try {
+      show = !sessionStorage.getItem("saeculo-room") && !/^#(beat|track)=/.test(window.location.hash);
+      sessionStorage.setItem("saeculo-room", "1");
+    } catch {
+      // storage blocked: no intro
+    }
+    if (!show) return;
+    const id = requestAnimationFrame(() => setRoom(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   // the saved look is applied after mount so the first render matches SSR
   useEffect(() => {
@@ -171,7 +205,7 @@ export default function Desktop() {
       <h1 className="sr-only">
         {PROFILE.artistName}: {PROFILE.tagline}
       </h1>
-      {booting && <BootScreen onDone={finishBoot} force={forceBoot} />}
+      {room ? <RoomIntro onEnter={leaveRoom} onSkip={skipRoom} /> : booting && <BootScreen onDone={finishBoot} force={forceBoot} />}
 
       {/* wallpaper: drifting aurora ribbons + a quiet wordmark */}
       {/* clipped in their own box: the rotated ribbons would otherwise
@@ -217,7 +251,7 @@ export default function Desktop() {
       })}
 
       {menu && <DesktopContextMenu x={menu.x} y={menu.y} onClose={closeMenu} onRefresh={refresh} />}
-      {startOpen && <StartMenu onClose={closeStart} onRestart={restart} onLock={() => setLocked(true)} />}
+      {startOpen && <StartMenu onClose={closeStart} onRestart={restart} onLock={() => setLocked(true)} onRoom={() => setRoom(true)} />}
       <TrayBalloon />
       <Taskbar onStartClick={() => setStartOpen((v) => !v)} startOpen={startOpen} />
       {showScreensaver && <ScreensaverOverlay onDismiss={locked ? unlock : undefined} />}

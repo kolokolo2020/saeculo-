@@ -5,6 +5,22 @@ Vista-era blue desktop: frosted Aero windows, a glowing start orb, a
 sidebar of gadgets, and a Bubbles screensaver. Click (or Tab + Enter) a
 desktop icon to open it.
 
+**The way in: the Room.** A first visit opens on a silent-film title card.
+Click to enter a hand-drawn, comic-ink scene: 3 am, rain on the window, a man
+at his laptop making a beat with a joint in his hand, and a black-and-white
+cat on the desk who sometimes turns to look at you. His music leaks muffled
+from his headphones. Click again (or wait) and the camera rises over his
+shoulder into the laptop screen, which is showing the boot screen. The desktop
+takes over and the same song opens up and keeps playing. It plays once per
+visit and is skippable; links to a beat or a track bypass it, and the Start
+menu has "Return to the room". Drawn in SVG in `src/components/room/`.
+
+**Atmosphere.** Film grain, faint scanlines, a vignette and the odd tape
+dropout sit over everything (Personalize → Atmosphere: Clean, Tape or
+Midnight). Between midnight and 4 am, Tape turns into Midnight and the
+desktop's light goes dark red. The rain icon in the tray switches on room
+tone: rain, vinyl crackle and hum, synthesized live.
+
 What's on the desktop:
 
 - **Welcome Center** — opens once per visit after boot: the latest
@@ -120,7 +136,7 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   progressions, step scheduling, the offline render and share codes.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (90 checks: windows,
+- `scripts/verify.mjs` — a Playwright smoke test (96 checks: the Room intro, windows,
   global audio, the player, gadgets, the Beat Maker, Beat Deck played, the
   secret hunt, lock/restart, idle screensaver, an axe accessibility audit,
   mobile, iPhone playback). Not part of the build: run it against a dev

@@ -64,6 +64,29 @@ function loadPrefs(): { volume: number; muted: boolean } | null {
   return null;
 }
 
+// The Room intro plays the music as if it were leaking from someone's
+// headphones in the next chair: low-passed and quiet. 0 = clear, 1 = fully
+// muffled. Lives in the player's own graph so the same song carries on,
+// uninterrupted, when the intro hands over to the desktop. (No graph on
+// iOS, so there it simply plays clear.)
+let tone: BiquadFilterNode | null = null;
+let bleed: GainNode | null = null;
+let muffle = 0;
+function applyMuffle(ctx: BaseAudioContext, amount: number, seconds: number) {
+  if (!tone || !bleed) return;
+  const freq = 20000 * Math.pow(380 / 20000, amount);
+  const at = ctx.currentTime;
+  const k = Math.max(0.005, seconds / 3);
+  tone.frequency.setTargetAtTime(freq, at, k);
+  tone.Q.setTargetAtTime(0.7 + amount * 3, at, k);
+  bleed.gain.setTargetAtTime(1 - amount * 0.45, at, k);
+}
+export function setMuffle(amount: number, seconds = 0.3) {
+  muffle = Math.min(1, Math.max(0, amount));
+  const { ctx } = usePlayerStore.getState();
+  if (ctx) applyMuffle(ctx, muffle, seconds);
+}
+
 export const usePlayerStore = create<PlayerState>((set, get) => {
   // createMediaElementSource may only be called once per element, so the
   // graph is built lazily on the first user-initiated play (which also
@@ -83,7 +106,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.8;
     const source = context.createMediaElementSource(audio);
-    source.connect(analyser);
+    tone = context.createBiquadFilter();
+    tone.type = "lowpass";
+    bleed = context.createGain();
+    applyMuffle(context, muffle, 0);
+    source.connect(tone).connect(bleed).connect(analyser);
     analyser.connect(context.destination);
     set({ ctx: context, analyser });
   };

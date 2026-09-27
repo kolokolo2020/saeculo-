@@ -966,3 +966,140 @@ main[data-atmo="midnight"] {
     radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.7) 100%),
     linear-gradient(160deg, #120306 0%, #3a0a12 55%, #1a0508 100%);
 }
+
+/* ------------------------------------------------------------------ */
+/* the Room (RoomIntro.tsx)                                             */
+/* ------------------------------------------------------------------ */
+
+.room-rain {
+  background-image:
+    repeating-linear-gradient(104deg, transparent 0 22px, rgba(200, 220, 255, 0.16) 22px 23px, transparent 23px 47px),
+    repeating-linear-gradient(98deg, transparent 0 35px, rgba(200, 220, 255, 0.1) 35px 36px, transparent 36px 61px);
+  background-size: 120px 90px, 160px 130px;
+  animation: room-rain 0.55s linear infinite;
+}
+@keyframes room-rain {
+  to { background-position: -22px 90px, -26px 130px; }
+}
+.room-clouds {
+  top: 40px;
+  left: -300px;
+  width: 1000px;
+  height: 180px;
+  background:
+    radial-gradient(ellipse 120px 34px at 200px 60px, rgba(52, 66, 104, 0.85), transparent 70%),
+    radial-gradient(ellipse 90px 26px at 280px 80px, rgba(44, 56, 92, 0.8), transparent 70%),
+    radial-gradient(ellipse 150px 30px at 640px 100px, rgba(52, 66, 104, 0.75), transparent 70%);
+  animation: room-clouds 60s linear infinite;
+}
+@keyframes room-clouds {
+  to { transform: translateX(520px); }
+}
+.room-headlights {
+  top: 0;
+  left: -500px;
+  width: 420px;
+  height: 640px;
+  background: linear-gradient(100deg, transparent, rgba(255, 244, 214, 0.1) 40%, rgba(255, 244, 214, 0.16) 50%, rgba(255, 244, 214, 0.1) 60%, transparent);
+  transform: skewX(-18deg);
+  mix-blend-mode: screen;
+  animation: room-headlights 2.6s ease-in-out forwards;
+}
+@keyframes room-headlights {
+  from { translate: 0 0; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  to { translate: 2300px 0; opacity: 0; }
+}
+.room-screen {
+  box-shadow: 0 0 40px rgba(127, 224, 255, 0.35);
+  animation: room-flicker 5s steps(1) infinite;
+}
+.room-screenglow {
+  background: radial-gradient(ellipse 560px 400px at 930px 470px, rgba(120, 210, 255, 0.16), transparent 70%);
+  mix-blend-mode: screen;
+  animation: room-flicker 5s steps(1) infinite;
+}
+@keyframes room-flicker {
+  0%, 100% { opacity: 1; }
+  41% { opacity: 0.86; }
+  42% { opacity: 1; }
+  77% { opacity: 0.92; }
+  78% { opacity: 1; }
+}
+.room-tail {
+  animation: room-tail 3.6s ease-in-out infinite alternate;
+}
+@keyframes room-tail {
+  from { rotate: -7deg; }
+  to { rotate: 9deg; }
+}
+.room-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: room-blink 5.2s infinite;
+}
+@keyframes room-blink {
+  0%, 94%, 100% { scale: 1 1; }
+  96% { scale: 1 0.08; }
+}
+.room-lava-a { animation: room-lava 14s ease-in-out infinite alternate; }
+.room-lava-b { animation: room-lava 11s ease-in-out infinite alternate-reverse; }
+.room-lava-c { animation: room-lava 17s ease-in-out infinite alternate; }
+@keyframes room-lava {
+  from { translate: 0 0; }
+  to { translate: 0 -120px; }
+}
+.room-ember {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: radial-gradient(circle, #ffe2a0 0%, #ff7a2e 30%, rgba(255, 90, 30, 0.25) 60%, transparent 72%);
+  animation: room-ember 1.8s ease-in-out infinite alternate;
+  transition: scale 0.6s;
+}
+.room-ember-hot {
+  scale: 2.1;
+  filter: brightness(1.4);
+}
+@keyframes room-ember {
+  from { opacity: 0.75; }
+  to { opacity: 1; }
+}
+.room-bars::before,
+.room-bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9vh;
+  background: #000;
+  transition: transform 1.2s ease-in;
+  pointer-events: none;
+}
+.room-bars::before { top: 0; }
+.room-bars::after { bottom: 0; }
+.room-bars-open::before { transform: translateY(-100%); }
+.room-bars-open::after { transform: translateY(100%); }
+.room-hint {
+  animation: room-hint 2.4s ease-in-out infinite;
+}
+@keyframes room-hint {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.room-caret {
+  animation: room-hint 1s steps(1) infinite;
+}
+.room-titlecard {
+  animation: room-titlecard 0.12s steps(2) infinite;
+}
+@keyframes room-titlecard {
+  0% { translate: 0 0; filter: brightness(1); }
+  50% { translate: 0.6px -0.4px; filter: brightness(0.93); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-rain, .room-clouds, .room-screen, .room-screenglow, .room-tail, .room-blink, .room-lava-a, .room-lava-b, .room-lava-c, .room-ember, .room-hint, .room-titlecard {
+    animation: none;
+  }
+}
