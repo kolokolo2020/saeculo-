@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, Open_Sans, Press_Start_2P } from "next/font/google";
+import { IBM_Plex_Mono, IM_Fell_English_SC, Open_Sans, Press_Start_2P, Special_Elite } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
 import { TRACKS } from "@/data/tracks";
@@ -25,6 +25,19 @@ const pixelFont = Press_Start_2P({
   weight: "400",
   subsets: ["latin"],
   variable: "--nf-pixel",
+});
+
+// The late-night layer: a typewriter for notes and captions, and an old
+// film-title face for the intro's cards.
+const typeFont = Special_Elite({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--nf-type",
+});
+const filmFont = IM_Fell_English_SC({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--nf-film",
 });
 
 const title = "saeculo — instrumentals & beats";
@@ -84,7 +97,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${uiFont.variable} ${monoFont.variable} ${pixelFont.variable} h-full`}
+      className={`${uiFont.variable} ${monoFont.variable} ${pixelFont.variable} ${typeFont.variable} ${filmFont.variable} h-full`}
     >
       <head>
         <script

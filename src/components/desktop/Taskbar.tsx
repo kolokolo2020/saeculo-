@@ -5,6 +5,7 @@ import { useWindowStore } from "@/components/window-manager/windowStore";
 import { APP_BY_KIND } from "@/components/window-manager/windowRegistry";
 import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
 import AppIcon from "@/components/ui/AppIcon";
+import { useAmbienceStore } from "./ambienceStore";
 import Glyph from "@/components/ui/Glyph";
 import StartMark from "@/components/ui/StartMark";
 import { useNow } from "@/hooks/useNow";
@@ -50,6 +51,23 @@ function TaskPreview({ kind, x }: { kind: WindowKind; x: number }) {
 }
 
 const QUICK_LAUNCH: WindowKind[] = ["player", "beatmaker", "beatdeck"];
+
+// Rain, crackle and hum under everything; off until asked for.
+function TrayRoomTone() {
+  const on = useAmbienceStore((s) => s.on);
+  const toggle = useAmbienceStore((s) => s.toggle);
+  return (
+    <button
+      onClick={toggle}
+      aria-pressed={on}
+      aria-label="Room tone"
+      title={on ? "Room tone: on (rain, vinyl, hum)" : "Room tone: off"}
+      className={`grid h-6 w-6 place-items-center rounded hover:bg-white/15 ${on ? "text-[#9fd3ff] drop-shadow-[0_0_4px_#6fb4ff]" : "text-white/70"}`}
+    >
+      <Glyph name="rain" size={15} />
+    </button>
+  );
+}
 
 function TrayClock() {
   const now = useNow();
@@ -181,6 +199,7 @@ export default function Taskbar({
       {/* notification area */}
       <div className="flex h-full items-center gap-1 border-l border-white/15 pl-1.5 [background:linear-gradient(to_bottom,rgba(255,255,255,0.06),rgba(0,0,0,0.25))]">
         <TrayNowPlaying />
+        <TrayRoomTone />
         <button
           onClick={toggleMute}
           aria-label={muted ? "Tray unmute" : "Tray mute"}

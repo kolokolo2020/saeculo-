@@ -7,6 +7,9 @@ import DesktopContextMenu from "./DesktopContextMenu";
 import DesktopIcon from "./DesktopIcon";
 import ScreensaverOverlay from "./ScreensaverOverlay";
 import Sidebar from "./Sidebar";
+import AuraLayer from "./AuraLayer";
+import { useAmbienceStore } from "./ambienceStore";
+import { useLateNight } from "@/hooks/useLateNight";
 import MobileWidgets from "./MobileWidgets";
 import StartMenu from "./StartMenu";
 import Taskbar from "./Taskbar";
@@ -63,6 +66,10 @@ export default function Desktop() {
   const glass = usePersonalizeStore((s) => s.glass);
   const wallpaper = usePersonalizeStore((s) => s.wallpaper);
   const transparency = usePersonalizeStore((s) => s.transparency);
+  const chosenAtmosphere = usePersonalizeStore((s) => s.atmosphere);
+  const lateNight = useLateNight();
+  // Tape turns into Midnight after midnight; Clean always stays clean
+  const atmosphere = chosenAtmosphere === "tape" && lateNight ? "midnight" : chosenAtmosphere;
   const windows = useWindowStore((s) => s.windows);
   const isMobile = useIsMobile();
   const reducedMotion = usePrefersReducedMotion();
@@ -100,6 +107,7 @@ export default function Desktop() {
   useEffect(() => {
     usePersonalizeStore.getState().hydrate();
     useSecretStore.getState().hydrate();
+    useAmbienceStore.getState().hydrate();
   }, []);
 
   // ↑ ↑ ↓ ↓ ← → ← → B A anywhere outside a text field reveals a hidden word
@@ -154,10 +162,12 @@ export default function Desktop() {
       data-glass={glass}
       data-wall={wallpaper}
       data-transparency={transparency ? "on" : "off"}
+      data-atmo={atmosphere}
       onContextMenu={onContextMenu}
       className="aero-wallpaper relative h-dvh w-full overflow-clip text-ink"
     >
       <AudioEngine />
+      <AuraLayer atmosphere={atmosphere} />
       <h1 className="sr-only">
         {PROFILE.artistName}: {PROFILE.tagline}
       </h1>
