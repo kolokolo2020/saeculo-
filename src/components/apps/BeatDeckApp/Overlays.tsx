@@ -10,7 +10,8 @@ import { useDeckStore } from "./deckStore";
 import { renderTakeWav, runKeyFor } from "./deckAudio";
 import { playTakeLive } from "./sound";
 import DeckCard from "./DeckCard";
-import { ROLES, fmt } from "./look";
+import { CERT_COLOR, ROLES, fmt } from "./look";
+import RecordDisc from "./RecordDisc";
 
 const NIGHT = SECRET_WORDS.find((s) => s.id === "brawl")!.word.toUpperCase();
 
@@ -101,6 +102,8 @@ export function Summary() {
   const run = useDeckStore((s) => s.run)!;
   const progress = useDeckStore((s) => s.progress);
   const newUnlocks = useDeckStore((s) => s.newUnlocks);
+  const newCert = useDeckStore((s) => s.newCert);
+  const cert = R.certOf(run);
   const { start, go, goEndless } = useDeckStore.getState();
   const [status, setStatus] = useState<string | null>(null);
   const won = run.phase === "victory";
@@ -126,8 +129,9 @@ export function Summary() {
   };
 
   const share = async () => {
+    const level = cert > 0 ? ` at ${R.CERTS[cert].name} level` : "";
     const text = won
-      ? `I beat all 8 rounds of Beat Deck with ${fmt(run.totalScore)} points${run.daily ? " (daily run)" : ""}. ${window.location.origin}`
+      ? `I beat all 8 rounds of Beat Deck${level} with ${fmt(run.totalScore)} points${run.daily ? " (daily run)" : ""}. ${window.location.origin}`
       : `I made it to round ${run.round} of 8 in Beat Deck (${fmt(run.totalScore)} points)${run.daily ? " on the daily run" : ""}. ${window.location.origin}`;
     try {
       await navigator.clipboard.writeText(text);
@@ -144,12 +148,20 @@ export function Summary() {
       </p>
       <p className="mt-1 text-[13px] text-[#c9d6e6]">
         {won
-          ? "All eight clients signed off, Metro Nome included."
+          ? `All eight clients signed off, Metro Nome included.${cert > 0 ? ` Certified ${R.CERTS[cert].name}.` : ""}`
           : run.endless
             ? `You kept going to round ${run.round}. ${R.roundDef(run).who} finally said no.`
             : `${R.roundDef(run).who} wasn't convinced. You reached round ${run.round} of 8.`}
         {run.daily && " (Daily run)"}
       </p>
+      {newCert !== null && (
+        <p className="mt-2 flex items-center gap-2 rounded-[4px] border p-2 text-[12px]" style={{ borderColor: `${CERT_COLOR[newCert]}66`, background: `${CERT_COLOR[newCert]}14` }}>
+          <RecordDisc level={newCert} size={26} />
+          <span className="text-[#e6eef8]">
+            <b style={{ color: CERT_COLOR[newCert] }}>{R.CERTS[newCert].name}</b> certification unlocked: {R.CERTS[newCert].rule.charAt(0).toLowerCase() + R.CERTS[newCert].rule.slice(1)}
+          </span>
+        </p>
+      )}
       {newUnlocks.length > 0 && (
         <p className="mt-2 rounded-[4px] border border-[#9fffb0]/40 bg-[#9fffb0]/10 p-2 text-[12px] text-[#c9ffd6]">
           Unlocked: {newUnlocks.map((d) => `${DECK_BY_ID[d].name} deck`).join(", ")}. Pick it on the title screen.
@@ -187,13 +199,18 @@ export function Summary() {
           {status}
         </p>
       )}
+      {newCert !== null && (
+        <button onClick={() => start(false, run.deckKind, newCert)} className="aero-btn aero-btn-primary mt-4 w-full py-1.5 text-[13px]">
+          Go for {R.CERTS[newCert].name} ›
+        </button>
+      )}
       {won && (
-        <button onClick={goEndless} className="aero-btn aero-btn-primary mt-4 w-full py-1.5 text-[13px]">
+        <button onClick={goEndless} className={`${newCert !== null ? "aero-btn-dark mt-2" : "aero-btn aero-btn-primary mt-4"} w-full py-1.5 text-[13px]`}>
           Keep going: Endless mode ›
         </button>
       )}
       <div className="mt-2 flex flex-wrap gap-2">
-        <button onClick={() => start(false, run.deckKind)} className={`${won ? "aero-btn-dark" : "aero-btn aero-btn-primary"} flex-1 py-1.5 text-[13px]`}>
+        <button onClick={() => start(false, run.deckKind, run.daily ? progress.cert : cert)} className={`${won ? "aero-btn-dark" : "aero-btn aero-btn-primary"} flex-1 py-1.5 text-[13px]`}>
           New run
         </button>
         <button onClick={() => void share()} className="aero-btn-dark px-3 py-1.5 text-[12px]">
@@ -211,7 +228,8 @@ export function DeckViewer({ onClose }: { onClose: () => void }) {
   const run = useDeckStore((s) => s.run)!;
   const removeCard = useDeckStore.getState().removeCard;
   const [confirm, setConfirm] = useState<string | null>(null);
-  const canRemove = run.phase === "shop" && !!run.shop && !run.shop.removed && run.money >= R.REMOVE_PRICE && run.deck.length > 10;
+  const removePrice = R.priceFor(run, R.REMOVE_PRICE);
+  const canRemove = run.phase === "shop" && !!run.shop && !run.shop.removed && run.money >= removePrice && run.deck.length > 10;
   const cards = [...run.deck].sort(
     (a, b) => ROLES.indexOf(rolesOf(CARD_BY_ID[a.id])[0]) - ROLES.indexOf(rolesOf(CARD_BY_ID[b.id])[0]) || a.id.localeCompare(b.id),
   );
@@ -224,11 +242,11 @@ export function DeckViewer({ onClose }: { onClose: () => void }) {
         </button>
       </div>
       <p className="mt-1 text-[11.5px] text-[#9fb2c9]">
-        {canRemove ? `Tap a card to remove it from your deck for $${R.REMOVE_PRICE} (once per shop).` : `${run.draw.length} still to draw this round.`}
+        {canRemove ? `Tap a card to remove it from your deck for $${removePrice} (once per shop).` : `${run.draw.length} still to draw this round.`}
       </p>
       {confirm && (
         <div className="mt-2 flex items-center gap-2 rounded-[4px] border border-[#ff9a8a]/40 bg-[#ff9a8a]/10 p-2 text-[12px]">
-          <span className="flex-1">Remove {CARD_BY_ID[run.deck.find((c) => c.uid === confirm)!.id].name} for ${R.REMOVE_PRICE}?</span>
+          <span className="flex-1">Remove {CARD_BY_ID[run.deck.find((c) => c.uid === confirm)!.id].name} for ${removePrice}?</span>
           <button
             onClick={() => {
               removeCard(confirm);

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  ATMOSPHERES,
   GLASS_COLORS,
   WALLPAPERS,
   usePersonalizeStore,
@@ -16,11 +17,12 @@ export default function PersonalizeApp() {
   const glass = usePersonalizeStore((s) => s.glass);
   const wallpaper = usePersonalizeStore((s) => s.wallpaper);
   const transparency = usePersonalizeStore((s) => s.transparency);
+  const atmosphere = usePersonalizeStore((s) => s.atmosphere);
   const apply = usePersonalizeStore((s) => s.set);
   const closeWindow = useWindowStore((s) => s.closeWindow);
   const [original] = useState<Look>(() => {
     const now = usePersonalizeStore.getState();
-    return { glass: now.glass, wallpaper: now.wallpaper, transparency: now.transparency };
+    return { glass: now.glass, wallpaper: now.wallpaper, transparency: now.transparency, atmosphere: now.atmosphere };
   });
 
   return (
@@ -95,6 +97,27 @@ export default function PersonalizeApp() {
         {wallpaper === "dreamscene" && (
           <p className="mt-2 text-[12px] text-mute">DreamScene is alive: it takes its colours from the playing track&apos;s cover and moves with the music.</p>
         )}
+        <h3 className="mt-5 text-[15px] text-[#1e3287]">Atmosphere</h3>
+        <div className="mt-2 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Atmosphere">
+          {ATMOSPHERES.map((a) => (
+            <button
+              key={a.id}
+              role="radio"
+              aria-checked={atmosphere === a.id}
+              aria-label={`Atmosphere ${a.label}`}
+              onClick={() => apply({ atmosphere: a.id })}
+              className={`flex flex-col gap-0.5 rounded-[4px] border p-2 text-left ${
+                atmosphere === a.id ? "border-[#1e3287] bg-[#e5f1fd] ring-1 ring-[#6fb4ff]" : "border-[#c3ccd8] hover:border-[#8fb4dc]"
+              }`}
+            >
+              <span data-atmo={a.id} className="aura-swatch relative block h-10 w-full overflow-hidden rounded-[3px] border border-black/40" />
+              <span className="text-[12.5px] font-semibold">{a.label}</span>
+              <span className="text-[11px] leading-snug text-mute">{a.text}</span>
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[11px] text-mute">Between midnight and 4 am, Tape turns into Midnight on its own.</p>
+
       </div>
 
       <div className="flex shrink-0 justify-end gap-2 border-t border-[#d4dbe4] bg-[#f1f5fa] px-4 py-2.5">

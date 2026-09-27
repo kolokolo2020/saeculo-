@@ -4,10 +4,12 @@ import { useState } from "react";
 import { CARD_BY_ID, DECKS, type DeckKind } from "@/lib/beatdeck/cards";
 import { ROUNDS } from "@/lib/beatdeck/rounds";
 import { BEAT_TYPES } from "@/lib/beatdeck/scoring";
+import { CERTS } from "@/lib/beatdeck/run";
+import RecordDisc from "./RecordDisc";
 import { useDeckStore } from "./deckStore";
 import { warmUp } from "./sound";
 import DeckCard from "./DeckCard";
-import { fmt } from "./look";
+import { CERT_COLOR, fmt } from "./look";
 
 const FAN = ["kick-trap", "mel-rhodes", "bass-808"];
 
@@ -42,6 +44,9 @@ function HowTo() {
       <p>
         <b className="text-white">Bosses</b> in rounds 3, 6 and 8 each bring a rule. Some say the first one drops something worth keeping.
       </p>
+      <p>
+        <b className="text-white">Certifications:</b> win a run to unlock the next level, from Demo up to Platinum. Each level adds a rule on top of the ones before it.
+      </p>
     </div>
   );
 }
@@ -54,6 +59,8 @@ export default function Title() {
   const { start, resume, go } = useDeckStore.getState();
   const [rules, setRules] = useState(false);
   const [deck, setDeck] = useState<DeckKind>("classic");
+  // start at the highest level unlocked; the state initializer runs after hydration
+  const [cert, setCert] = useState(() => progress.cert);
   const canContinue = run && run.phase !== "over" && run.phase !== "victory";
 
   return (
@@ -63,7 +70,7 @@ export default function Title() {
         <p className="text-[12.5px] text-[#9fb2c9]">a beatmaking card game by saeculo</p>
       </div>
 
-      <div className="flex -space-x-6 py-2" aria-hidden>
+      <div className="flex -space-x-6 py-2" aria-hidden inert>
         {FAN.map((id, i) => (
           <div key={id} style={{ transform: `rotate(${(i - 1) * 9}deg) translateY(${i === 1 ? -8 : 0}px)` }}>
             <DeckCard def={CARD_BY_ID[id]} compact />
@@ -97,6 +104,49 @@ export default function Title() {
         })}
       </div>
 
+      <div className="flex w-full max-w-[560px] flex-col items-center gap-2">
+        <div className="flex flex-wrap justify-center gap-1" role="radiogroup" aria-label="Certification">
+          {CERTS.map((c, i) => {
+            const locked = i > progress.cert;
+            const on = cert === i;
+            return (
+              <button
+                key={c.name}
+                role="radio"
+                aria-checked={on}
+                aria-label={`${c.name} certification${locked ? " (locked)" : ""}`}
+                disabled={locked}
+                title={locked ? "Win a run at the level before to unlock" : c.rule}
+                onClick={() => setCert(i)}
+                className={`flex flex-col items-center gap-1 rounded-[6px] border px-2 py-1.5 ${
+                  on ? "bg-white/10" : "border-transparent hover:bg-white/5"
+                } disabled:hover:bg-transparent`}
+                style={on ? { borderColor: CERT_COLOR[i], boxShadow: `0 0 10px ${CERT_COLOR[i]}55` } : undefined}
+              >
+                <span className="relative">
+                  <RecordDisc level={i} dim={locked} />
+                  {progress.certBest >= i && (
+                    <span className="absolute -right-1 -bottom-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-[#25b025] text-[9px] text-white" title="Won">
+                      ✓
+                    </span>
+                  )}
+                </span>
+                <span className={`text-[10.5px] ${locked ? "text-[#5d6b80]" : on ? "text-white" : "text-[#9fb2c9]"}`}>{locked ? "🔒" : c.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="min-h-[2.4em] max-w-[420px] text-center text-[11.5px] leading-snug text-[#9fb2c9]" aria-live="polite">
+          {cert === 0
+            ? progress.cert === 0
+              ? "Demo: the standard game. Win a run to unlock the Mixtape certification."
+              : "Demo: the standard game."
+            : CERTS.slice(1, cert + 1)
+                .map((c) => c.rule.replace(/\.$/, ""))
+                .join(" · ")}
+        </p>
+      </div>
+
       <div className="flex w-full max-w-[300px] flex-col gap-2">
         {canContinue && (
           <button
@@ -113,11 +163,11 @@ export default function Title() {
         <button
           onClick={() => {
             warmUp();
-            start(false, deck);
+            start(false, deck, cert);
           }}
           className={`${canContinue ? "aero-btn-dark" : "aero-btn aero-btn-primary"} py-2 text-[14px]`}
         >
-          New run
+          New run{cert > 0 ? ` · ${CERTS[cert].name}` : ""}
         </button>
         <button
           onClick={() => {

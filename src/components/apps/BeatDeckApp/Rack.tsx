@@ -43,7 +43,7 @@ export default function Rack() {
         <span className="mr-1 text-[10px] tracking-wide text-[#9fb2c9] uppercase">
           Gear <span className="sm:hidden">{run.gear.length}/{MAX_GEAR}</span>
         </span>
-        <span className="flex flex-wrap gap-1.5" aria-label="Gear">
+        <span className="flex flex-wrap gap-1.5" role="group" aria-label="Gear">
           {Array.from({ length: MAX_GEAR }, (_, i) => {
             const id = run.gear[i];
             if (!id) return <span key={i} className="h-7 w-[84px] rounded-[4px] border border-dashed border-white/15 max-sm:hidden" aria-hidden />;
@@ -59,7 +59,7 @@ export default function Rack() {
           })}
         </span>
         <span className="mr-1 ml-2 text-[10px] tracking-wide text-[#9fb2c9] uppercase">Studio</span>
-        <span className="flex gap-1.5" aria-label="Studio sessions">
+        <span className="flex gap-1.5" role="group" aria-label="Studio sessions">
           {Array.from({ length: MAX_SESSIONS }, (_, i) => {
             const id = run.sessions[i];
             if (!id) return <span key={i} className="h-7 w-[84px] rounded-[4px] border border-dashed border-[#ffd27a]/25" aria-hidden />;

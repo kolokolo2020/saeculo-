@@ -62,10 +62,12 @@ export default function StartMenu({
   onClose,
   onRestart,
   onLock,
+  onRoom,
 }: {
   onClose: () => void;
   onRestart: () => void;
   onLock: () => void;
+  onRoom: () => void;
 }) {
   const openWindow = useWindowStore((s) => s.openWindow);
   const [query, setQuery] = useState("");
@@ -167,6 +169,15 @@ export default function StartMenu({
             ))}
           </ul>
           <div className="mt-2 flex items-center justify-end gap-1">
+            <button
+              onClick={() => {
+                onClose();
+                onRoom();
+              }}
+              className="aero-start-link mr-auto px-2 py-1 text-[12px]"
+            >
+              Return to the room
+            </button>
             <button
               onClick={() => {
                 onClose();

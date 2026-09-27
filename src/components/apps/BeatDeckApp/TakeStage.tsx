@@ -137,11 +137,11 @@ export default function TakeStage({
           {result.level > 0 && <span className="text-[#9fb2c9]"> LV{result.level + 1}</span>}
         </p>
         <p className="flex items-center gap-2 font-mono">
-          <span className="rounded-[4px] bg-[#1f6fd1] px-2 py-1 text-[18px] text-white" aria-label="Groove">
+          <span className="rounded-[4px] bg-[#1f6fd1] px-2 py-1 text-[18px] text-white" role="group" aria-label="Groove">
             {fmt(groove)}
           </span>
           <span className="text-[#9fb2c9]">×</span>
-          <span className="rounded-[4px] bg-[#c42a78] px-2 py-1 text-[18px] text-white" aria-label="Hype">
+          <span className="rounded-[4px] bg-[#c42a78] px-2 py-1 text-[18px] text-white" role="group" aria-label="Hype">
             {Number.isInteger(hype) ? hype : hype.toFixed(1)}
           </span>
         </p>

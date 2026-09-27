@@ -151,7 +151,7 @@ export default function BeatMakerApp() {
           <div className="flex min-w-[230px] flex-[1.3] flex-col gap-1.5 rounded-[5px] border border-black bg-[#03070f] px-2.5 py-2 font-mono text-[#7fe0ff] shadow-[inset_0_1px_4px_rgba(0,0,0,0.95),0_1px_0_rgba(255,255,255,0.08)] [text-shadow:0_0_6px_rgba(127,224,255,0.55)]">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-[22px] leading-none tabular-nums">{groove.bpm} bpm</span>
-              <span className="text-[11px] text-[#7fe0ff]/80 tabular-nums" aria-label="Position">
+              <span className="text-[11px] text-[#7fe0ff]/80 tabular-nums" role="timer" aria-label="Position">
                 {playing && position.step >= 0 ? `${position.bar + 1}.${Math.floor(position.step / 4) + 1}.${(position.step % 4) + 1}` : "-.-.-"}
               </span>
             </div>

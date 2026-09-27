@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: `${PROFILE.artistName} — ${PROFILE.tagline}`,
     short_name: PROFILE.artistName,
     description:
-      "saeculo makes instrumentals for late-night drives and old video game menus. Listen to the beats, build a loop, play the rhythm games.",
+      "saeculo makes instrumentals for late-night drives and old video game menus. Listen to the beats, build a loop, play Beat Deck.",
     start_url: "/",
     display: "standalone",
     background_color: "#0b2a5b",

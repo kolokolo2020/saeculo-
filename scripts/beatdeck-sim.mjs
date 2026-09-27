@@ -63,8 +63,9 @@ function playRound(s) {
 }
 
 const DECK = process.argv[3] || "classic";
+const CERT = Number(process.argv[4] || 0);
 function run(seed) {
-  let s = newRun(seed, false, DECK);
+  let s = newRun(seed, false, DECK, CERT);
   for (;;) {
     s = playRound(s);
     if (s.phase !== "won") return s;
@@ -91,6 +92,6 @@ for (let i = 1; i <= N; i++) {
   ended[key] = (ended[key] || 0) + 1;
   if (s.phase === "victory") wins++;
 }
-console.log(`${DECK} deck · ${N} runs · bot win rate ${((wins / N) * 100).toFixed(1)}%`);
+console.log(`${DECK} deck · certification ${CERT} · ${N} runs · bot win rate ${((wins / N) * 100).toFixed(1)}%`);
 console.log("runs ended at:", ended);
 fs.rmSync(out, { recursive: true, force: true });

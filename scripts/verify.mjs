@@ -1,8 +1,17 @@
 // Browser smoke test for the desktop. Run against a local dev server:
-//   npm i --no-save playwright-core && npm run dev -- -p 3210
+//   npm i --no-save playwright-core axe-core && npm run dev -- -p 3210
 //   node scripts/verify.mjs
+// (axe-core is optional: without it the accessibility check is skipped.)
 import { chromium } from "playwright-core";
 import { readFileSync } from "fs";
+import { createRequire } from "module";
+
+let axeSource = null;
+try {
+  axeSource = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
+} catch {
+  console.log("(axe-core not installed: skipping the accessibility audit)");
+}
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3210";
 const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
@@ -17,10 +26,53 @@ function check(name, ok, extra = "") {
 // that's the network, not the site.
 const isEnvNoise = (text) => /vercel-scripts|ERR_TUNNEL|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED/.test(text);
 
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await chromium.launch({ executablePath: CHROME, args: ["--autoplay-policy=no-user-gesture-required"] });
 const consoleErrors = [];
 
+// The Room intro plays once per visit; every context skips it except the
+// one that tests it. (The desktop marks it seen in sessionStorage.)
+const rawNewContext = browser.newContext.bind(browser);
+browser.newContext = async (opts) => {
+  const ctx = await rawNewContext(opts);
+  await ctx.addInitScript(() => sessionStorage.setItem("saeculo-room", "1"));
+  return ctx;
+};
+
 try {
+  // ---- the Room intro ----
+  {
+    const rc = await rawNewContext({ viewport: { width: 1366, height: 800 } });
+    await rc.addInitScript(() => localStorage.setItem("saeculo-welcome", "off"));
+    const rp = await rc.newPage();
+    rp.on("pageerror", (err) => consoleErrors.push(String(err)));
+    await rp.goto(BASE, { waitUntil: "networkidle" });
+    const room = rp.getByRole("dialog", { name: "The room" });
+    await room.waitFor({ timeout: 5000 }).catch(() => {});
+    check("a first visit opens on the Room's title card", await room.getByText("click to enter").isVisible().catch(() => false));
+    await rp.mouse.click(683, 400);
+    await rp.waitForTimeout(1500);
+    check(
+      "entering the room starts the music (muffled) and shows the scene",
+      (await rp.getByText("click to step inside").isVisible()) && (await rp.evaluate(() => !document.querySelector("audio")?.paused)),
+    );
+    await rp.mouse.click(683, 400);
+    await rp.getByLabel("Skip boot sequence").waitFor({ timeout: 8000 }).catch(() => {});
+    check("the camera push lands on the boot screen, music still playing", (await room.count()) === 0 && (await rp.evaluate(() => !document.querySelector("audio")?.paused)));
+    await rp.reload({ waitUntil: "networkidle" });
+    await rp.waitForTimeout(500);
+    check("the Room plays once per visit", (await room.count()) === 0);
+    const rp2 = await rc.newPage();
+    await rp2.goto(BASE + "/#track=elbtunnel", { waitUntil: "networkidle" });
+    await rp2.waitForTimeout(600);
+    check("a track link skips the Room", (await rp2.getByRole("dialog", { name: "The room" }).count()) === 0);
+    const rp3 = await (await rawNewContext({ viewport: { width: 1366, height: 800 } })).newPage();
+    await rp3.goto(BASE, { waitUntil: "networkidle" });
+    await rp3.getByRole("button", { name: "Skip intro ›" }).click();
+    await rp3.waitForTimeout(500);
+    check("Skip intro goes straight to the desktop", await rp3.getByRole("navigation", { name: "Desktop" }).isVisible());
+    await rc.close();
+  }
+
   const context = await browser.newContext({ viewport: { width: 1366, height: 800 }, acceptDownloads: true });
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(BASE).origin });
   const page = await context.newPage();
@@ -128,6 +180,11 @@ try {
   const deck = win("Beat Deck");
   check("start search + Enter launches Beat Deck", await deck.getByRole("button", { name: "New run" }).isVisible());
   check("locked starting decks can't be picked yet", await deck.getByRole("radio", { name: "Trap House deck (locked)" }).isDisabled());
+  check(
+    "certifications start at Demo, the rest locked",
+    (await deck.getByRole("radio", { name: "Demo certification" }).getAttribute("aria-checked")) === "true" &&
+      (await deck.getByRole("radio", { name: "Mixtape certification (locked)" }).isDisabled()),
+  );
   await deck.getByRole("button", { name: "The Crate" }).click();
   check("the Crate lists every card, hidden until found", (await deck.getByText("???").count()) > 30);
   await deck.getByRole("button", { name: "Back" }).click();
@@ -138,9 +195,11 @@ try {
   await tour.getByRole("button", { name: "Skip" }).click();
   const handCards = deck.getByLabel("Your hand").getByRole("button", { name: / card$/ });
   check("Beat Deck deals a hand of 8", (await handCards.count()) === 8);
-  for (let i = 0; i < 3; i++) await handCards.nth(i).click();
+  // number keys pick cards while Beat Deck is the active window, even with
+  // nothing inside it focused (the tutorial's Skip button just unmounted)
+  for (const k of ["1", "2", "3"]) await page.keyboard.press(k);
   check(
-    "selecting cards previews the beat type",
+    "keys 1–8 pick cards, and the selection previews the beat type",
     (await deck.getByRole("button", { name: /^Play take \(3\/5\)/ }).isVisible()) && (await deck.getByText(/groove × \d+ hype base/).isVisible()),
   );
   await deck.getByRole("button", { name: /^Play take/ }).click();
@@ -448,6 +507,53 @@ try {
   check("a studio session upgrades a card", (await bd.getByLabel("Your hand").getByRole("button", { name: /\(Tape-saturated\)$/ }).count()) === 1);
   await close("Beat Deck");
 
+  // ---- Beat Deck: winning the last round unlocks the next certification ----
+  await page.evaluate(() => {
+    const run = JSON.parse(localStorage.getItem("saeculo-beatdeck-run"));
+    run.plan[7] = "metronome";
+    Object.assign(run, { phase: "play", round: 8, target: 8400, score: 8399, takesLeft: 1, usedTypes: [] });
+    localStorage.setItem("saeculo-beatdeck-run", JSON.stringify(run));
+  });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(300);
+  await openFromDesktop("Beat Deck");
+  await page.waitForTimeout(1000);
+  await win("Beat Deck").getByRole("button", { name: /^Continue/ }).click();
+  await page.keyboard.press("1");
+  await page.keyboard.press("p");
+  await win("Beat Deck").getByRole("button", { name: "Skip ›" }).click();
+  const summary = page.getByRole("dialog", { name: "Run won" });
+  await summary.waitFor({ timeout: 3000 }).catch(() => {});
+  check("winning a run unlocks the Mixtape certification", (await summary.innerText().catch(() => "")).includes("Mixtape certification unlocked"));
+  await summary.getByRole("button", { name: "Title" }).click();
+  check(
+    "the next certification is ready on the title screen",
+    (await win("Beat Deck").getByRole("radio", { name: "Mixtape certification" }).getAttribute("aria-checked")) === "true" &&
+      (await win("Beat Deck").getByRole("button", { name: "New run · Mixtape" }).isVisible()),
+  );
+  await close("Beat Deck");
+
+  // ---- accessibility: axe over the desktop and the main windows ----
+  if (axeSource) {
+    await page.addScriptTag({ content: axeSource });
+    const problems = [];
+    const audit = async (label) => {
+      const found = await page.evaluate(async () => {
+        const r = await window.axe.run(document, { resultTypes: ["violations"] });
+        return r.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => `${v.id} (${v.nodes[0]?.target.join(" ")})`);
+      });
+      problems.push(...found.map((f) => `${label}: ${f}`));
+    };
+    await audit("desktop");
+    for (const app of ["Media Player", "Beat Maker", "Beat Deck"]) {
+      await openFromDesktop(app);
+      await page.waitForTimeout(900);
+      await audit(app);
+      await close(app === "Media Player" ? "saeculo Media Player" : app);
+    }
+    check("no serious accessibility violations (axe)", problems.length === 0, problems.slice(0, 4).join("; "));
+  }
+
   // ---- lock / restart ----
   const saver = page.getByRole("status", { name: /Screensaver active/ });
   await page.getByRole("button", { name: "Start", exact: true }).click();
@@ -494,13 +600,27 @@ try {
   const m = await mContext.newPage();
   await m.goto(BASE, { waitUntil: "networkidle" });
   await m.getByLabel("Skip boot sequence").click({ force: true });
+  const widget = m.getByRole("group", { name: "Now playing widget" });
+  check("mobile: the home screen shows a Now Playing widget", await widget.isVisible());
+  await widget.getByRole("button", { name: /^Play / }).tap();
+  await m.waitForTimeout(400);
+  check("mobile: the widget plays the music", await widget.getByRole("button", { name: /^Pause / }).isVisible());
+  await widget.getByRole("button", { name: /^Pause / }).tap();
   await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Beat Deck", exact: true }).tap();
   await m.waitForTimeout(1200); // the game loads on demand; the open animation (scale .94→1) settles
   const gBox = await m.getByRole("region", { name: "Beat Deck", exact: true }).boundingBox();
   check("mobile: windows open full-screen", gBox.width >= 389, `w=${gBox?.width}`);
   await m.getByRole("button", { name: "New run" }).tap();
   await m.getByRole("dialog", { name: "Tutorial" }).getByRole("button", { name: "Skip" }).tap();
-  await m.getByLabel("Your hand").getByRole("button", { name: / card$/ }).first().tap();
+  const mHand = m.getByLabel("Your hand").getByRole("button", { name: / card$/ });
+  const firstCard = await mHand.first().boundingBox();
+  const lastCard = await mHand.last().boundingBox();
+  check(
+    "mobile: the whole hand fits on screen, in two rows",
+    lastCard.x + lastCard.width <= 390 && lastCard.y > firstCard.y + firstCard.height / 2,
+    `last card at x=${Math.round(lastCard.x)}`,
+  );
+  await mHand.first().tap();
   check("mobile: Beat Deck plays with taps", await m.getByRole("button", { name: /^Play take \(1\/5\)/ }).isVisible());
   await m.getByLabel("Taskbar").getByRole("button", { name: "Start", exact: true }).tap();
   await m.getByRole("textbox", { name: "Start Search" }).fill("up up down down left right left right b a");

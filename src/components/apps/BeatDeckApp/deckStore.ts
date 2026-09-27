@@ -4,7 +4,7 @@ import { CARD_BY_ID, type CardDef, type DeckKind } from "@/lib/beatdeck/cards";
 import type { GearId } from "@/lib/beatdeck/gear";
 import { dailySeed } from "@/lib/beatdeck/rng";
 import type { TakeResult } from "@/lib/beatdeck/scoring";
-import { DEFAULT_PROGRESS, loadProgress, noteSeen, saveProgress, unlocksFor, type Progress, type Speed } from "./progress";
+import { DEFAULT_PROGRESS, certUnlockFor, loadProgress, noteSeen, saveProgress, unlocksFor, type Progress, type Speed } from "./progress";
 
 const SAVE_KEY = "saeculo-beatdeck-run";
 
@@ -28,11 +28,13 @@ interface DeckState {
   progress: Progress;
   /** Decks this run just unlocked (shown on the summary). */
   newUnlocks: DeckKind[];
+  /** The certification this run just unlocked (shown on the summary). */
+  newCert: number | null;
   /** First-run coach marks: the step showing, or null. */
   tutorial: number | null;
   hydrated: boolean;
   hydrate: () => void;
-  start: (daily: boolean, deck: DeckKind) => void;
+  start: (daily: boolean, deck: DeckKind, cert?: number) => void;
   resume: () => void;
   go: (screen: Screen) => void;
   toggle: (uid: string) => void;
@@ -93,6 +95,7 @@ export const useDeckStore = create<DeckState>((set, get) => {
     scoring: null,
     progress: DEFAULT_PROGRESS,
     newUnlocks: [],
+    newCert: null,
     tutorial: null,
     hydrated: false,
 
@@ -107,11 +110,12 @@ export const useDeckStore = create<DeckState>((set, get) => {
       set({ run, progress: loadProgress(), hydrated: true });
     },
 
-    start: (daily, deck) => {
+    start: (daily, deck, cert = 0) => {
       const seed = daily ? dailySeed() : Math.floor(Math.random() * 2 ** 31);
-      const run = R.newRun(seed, daily, deck);
       const progress = get().progress;
-      set({ screen: "table", selected: [], scoring: null, newUnlocks: [], tutorial: progress.tutorialDone ? null : 0 });
+      // the daily run is the same for everyone: always at Demo level
+      const run = R.newRun(seed, daily, deck, daily ? 0 : Math.min(cert, progress.cert));
+      set({ screen: "table", selected: [], scoring: null, newUnlocks: [], newCert: null, tutorial: progress.tutorialDone ? null : 0 });
       setProgress({ ...progress, runs: progress.runs + 1 });
       commit(run);
     },
@@ -140,17 +144,21 @@ export const useDeckStore = create<DeckState>((set, get) => {
       const next = scoring.next;
       let p: Progress = { ...progress, bestTake: Math.max(progress.bestTake, scoring.result.score) };
       let newUnlocks: DeckKind[] = [];
+      let newCert: number | null = null;
       if (next.phase === "over" || next.phase === "victory") {
         newUnlocks = unlocksFor(p, next);
+        newCert = certUnlockFor(p, next);
         p = {
           ...p,
+          cert: newCert ?? p.cert,
+          certBest: next.phase === "victory" ? Math.max(p.certBest, R.certOf(next)) : p.certBest,
           bestTotal: Math.max(p.bestTotal, next.totalScore),
           furthest: Math.max(p.furthest, next.phase === "victory" ? 9 : next.endless ? next.round : next.round),
           wins: p.wins + (next.phase === "victory" ? 1 : 0),
           unlocked: [...p.unlocked, ...newUnlocks],
         };
       }
-      set({ scoring: null, selected: [], newUnlocks });
+      set({ scoring: null, selected: [], newUnlocks, newCert });
       setProgress(p);
       commit(next);
     },
@@ -188,7 +196,7 @@ export const useDeckStore = create<DeckState>((set, get) => {
     goEndless: () => {
       const { run } = get();
       if (!run) return;
-      set({ newUnlocks: [] });
+      set({ newUnlocks: [], newCert: null });
       commit(R.openShop(R.goEndless(run)));
     },
 

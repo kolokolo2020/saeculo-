@@ -17,7 +17,8 @@ export type GlyphName =
   | "search"
   | "power"
   | "arrow"
-  | "shuffle";
+  | "shuffle"
+  | "rain";
 
 const PATHS: Record<GlyphName, React.ReactNode> = {
   play: <path d="M5 3.5v9l8-4.5z" fill="currentColor" />,
@@ -46,6 +47,16 @@ const PATHS: Record<GlyphName, React.ReactNode> = {
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  rain: (
+    <path
+      d="M4.5 9.5a2.8 2.8 0 0 1 .4-5.6 3.6 3.6 0 0 1 6.8 1.2 2.2 2.2 0 0 1-.2 4.4zM5.5 11.5l-.8 2M8.5 11.5l-.8 2M11.2 11.5l-.8 2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
       strokeLinecap="round"
       strokeLinejoin="round"
     />

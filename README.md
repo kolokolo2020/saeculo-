@@ -5,6 +5,22 @@ Vista-era blue desktop: frosted Aero windows, a glowing start orb, a
 sidebar of gadgets, and a Bubbles screensaver. Click (or Tab + Enter) a
 desktop icon to open it.
 
+**The way in: the Room.** A first visit opens on a silent-film title card.
+Click to enter a hand-drawn, comic-ink scene: 3 am, rain on the window, a man
+at his laptop making a beat with a joint in his hand, and a black-and-white
+cat on the desk who sometimes turns to look at you. His music leaks muffled
+from his headphones. Click again (or wait) and the camera rises over his
+shoulder into the laptop screen, which is showing the boot screen. The desktop
+takes over and the same song opens up and keeps playing. It plays once per
+visit and is skippable; links to a beat or a track bypass it, and the Start
+menu has "Return to the room". Drawn in SVG in `src/components/room/`.
+
+**Atmosphere.** Film grain, faint scanlines, a vignette and the odd tape
+dropout sit over everything (Personalize → Atmosphere: Clean, Tape or
+Midnight). Between midnight and 4 am, Tape turns into Midnight and the
+desktop's light goes dark red. The rain icon in the tray switches on room
+tone: rain, vinyl crackle and hum, synthesized live.
+
 What's on the desktop:
 
 - **Welcome Center** — opens once per visit after boot: the latest
@@ -38,7 +54,10 @@ What's on the desktop:
   Block, and Metro Nome). Between rounds a shop sells gear that bends the
   rules, new sounds, studio time (level up a beat type) and card removal.
   Runs save after every move; there's a Daily Run with the same shuffle
-  for everyone; the best take of a run exports as a WAV.
+  for everyone; the best take of a run exports as a WAV. Winning a run
+  unlocks the next **certification**, a difficulty ladder from Demo through
+  Mixtape, EP, Album and Gold to Platinum, each adding a rule (higher
+  targets, fewer redraws, leaner pay, pricier shop, a smaller hand).
 - **about.txt** (Notepad), **Contact** (a compose-mail form that opens the
   visitor's mail app), and a **Recycle Bin** of beats that didn't make it.
 - **Right-click the desktop** for a context menu, including **Personalize**:
@@ -101,7 +120,8 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
 - `src/lib/beatdeck/` — Beat Deck's rules as pure TypeScript (no DOM):
   cards, gear, clients and bosses, the scoring engine, and the run's state
   transitions, all seeded so a run replays from its seed. Balanced by
-  simulating a few hundred bot runs per change (the bot wins about a third).
+  simulating a few hundred bot runs per change (the bot wins about a third
+  at Demo, under a tenth at Platinum).
 - `src/components/apps/BeatDeckApp/` — the game's UI and its sound: card
   voices, chops sliced from the tracks and re-pitched to the run's key, and
   the take playback that times every score pop off the audio clock.
@@ -116,15 +136,18 @@ Real: the three tracks (`public/audio/*.mp3`) and their cover art
   progressions, step scheduling, the offline render and share codes.
 - `src/components/desktop/personalizeStore.ts` — the saved look; the CSS
   variables it switches live at the top of `globals.css`.
-- `scripts/verify.mjs` — a Playwright smoke test (83 checks: windows,
+- `scripts/verify.mjs` — a Playwright smoke test (96 checks: the Room intro, windows,
   global audio, the player, gadgets, the Beat Maker, Beat Deck played, the
-  secret hunt, lock/restart, idle screensaver, mobile, iPhone playback). Not part of the build — run it against a dev
-  server on port 3210 after `npm i --no-save playwright-core`.
+  secret hunt, lock/restart, idle screensaver, an axe accessibility audit,
+  mobile, iPhone playback). Not part of the build: run it against a dev
+  server on port 3210 after `npm i --no-save playwright-core axe-core`.
 
 ## Mobile
 
-Below 768px, windows open full-screen one at a time and the sidebar hides.
-Beat Deck is turn-based, so it plays the same with taps. Minimize or use the taskbar to get back to
+Below 768px, windows open full-screen one at a time, and the sidebar gives
+way to home-screen widgets: Now Playing (cover, play, progress, live bars)
+and the release countdown. Beat Deck is turn-based, so it plays the same
+with taps, and its hand folds into two rows of four. Minimize or use the taskbar to get back to
 the icons.
 
 ## Deploying

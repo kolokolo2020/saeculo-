@@ -23,7 +23,7 @@ function ClockGadget() {
   const min = d.getMinutes() + sec / 60;
   const hr = (d.getHours() % 12) + min / 60;
   return (
-    <div className="flex flex-col items-center" aria-label="Clock gadget">
+    <div className="flex flex-col items-center" role="group" aria-label="Clock gadget">
       <svg width="128" height="128" viewBox="0 0 128 128" aria-hidden className="drop-shadow-[0_4px_8px_rgba(0,0,0,0.45)]">
         <defs>
           <radialGradient id="clock-face" cx="0.5" cy="0.35" r="0.7">
@@ -83,7 +83,7 @@ function NowPlayingGadget() {
   const reducedMotion = usePrefersReducedMotion();
 
   return (
-    <div className="aero-gadget overflow-hidden p-2" aria-label="Now Playing gadget">
+    <div className="aero-gadget overflow-hidden p-2" role="group" aria-label="Now Playing gadget">
       <div className="overflow-hidden rounded-[4px] border border-black/60 bg-[#03070f]">
         <Visualizer mode="bars" playing={playing} reducedMotion={reducedMotion} className="h-12" palette={paletteFor(track.id)} />
       </div>
@@ -123,7 +123,7 @@ function NowPlayingGadget() {
 }
 
 // The next drop, as a download that is taking its time.
-function ReleaseGadget() {
+export function ReleaseGadget() {
   const now = useNow();
   const openWindow = useWindowStore((s) => s.openWindow);
   const progress = now ? releaseProgress(now) : null;
@@ -180,7 +180,7 @@ function MeterGadget() {
   const bpmAngle = -120 + Math.min(1, Math.max(0, (track.bpm - 60) / 120)) * 240;
 
   return (
-    <div className="aero-gadget flex items-end justify-center gap-1 px-1 py-2" aria-label="Meter gadget">
+    <div className="aero-gadget flex items-end justify-center gap-1 px-1 py-2" role="group" aria-label="Meter gadget">
       <svg width="96" height="84" viewBox="0 0 100 88" aria-hidden>
         <circle cx="50" cy="52" r="40" fill="#0d1117" stroke="#8fa4bd" strokeWidth="3" />
         <path d="M20 72 A40 40 0 1 1 80 72" fill="none" stroke="#1f6fd1" strokeWidth="4" opacity="0.5" />

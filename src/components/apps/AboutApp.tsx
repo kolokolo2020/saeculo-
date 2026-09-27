@@ -56,13 +56,13 @@ export default function AboutApp() {
         <p className="font-semibold">
           {PROFILE.artistName} — {PROFILE.tagline}
         </p>
-        <p className="text-[#777]">{"=".repeat(28)}</p>
+        <p className="text-[#666]">{"=".repeat(28)}</p>
         {PROFILE.bio.map((paragraph, i) => (
           <p key={i} className="mt-3">
             {paragraph}
           </p>
         ))}
-        <p className="mt-5 text-[#777]">-- links --</p>
+        <p className="mt-5 text-[#666]">-- links --</p>
         <ul>
           {PROFILE.socials.map((social) => (
             <li key={social.label}>
@@ -74,11 +74,11 @@ export default function AboutApp() {
               >
                 {social.label}
               </a>{" "}
-              <span className="text-[#777]">{social.handle}</span>
+              <span className="text-[#666]">{social.handle}</span>
             </li>
           ))}
         </ul>
-        <p className="mt-5 text-[#777]">p.s. not everything on this desktop is visible.</p>
+        <p className="mt-5 text-[#666]">p.s. not everything on this desktop is visible.</p>
         <p className="mt-6 text-white selection:bg-[#316ac5] selection:text-white">{HIDDEN_LINE}</p>
       </article>
     </div>

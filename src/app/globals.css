@@ -8,6 +8,15 @@
   --font-ui: "Segoe UI", "Segoe UI Web (West European)", var(--nf-ui), Tahoma, sans-serif;
   --font-mono: Consolas, "Lucida Console", var(--nf-mono), monospace;
   --font-pixel: var(--nf-pixel), monospace;
+  --font-type: var(--nf-type), "Courier New", monospace;
+  --font-film: var(--nf-film), Georgia, serif;
+
+  /* night: the room's palette */
+  --color-night-ink: #07080c;
+  --color-night-moon: #b9c8e6;
+  --color-night-crt: #7fe0ff;
+  --color-night-ember: #ff7a2e;
+  --color-night-blood: #8e1b1b;
 
   /* Aero blues */
   --color-aero: #1f6fd1;
@@ -847,4 +856,250 @@
 .dark-scroll::-webkit-scrollbar-thumb {
   border-color: #000;
   background: linear-gradient(to right, #3a4452, #1c232d);
+}
+
+/* ------------------------------------------------------------------ */
+/* the aura: grain, scanlines, vignette, dropouts (AuraLayer.tsx)       */
+/* ------------------------------------------------------------------ */
+
+.aura {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  overflow: hidden;
+}
+.aura-grain {
+  position: absolute;
+  inset: -120px;
+  background-size: 160px 160px;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  animation: aura-grain 0.7s steps(7) infinite;
+}
+.aura-scan {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+  opacity: 0.16;
+}
+.aura-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 85% 80% at 50% 45%, transparent 60%, rgba(0, 0, 0, 0.32) 100%);
+}
+.aura[data-atmo="midnight"] .aura-grain {
+  opacity: 0.09;
+}
+.aura[data-atmo="midnight"] .aura-scan {
+  opacity: 0.24;
+}
+.aura[data-atmo="midnight"] .aura-vignette {
+  background:
+    radial-gradient(ellipse 80% 75% at 50% 45%, transparent 50%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(rgba(70, 0, 0, 0.1), rgba(70, 0, 0, 0.1));
+}
+/* a tracking error rolling down the picture */
+.aura-drop {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 4vh;
+  background-size: 160px 26px;
+  background-color: rgba(255, 255, 255, 0.04);
+  mix-blend-mode: screen;
+  opacity: 0.2;
+  filter: contrast(2.5) brightness(1.3);
+  box-shadow:
+    0 -6px 0 rgba(255, 60, 60, 0.12),
+    0 6px 0 rgba(60, 200, 255, 0.12);
+  animation: aura-drop 1.3s cubic-bezier(0.3, 0.1, 0.7, 0.9) forwards;
+}
+@keyframes aura-grain {
+  0% { transform: translate(0, 0); }
+  15% { transform: translate(-38px, 22px); }
+  30% { transform: translate(24px, -46px); }
+  45% { transform: translate(-60px, -18px); }
+  60% { transform: translate(52px, 36px); }
+  75% { transform: translate(-14px, 58px); }
+  90% { transform: translate(40px, -8px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes aura-drop {
+  0% { transform: translateY(-12vh) scaleY(0.6); opacity: 0; }
+  8% { opacity: 0.22; }
+  50% { transform: translateY(45vh) scaleY(1.2); }
+  92% { opacity: 0.16; }
+  100% { transform: translateY(110vh) scaleY(0.8); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aura-grain {
+    animation: none;
+  }
+}
+
+/* after midnight the desktop's own light goes red and low (overrides
+   whichever wallpaper is chosen; DreamScene draws its own sky) */
+main[data-atmo="midnight"] {
+  --wall:
+    radial-gradient(ellipse 80% 55% at 65% 115%, rgba(150, 20, 30, 0.45), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 15% -10%, rgba(60, 10, 40, 0.5), transparent 70%),
+    linear-gradient(165deg, #050104 0%, #14040a 45%, #22060d 75%, #0a0205 100%);
+  --ribbon-a: linear-gradient(90deg, transparent, rgba(200, 40, 50, 0.28) 30%, rgba(120, 30, 90, 0.3) 60%, transparent);
+  --ribbon-b: linear-gradient(90deg, transparent, rgba(140, 20, 40, 0.22) 35%, rgba(200, 60, 60, 0.18) 65%, transparent);
+}
+
+/* the atmosphere previews in Personalize */
+.aura-swatch {
+  background: linear-gradient(160deg, #031633 0%, #06306b 45%, #0a4a8f 70%, #042455 100%);
+}
+.aura-swatch[data-atmo="tape"],
+.aura-swatch[data-atmo="midnight"] {
+  background-image:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.5) 100%),
+    linear-gradient(160deg, #031633 0%, #06306b 45%, #0a4a8f 70%, #042455 100%);
+}
+.aura-swatch[data-atmo="midnight"] {
+  background-image:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.4) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(0, 0, 0, 0.7) 100%),
+    linear-gradient(160deg, #120306 0%, #3a0a12 55%, #1a0508 100%);
+}
+
+/* ------------------------------------------------------------------ */
+/* the Room (RoomIntro.tsx)                                             */
+/* ------------------------------------------------------------------ */
+
+.room-rain {
+  background-image:
+    repeating-linear-gradient(104deg, transparent 0 22px, rgba(200, 220, 255, 0.16) 22px 23px, transparent 23px 47px),
+    repeating-linear-gradient(98deg, transparent 0 35px, rgba(200, 220, 255, 0.1) 35px 36px, transparent 36px 61px);
+  background-size: 120px 90px, 160px 130px;
+  animation: room-rain 0.55s linear infinite;
+}
+@keyframes room-rain {
+  to { background-position: -22px 90px, -26px 130px; }
+}
+.room-clouds {
+  top: 40px;
+  left: -300px;
+  width: 1000px;
+  height: 180px;
+  background:
+    radial-gradient(ellipse 120px 34px at 200px 60px, rgba(52, 66, 104, 0.85), transparent 70%),
+    radial-gradient(ellipse 90px 26px at 280px 80px, rgba(44, 56, 92, 0.8), transparent 70%),
+    radial-gradient(ellipse 150px 30px at 640px 100px, rgba(52, 66, 104, 0.75), transparent 70%);
+  animation: room-clouds 60s linear infinite;
+}
+@keyframes room-clouds {
+  to { transform: translateX(520px); }
+}
+.room-headlights {
+  top: 0;
+  left: -500px;
+  width: 420px;
+  height: 640px;
+  background: linear-gradient(100deg, transparent, rgba(255, 244, 214, 0.1) 40%, rgba(255, 244, 214, 0.16) 50%, rgba(255, 244, 214, 0.1) 60%, transparent);
+  transform: skewX(-18deg);
+  mix-blend-mode: screen;
+  animation: room-headlights 2.6s ease-in-out forwards;
+}
+@keyframes room-headlights {
+  from { translate: 0 0; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  to { translate: 2300px 0; opacity: 0; }
+}
+.room-screen {
+  box-shadow: 0 0 40px rgba(127, 224, 255, 0.35);
+  animation: room-flicker 5s steps(1) infinite;
+}
+.room-screenglow {
+  background: radial-gradient(ellipse 560px 400px at 930px 470px, rgba(120, 210, 255, 0.16), transparent 70%);
+  mix-blend-mode: screen;
+  animation: room-flicker 5s steps(1) infinite;
+}
+@keyframes room-flicker {
+  0%, 100% { opacity: 1; }
+  41% { opacity: 0.86; }
+  42% { opacity: 1; }
+  77% { opacity: 0.92; }
+  78% { opacity: 1; }
+}
+.room-tail {
+  animation: room-tail 3.6s ease-in-out infinite alternate;
+}
+@keyframes room-tail {
+  from { rotate: -7deg; }
+  to { rotate: 9deg; }
+}
+.room-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: room-blink 5.2s infinite;
+}
+@keyframes room-blink {
+  0%, 94%, 100% { scale: 1 1; }
+  96% { scale: 1 0.08; }
+}
+.room-lava-a { animation: room-lava 14s ease-in-out infinite alternate; }
+.room-lava-b { animation: room-lava 11s ease-in-out infinite alternate-reverse; }
+.room-lava-c { animation: room-lava 17s ease-in-out infinite alternate; }
+@keyframes room-lava {
+  from { translate: 0 0; }
+  to { translate: 0 -120px; }
+}
+.room-ember {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: radial-gradient(circle, #ffe2a0 0%, #ff7a2e 30%, rgba(255, 90, 30, 0.25) 60%, transparent 72%);
+  animation: room-ember 1.8s ease-in-out infinite alternate;
+  transition: scale 0.6s;
+}
+.room-ember-hot {
+  scale: 2.1;
+  filter: brightness(1.4);
+}
+@keyframes room-ember {
+  from { opacity: 0.75; }
+  to { opacity: 1; }
+}
+.room-bars::before,
+.room-bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9vh;
+  background: #000;
+  transition: transform 1.2s ease-in;
+  pointer-events: none;
+}
+.room-bars::before { top: 0; }
+.room-bars::after { bottom: 0; }
+.room-bars-open::before { transform: translateY(-100%); }
+.room-bars-open::after { transform: translateY(100%); }
+.room-hint {
+  animation: room-hint 2.4s ease-in-out infinite;
+}
+@keyframes room-hint {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.room-caret {
+  animation: room-hint 1s steps(1) infinite;
+}
+.room-titlecard {
+  animation: room-titlecard 0.12s steps(2) infinite;
+}
+@keyframes room-titlecard {
+  0% { translate: 0 0; filter: brightness(1); }
+  50% { translate: 0.6px -0.4px; filter: brightness(0.93); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-rain, .room-clouds, .room-screen, .room-screenglow, .room-tail, .room-blink, .room-lava-a, .room-lava-b, .room-lava-c, .room-ember, .room-hint, .room-titlecard {
+    animation: none;
+  }
 }

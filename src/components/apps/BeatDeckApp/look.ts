@@ -25,4 +25,7 @@ export const GENRE_LABEL: Record<Genre, string> = { trap: "Trap", boombap: "Boom
 
 export const RARITY_COLOR: Record<Rarity, string> = { common: "#9fb2c9", uncommon: "#6fb4ff", rare: "#ffd27a" };
 
+/** Record-disc colours for each certification, Demo → Platinum. */
+export const CERT_COLOR = ["#8a96a6", "#39a6ff", "#2ec4b6", "#9a6bff", "#ffc94a", "#e8f1ff"];
+
 export const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
