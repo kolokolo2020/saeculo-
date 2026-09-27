@@ -12,16 +12,36 @@ import { analysisFor, paletteFor } from "@/components/player/analysis";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import Glyph from "@/components/ui/Glyph";
 import { trackUrl } from "@/lib/trackLink";
+import { useAtmosphere } from "@/hooks/useAtmosphere";
 
 type Tab = "now" | "library";
 const VIZ_KEY = "saeculo-viz";
+const TAPE_KEY = "saeculo-viz-tape";
 
-function savedViz(): VizMode {
+/** The visitor's picked style, or null to follow the atmosphere. */
+function savedViz(): VizMode | null {
   try {
     const v = localStorage.getItem(VIZ_KEY);
-    return VIZ_MODES.includes(v as VizMode) ? (v as VizMode) : "art";
+    return VIZ_MODES.includes(v as VizMode) ? (v as VizMode) : null;
   } catch {
-    return "art";
+    return null;
+  }
+}
+
+function savedTape(): boolean | null {
+  try {
+    const v = localStorage.getItem(TAPE_KEY);
+    return v === "on" ? true : v === "off" ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // not remembered — fine
   }
 }
 
@@ -31,7 +51,8 @@ function savedViz(): VizMode {
 export default function MediaPlayerApp() {
   const [tab, setTab] = useState<Tab>("now");
   // windows only render after the desktop has mounted, so storage is safe here
-  const [viz, setViz] = useState<VizMode>(savedViz);
+  const [pickedViz, setViz] = useState<VizMode | null>(savedViz);
+  const [pickedTape, setTape] = useState<boolean | null>(savedTape);
   const [copied, setCopied] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -47,6 +68,12 @@ export default function MediaPlayerApp() {
   const repeatOne = usePlayerStore((s) => s.repeatOne);
   const { toggle, next, prev, setVolume, toggleMute, toggleRepeat, selectTrack, pause } = usePlayerStore.getState();
   const palette = paletteFor(track.id);
+  const atmosphere = useAtmosphere();
+  // Until the visitor picks, the player follows the room: the Projector
+  // after dark, and the tape look whenever the desktop is on tape.
+  const chosenViz = pickedViz ?? (atmosphere === "midnight" ? "projector" : "art");
+  const viz: VizMode = chosenViz === "film" && !track.video ? "projector" : chosenViz;
+  const tape = pickedTape ?? atmosphere !== "clean";
   const total = duration || analysisFor(track.id)?.duration || 0;
 
   useEffect(() => {
@@ -55,14 +82,15 @@ export default function MediaPlayerApp() {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
+  const modes = VIZ_MODES.filter((m) => m !== "film" || track.video);
   const cycleViz = () => {
-    const nextMode = VIZ_MODES[(VIZ_MODES.indexOf(viz) + 1) % VIZ_MODES.length];
+    const nextMode = modes[(modes.indexOf(viz) + 1) % modes.length];
     setViz(nextMode);
-    try {
-      localStorage.setItem(VIZ_KEY, nextMode);
-    } catch {
-      // not remembered — fine
-    }
+    remember(VIZ_KEY, nextMode);
+  };
+  const toggleTape = () => {
+    setTape(!tape);
+    remember(TAPE_KEY, tape ? "off" : "on");
   };
 
   const toggleFullscreen = () => {
@@ -130,11 +158,29 @@ export default function MediaPlayerApp() {
               <img key={track.cover} src={track.cover} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-125 object-cover opacity-45 blur-2xl" />
             )}
             <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/80" aria-hidden />
-            <Visualizer mode={viz} playing={playing} reducedMotion={reducedMotion} className="relative h-full" palette={palette} cover={track.cover} />
+            <Visualizer
+              mode={viz}
+              playing={playing}
+              reducedMotion={reducedMotion}
+              className="relative h-full"
+              palette={palette}
+              cover={track.cover}
+              video={track.video}
+              tape={tape}
+            />
 
             <div className="absolute top-2 right-2 flex gap-1.5">
               <button onClick={cycleViz} aria-label="Cycle visualizer style" className="aero-btn-dark px-2 py-1 text-[11px]">
                 {VIZ_LABEL[viz]} ↻
+              </button>
+              <button
+                onClick={toggleTape}
+                aria-pressed={tape}
+                aria-label="Tape effect"
+                title="Play it off a VHS"
+                className={`aero-btn-dark px-2 py-1 text-[11px] ${tape ? "text-[#ffd08a]" : ""}`}
+              >
+                Tape
               </button>
               <button onClick={toggleFullscreen} aria-label={fullscreen ? "Exit full screen" : "Full screen"} className="aero-btn-dark px-2 py-1 text-[11px]">
                 {fullscreen ? "Exit ⤡" : "⤢"}

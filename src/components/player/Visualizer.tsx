@@ -3,17 +3,24 @@
 import { useEffect, useRef } from "react";
 import { readFrequencies, readWaveform, beatInfo } from "./spectrum";
 import { DEFAULT_PALETTE, type TrackPalette } from "./analysis";
+import { usePlayerStore } from "./playerStore";
+import { createProjector, createTape, drawProjector, drawTape } from "./filmfx";
 
-export const VIZ_MODES = ["art", "aurora", "bars", "scope"] as const;
+/** "film" only shows up for tracks that have a video. */
+export const VIZ_MODES = ["art", "projector", "aurora", "bars", "scope", "film"] as const;
 export type VizMode = (typeof VIZ_MODES)[number];
 export const VIZ_LABEL: Record<VizMode, string> = {
   art: "Cover Art",
+  projector: "Projector",
   aurora: "Aurora",
   bars: "Bars & Waves",
   scope: "Scope",
+  film: "Film",
 };
 
 const BAR_COUNT = 32;
+/** Where each Film clip was, so pausing the music doesn't rewind it. */
+const clipTimes = new Map<string, number>();
 /** Dots per side of the Cover Art grid. */
 const ART_GRID = 44;
 
@@ -46,6 +53,10 @@ function sampleCover(img: HTMLImageElement, n: number): ArtDots {
 // loop, so React never re-renders per frame. Colours come from the track's
 // cover palette; every mode breathes on the beat.
 //
+// Projector throws the cover onto the wall as a worn 16 mm print, and
+// Film does the same with the track's video (see filmfx.ts). With `tape`
+// on, any mode plays as if off a VHS.
+//
 // Cover Art mode rebuilds the cover as a grid of dots: each dot keeps its
 // pixel's colour, swells with the frequency band at its distance from the
 // centre (bass in the middle, treble at the edges), and a ripple rolls out
@@ -57,6 +68,8 @@ export default function Visualizer({
   className = "h-40",
   palette = DEFAULT_PALETTE,
   cover,
+  video,
+  tape = false,
 }: {
   mode: VizMode;
   playing: boolean;
@@ -64,6 +77,9 @@ export default function Visualizer({
   className?: string;
   palette?: TrackPalette;
   cover?: string;
+  /** A looping clip for the Film mode. */
+  video?: string;
+  tape?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -92,14 +108,42 @@ export default function Visualizer({
     let t = 0;
     let raf = 0;
     let dots: ArtDots | null = null;
+    let coverImg: HTMLImageElement | null = null;
+    /** Set once whatever the mode draws from has loaded (for the still frame). */
+    let ready = mode !== "art" && mode !== "projector" && mode !== "film";
     let cancelled = false;
-    if (mode === "art" && cover) {
+    if ((mode === "art" || mode === "projector" || mode === "film") && cover) {
       const img = new Image();
       img.onload = () => {
-        if (!cancelled) dots = sampleCover(img, ART_GRID);
+        if (cancelled) return;
+        if (mode === "art") dots = sampleCover(img, ART_GRID);
+        coverImg = img;
+        ready = true;
       };
       img.src = cover;
     }
+    // Film: a muted loop that plays while the music does
+    let clip: HTMLVideoElement | null = null;
+    if (mode === "film" && video) {
+      clip = document.createElement("video");
+      clip.muted = true;
+      clip.loop = true;
+      clip.playsInline = true;
+      clip.preload = "auto";
+      clip.src = video;
+      const resumeAt = clipTimes.get(video) ?? 0;
+      clip.addEventListener(
+        "loadeddata",
+        () => {
+          ready = true;
+          if (clip && resumeAt) clip.currentTime = resumeAt;
+        },
+        { once: true },
+      );
+      if (playing && !reducedMotion) void clip.play().catch(() => {});
+    }
+    const projector = createProjector();
+    const tapeFx = tape ? createTape() : null;
 
     const pulseNow = () => (playing ? (beatInfo()?.pulse ?? 0) : 0);
 
@@ -247,6 +291,15 @@ export default function Visualizer({
       ctx.fillRect(0, floor, w, h - floor);
     };
 
+    const drawProjected = () => {
+      const beat = playing ? beatInfo() : null;
+      const pulse = beat?.pulse ?? 0;
+      const barHit = beat && beat.beat % 4 === 0 ? 1 : 0.55;
+      const opts = { pulse, barHit, still: reducedMotion };
+      if (clip && clip.readyState >= 2) drawProjector(ctx, w, h, clip, clip.videoWidth, clip.videoHeight, "cover", projector, opts);
+      else drawProjector(ctx, w, h, coverImg, coverImg?.naturalWidth ?? 1, coverImg?.naturalHeight ?? 1, "contain", projector, opts);
+    };
+
     const drawScope = () => {
       ctx.fillStyle = "rgba(3, 10, 22, 0.35)";
       ctx.fillRect(0, 0, w, h);
@@ -276,12 +329,27 @@ export default function Visualizer({
       ctx.shadowBlur = 0;
     };
 
-    const frame = () => {
+    const drawMode = () => {
       t++;
       if (mode === "art") drawArt();
+      else if (mode === "projector" || mode === "film") drawProjected();
       else if (mode === "aurora") drawAurora();
       else if (mode === "bars") drawBars();
       else drawScope();
+    };
+
+    const frame = () => {
+      drawMode();
+      if (tapeFx) {
+        const { audio } = usePlayerStore.getState();
+        drawTape(ctx, canvas, w, h, tapeFx, {
+          bass: bands().bass,
+          pulse: pulseNow(),
+          playing,
+          time: audio?.currentTime ?? 0,
+          still: reducedMotion,
+        });
+      }
     };
 
     if (reducedMotion) {
@@ -291,11 +359,15 @@ export default function Visualizer({
           ctx.fillStyle = "#03070f";
           ctx.fillRect(0, 0, w, h);
         }
-        for (let i = 0; i < 30; i++) frame();
+        // the trail-drawing modes need a few passes to settle; the tape
+        // effects would stack, so they only go over the last one
+        const passes = mode === "aurora" || mode === "scope" ? 30 : 1;
+        for (let i = 1; i < passes; i++) drawMode();
+        frame();
       };
       still();
       const poll = setInterval(() => {
-        if (dots) {
+        if (ready) {
           still();
           clearInterval(poll);
         }
@@ -313,8 +385,14 @@ export default function Visualizer({
       cancelled = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
+      if (clip && video) {
+        clipTimes.set(video, clip.currentTime);
+        clip.pause();
+        clip.removeAttribute("src");
+        clip.load();
+      }
     };
-  }, [mode, playing, reducedMotion, palette, cover]);
+  }, [mode, playing, reducedMotion, palette, cover, video, tape]);
 
   return <canvas ref={canvasRef} className={`block w-full ${className}`} aria-label="Audio visualizer" role="img" />;
 }

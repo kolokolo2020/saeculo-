@@ -36,6 +36,9 @@ export interface Track {
   /** Square cover art under public/. */
   cover?: string;
   src: string;
+  /** Optional looping clip under public/ (MP4/H.264 or WebM, ~10–20 s, muted),
+   *  shown by the player's Film visualizer. */
+  video?: string;
   streamingLinks: { label: string; url: string }[];
 }
 

@@ -9,7 +9,7 @@ import ScreensaverOverlay from "./ScreensaverOverlay";
 import Sidebar from "./Sidebar";
 import AuraLayer from "./AuraLayer";
 import { useAmbienceStore } from "./ambienceStore";
-import { useLateNight } from "@/hooks/useLateNight";
+import { useAtmosphere } from "@/hooks/useAtmosphere";
 import MobileWidgets from "./MobileWidgets";
 import StartMenu from "./StartMenu";
 import Taskbar from "./Taskbar";
@@ -71,10 +71,7 @@ export default function Desktop() {
   const glass = usePersonalizeStore((s) => s.glass);
   const wallpaper = usePersonalizeStore((s) => s.wallpaper);
   const transparency = usePersonalizeStore((s) => s.transparency);
-  const chosenAtmosphere = usePersonalizeStore((s) => s.atmosphere);
-  const lateNight = useLateNight();
-  // Tape turns into Midnight after midnight; Clean always stays clean
-  const atmosphere = chosenAtmosphere === "tape" && lateNight ? "midnight" : chosenAtmosphere;
+  const atmosphere = useAtmosphere();
   const windows = useWindowStore((s) => s.windows);
   const isMobile = useIsMobile();
   const reducedMotion = usePrefersReducedMotion();
@@ -211,7 +208,7 @@ export default function Desktop() {
       {/* clipped in their own box: the rotated ribbons would otherwise
           extend past the viewport and make the desktop scrollable */}
       {wallpaper === "dreamscene" ? (
-        <DreamScene />
+        <DreamScene atmosphere={atmosphere} />
       ) : (
         <div className="pointer-events-none absolute inset-0 overflow-clip" aria-hidden>
           <div className="aero-ribbon aero-ribbon-a" />
