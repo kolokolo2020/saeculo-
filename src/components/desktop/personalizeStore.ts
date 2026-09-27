@@ -14,6 +14,7 @@ export const WALLPAPERS = [
   { id: "harmony", label: "Harmony" },
   { id: "dusk", label: "Dusk" },
   { id: "midnight", label: "Midnight" },
+  { id: "dreamscene", label: "DreamScene" },
 ] as const;
 
 export type GlassColor = (typeof GLASS_COLORS)[number]["id"];

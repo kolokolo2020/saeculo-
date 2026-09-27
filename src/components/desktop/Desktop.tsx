@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import BootScreen from "./BootScreen";
 import DesktopContextMenu from "./DesktopContextMenu";
 import DesktopIcon from "./DesktopIcon";
@@ -18,18 +19,16 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { PROFILE } from "@/data/profile";
-import { decodeBeat, setPendingBeat } from "@/lib/beatCode";
+import DreamScene from "./DreamScene";
+import { decodeGroove, setPendingGroove } from "@/lib/groove";
 import { trackIndexFromHash } from "@/lib/trackLink";
 import MediaPlayerApp from "@/components/apps/MediaPlayerApp";
 import AboutApp from "@/components/apps/AboutApp";
 import ContactApp from "@/components/apps/ContactApp";
-import GamesExplorerApp from "@/components/apps/GamesExplorerApp";
 import RecycleBinApp from "@/components/apps/RecycleBinApp";
 import BeatMakerApp from "@/components/lab/BeatMakerApp/BeatMakerApp";
-import RhythmRushApp from "@/components/lab/RhythmRushApp/RhythmRushApp";
-import BeatBrawlApp from "@/components/apps/BeatBrawlApp/BeatBrawlApp";
-import PadRecallApp from "@/components/apps/PadRecallApp/PadRecallApp";
 import PersonalizeApp from "@/components/apps/PersonalizeApp";
+import WelcomeCenter, { WELCOME_KEY } from "@/components/apps/WelcomeCenter";
 import VaultApp from "@/components/apps/VaultApp";
 import ReleaseApp from "@/components/apps/ReleaseApp";
 import TrayBalloon from "./TrayBalloon";
@@ -37,19 +36,20 @@ import { useSecretStore } from "@/components/secrets/secretStore";
 import { createKonamiListener } from "@/components/secrets/konami";
 import type { WindowKind } from "@/lib/types";
 
+// the game is the heaviest window, so it only downloads when first opened
+const BeatDeckApp = dynamic(() => import("@/components/apps/BeatDeckApp/BeatDeckApp"), { ssr: false });
+
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   player: MediaPlayerApp,
   beatmaker: BeatMakerApp,
-  games: GamesExplorerApp,
-  rhythm: RhythmRushApp,
-  brawl: BeatBrawlApp,
-  pads: PadRecallApp,
+  beatdeck: BeatDeckApp,
   about: AboutApp,
   contact: ContactApp,
   recycle: RecycleBinApp,
   personalize: PersonalizeApp,
   vault: VaultApp,
   release: ReleaseApp,
+  welcome: WelcomeCenter,
 };
 
 export default function Desktop() {
@@ -71,6 +71,18 @@ export default function Desktop() {
   const finishBoot = useCallback(() => {
     setBooting(false);
     setForceBoot(false);
+    // the Welcome Center greets first-time visitors (and anyone who keeps
+    // "Show at startup" ticked), unless a link already opened something
+    let show = true;
+    try {
+      show = localStorage.getItem(WELCOME_KEY) !== "off" && !sessionStorage.getItem("saeculo-welcomed");
+      sessionStorage.setItem("saeculo-welcomed", "1");
+    } catch {
+      // storage blocked: show it
+    }
+    if (show && Object.keys(useWindowStore.getState().windows).length === 0) {
+      useWindowStore.getState().openWindow("welcome");
+    }
   }, []);
   const closeStart = useCallback(() => setStartOpen(false), []);
   const unlock = useCallback(() => setLocked(false), []);
@@ -108,10 +120,10 @@ export default function Desktop() {
   useEffect(() => {
     const importFromHash = () => {
       const { hash } = window.location;
-      const beat = decodeBeat(hash);
+      const beat = decodeGroove(hash);
       const trackIndex = trackIndexFromHash(hash);
       if (beat) {
-        setPendingBeat(beat);
+        setPendingGroove(beat);
         useWindowStore.getState().openWindow("beatmaker");
       } else if (trackIndex >= 0) {
         // a track link: cue it up in the player (browsers only allow
@@ -150,10 +162,14 @@ export default function Desktop() {
       {/* wallpaper: drifting aurora ribbons + a quiet wordmark */}
       {/* clipped in their own box: the rotated ribbons would otherwise
           extend past the viewport and make the desktop scrollable */}
-      <div className="pointer-events-none absolute inset-0 overflow-clip" aria-hidden>
-        <div className="aero-ribbon aero-ribbon-a" />
-        <div className="aero-ribbon aero-ribbon-b" />
-      </div>
+      {wallpaper === "dreamscene" ? (
+        <DreamScene />
+      ) : (
+        <div className="pointer-events-none absolute inset-0 overflow-clip" aria-hidden>
+          <div className="aero-ribbon aero-ribbon-a" />
+          <div className="aero-ribbon aero-ribbon-b" />
+        </div>
+      )}
       <div
         aria-hidden
         className="pointer-events-none absolute right-8 bottom-16 text-right select-none lg:right-[212px]"

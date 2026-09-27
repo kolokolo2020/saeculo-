@@ -1,16 +1,14 @@
 export type WindowKind =
   | "player"
   | "beatmaker"
-  | "games"
-  | "rhythm"
-  | "brawl"
-  | "pads"
+  | "beatdeck"
   | "about"
   | "contact"
   | "recycle"
   | "personalize"
   | "vault"
-  | "release";
+  | "release"
+  | "welcome";
 
 export interface WindowState {
   kind: WindowKind;

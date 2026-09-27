@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { useWindowStore } from "@/components/window-manager/windowStore";
 import { APP_BY_KIND } from "@/components/window-manager/windowRegistry";
 import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
@@ -8,8 +9,47 @@ import Glyph from "@/components/ui/Glyph";
 import StartMark from "@/components/ui/StartMark";
 import { useNow } from "@/hooks/useNow";
 import type { WindowKind } from "@/lib/types";
+import { paletteFor } from "@/components/player/analysis";
 
-const QUICK_LAUNCH: WindowKind[] = ["player", "beatmaker", "games"];
+// Hovering a taskbar button floats a glass preview above it, the way Vista
+// showed live thumbnails: the window's icon and what it's up to — for the
+// media player, the cover and track.
+function TaskPreview({ kind, x }: { kind: WindowKind; x: number }) {
+  const app = APP_BY_KIND[kind];
+  const track = useCurrentTrack();
+  const playing = usePlayerStore((s) => s.playing);
+  const isPlayer = kind === "player";
+  return (
+    <div
+      className="aero-glass aero-open pointer-events-none fixed bottom-[46px] z-[9400] w-[210px] p-2 max-md:hidden"
+      style={{ left: Math.max(6, x - 105) }}
+      aria-hidden
+    >
+      <p className="aero-title-text truncate px-0.5 text-[12px]">{app.title}</p>
+      <div className="mt-1.5 flex h-[104px] items-center justify-center gap-3 overflow-hidden rounded-[3px] border border-black/40 bg-[linear-gradient(to_bottom,#1b2533,#03070f)]">
+        {isPlayer && track.cover ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- local cover */}
+            <img src={track.cover} alt="" className="h-[76px] w-[76px] rounded-[2px] border border-white/25 shadow-[0_3px_10px_rgba(0,0,0,0.7)]" />
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] font-semibold text-white">{track.title}</span>
+              <span className="block text-[11px]" style={{ color: paletteFor(track.id).accent }}>
+                {playing ? "▶ Playing" : "❚❚ Paused"}
+              </span>
+            </span>
+          </>
+        ) : (
+          <>
+            <AppIcon kind={kind} size={48} />
+            <span className="max-w-[110px] text-[11px] leading-snug text-[#c9d6e6]">{app.description}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const QUICK_LAUNCH: WindowKind[] = ["player", "beatmaker", "beatdeck"];
 
 function TrayClock() {
   const now = useNow();
@@ -63,6 +103,17 @@ export default function Taskbar({
   const minimizeAll = useWindowStore((s) => s.minimizeAll);
   const muted = usePlayerStore((s) => s.muted);
   const toggleMute = usePlayerStore((s) => s.toggleMute);
+  const [preview, setPreview] = useState<{ kind: WindowKind; x: number } | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showPreview = (kind: WindowKind, el: HTMLElement) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    const r = el.getBoundingClientRect();
+    hoverTimer.current = setTimeout(() => setPreview({ kind, x: r.left + r.width / 2 }), 350);
+  };
+  const hidePreview = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setPreview(null);
+  };
 
   return (
     <footer
@@ -105,7 +156,13 @@ export default function Taskbar({
             return (
               <button
                 key={win.kind}
-                onClick={() => (active ? toggleMinimize(win.kind) : focusWindow(win.kind))}
+                onClick={() => {
+                  hidePreview();
+                  if (active) toggleMinimize(win.kind);
+                  else focusWindow(win.kind);
+                }}
+                onMouseEnter={(e) => showPreview(win.kind, e.currentTarget)}
+                onMouseLeave={hidePreview}
                 aria-label={`Taskbar ${app.title}`}
                 aria-pressed={active}
                 className={`aero-task-btn flex h-[30px] w-40 min-w-0 shrink items-center gap-1.5 px-2 text-[12px] ${
@@ -118,6 +175,8 @@ export default function Taskbar({
             );
           })}
       </div>
+
+      {preview && windows[preview.kind] && <TaskPreview kind={preview.kind} x={preview.x} />}
 
       {/* notification area */}
       <div className="flex h-full items-center gap-1 border-l border-white/15 pl-1.5 [background:linear-gradient(to_bottom,rgba(255,255,255,0.06),rgba(0,0,0,0.25))]">

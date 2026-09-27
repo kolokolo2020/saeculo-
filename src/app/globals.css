@@ -119,19 +119,42 @@
   --ribbon-a: linear-gradient(90deg, transparent, rgba(60, 140, 255, 0.22) 30%, rgba(90, 200, 255, 0.25) 60%, transparent);
   --ribbon-b: linear-gradient(90deg, transparent, rgba(80, 120, 255, 0.18) 35%, rgba(120, 220, 255, 0.15) 65%, transparent);
 }
+/* DreamScene paints itself on a canvas (DreamScene.tsx); this is what
+   shows before its first frame and in the Personalize thumbnail */
+[data-wall="dreamscene"] {
+  --wall:
+    radial-gradient(ellipse 70% 55% at 50% 115%, rgba(150, 110, 255, 0.55), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(255, 140, 110, 0.25), transparent 70%),
+    linear-gradient(170deg, #07051a 0%, #140f3a 55%, #2a1d5e 100%);
+  --ribbon-a: linear-gradient(90deg, transparent, rgba(255, 150, 120, 0.4) 30%, rgba(160, 130, 255, 0.5) 60%, transparent);
+  --ribbon-b: linear-gradient(90deg, transparent, rgba(160, 130, 255, 0.3) 35%, rgba(255, 170, 140, 0.25) 65%, transparent);
+}
 
 /* ------------------------------------------------------------------ */
 /* keyframes                                                           */
 /* ------------------------------------------------------------------ */
 
+/* animate `scale`, not `transform`: windows are positioned with an inline
+   transform that a transform keyframe would override mid-animation */
 @keyframes aero-open {
   from {
     opacity: 0;
-    transform: scale(0.94);
+    scale: 0.94;
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    scale: 1;
+  }
+}
+
+@keyframes aero-close {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 0.92;
   }
 }
 
@@ -207,6 +230,114 @@
   }
 }
 
+/* Beat Maker: a lit step pops as the playhead crosses it */
+@keyframes bm-hit {
+  from {
+    scale: 1.14;
+    filter: brightness(1.7);
+  }
+  to {
+    scale: 1;
+    filter: brightness(1);
+  }
+}
+.bm-hit {
+  animation: bm-hit 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bm-hit {
+    animation: none;
+  }
+}
+
+@keyframes deck-deal {
+  from {
+    opacity: 0;
+    transform: translateY(40px) rotate(-8deg) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes deck-banner {
+  0% {
+    opacity: 0;
+    transform: translateX(-30px) skewX(-12deg);
+  }
+  15%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+}
+
+@keyframes deck-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translate(-5px, 2px) rotate(-0.4deg);
+  }
+  40% {
+    transform: translate(5px, -2px) rotate(0.4deg);
+  }
+  60% {
+    transform: translate(-3px, 1px);
+  }
+  80% {
+    transform: translate(3px, -1px);
+  }
+}
+
+@keyframes deck-flash {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes deck-spark {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+  }
+}
+
+@keyframes deck-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes deck-slam {
+  from {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes vault-shake {
   20%,
   60% {
@@ -216,6 +347,14 @@
   80% {
     transform: translateX(6px);
   }
+}
+
+/* Beat Deck's tutorial outlines the part of the table it's talking about */
+.deck-tour-focus {
+  outline: 2px solid #ffd27a;
+  outline-offset: 3px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 6px rgba(255, 210, 122, 0.15);
 }
 
 /* Custom component classes live in this layer so Tailwind utilities (the
@@ -630,6 +769,9 @@
 
   .aero-open {
     animation: aero-open 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .aero-closing {
+    animation: aero-close 140ms ease-in forwards;
   }
   @media (prefers-reduced-motion: reduce) {
     .aero-open {

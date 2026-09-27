@@ -11,15 +11,16 @@ import { isKonamiPhrase } from "@/components/secrets/konami";
 import { useSecretStore } from "@/components/secrets/secretStore";
 import type { WindowKind } from "@/lib/types";
 
-const PINNED: WindowKind[] = ["player", "beatmaker"];
+const PINNED: WindowKind[] = ["player", "beatdeck", "beatmaker"];
 const RIGHT_LINKS: { label: string; kind: WindowKind }[] = [
   { label: "Music", kind: "player" },
-  { label: "Games", kind: "games" },
+  { label: "Beat Deck", kind: "beatdeck" },
   { label: "Beat Maker", kind: "beatmaker" },
   { label: "About", kind: "about" },
   { label: "Contact", kind: "contact" },
   { label: "Recycle Bin", kind: "recycle" },
   { label: "Personalize", kind: "personalize" },
+  { label: "Welcome Center", kind: "welcome" },
 ];
 
 const LISTED = APPS.filter((a) => !a.hidden);

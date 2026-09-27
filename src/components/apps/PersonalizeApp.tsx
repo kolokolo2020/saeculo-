@@ -65,7 +65,7 @@ export default function PersonalizeApp() {
         </label>
 
         <h3 className="mt-5 text-[15px] text-[#1e3287]">Desktop Background</h3>
-        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4" role="group" aria-label="Desktop background">
+        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-5" role="group" aria-label="Desktop background">
           {WALLPAPERS.map((w) => (
             <button
               key={w.id}
@@ -82,11 +82,19 @@ export default function PersonalizeApp() {
                 }`}
               >
                 <span className="aero-ribbon aero-ribbon-a [animation:none]" />
+                {w.id === "dreamscene" && (
+                  <span className="absolute right-1 bottom-1 rounded-[2px] bg-black/50 px-1 text-[9px] font-semibold tracking-wide text-white uppercase">
+                    live
+                  </span>
+                )}
               </span>
               <span className="text-[11px] text-mute">{w.label}</span>
             </button>
           ))}
         </div>
+        {wallpaper === "dreamscene" && (
+          <p className="mt-2 text-[12px] text-mute">DreamScene is alive: it takes its colours from the playing track&apos;s cover and moves with the music.</p>
+        )}
       </div>
 
       <div className="flex shrink-0 justify-end gap-2 border-t border-[#d4dbe4] bg-[#f1f5fa] px-4 py-2.5">
