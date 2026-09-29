@@ -8,6 +8,7 @@ import DesktopIcon from "./DesktopIcon";
 import ScreensaverOverlay from "./ScreensaverOverlay";
 import Sidebar from "./Sidebar";
 import AuraLayer from "./AuraLayer";
+import Haunts from "./Haunts";
 import { useAmbienceStore } from "./ambienceStore";
 import { useAtmosphere } from "@/hooks/useAtmosphere";
 import MobileWidgets from "./MobileWidgets";
@@ -35,16 +36,20 @@ import PersonalizeApp from "@/components/apps/PersonalizeApp";
 import WelcomeCenter, { WELCOME_KEY } from "@/components/apps/WelcomeCenter";
 import VaultApp from "@/components/apps/VaultApp";
 import ReleaseApp from "@/components/apps/ReleaseApp";
+import FootageApp from "@/components/apps/FootageApp";
 import TrayBalloon from "./TrayBalloon";
 import { useSecretStore } from "@/components/secrets/secretStore";
 import { createKonamiListener } from "@/components/secrets/konami";
 import type { WindowKind } from "@/lib/types";
 
-// the game is the heaviest window, so it only downloads when first opened
+// the Room, the Pictures (which reuse its artwork), the radio and the game
+// download only when first needed
 const RoomIntro = dynamic(() => import("@/components/room/RoomIntro"), {
   ssr: false,
   loading: () => <div className="fixed inset-0 z-[10000] bg-black" />,
 });
+const RadioApp = dynamic(() => import("@/components/apps/RadioApp"), { ssr: false });
+const PicturesApp = dynamic(() => import("@/components/apps/PicturesApp"), { ssr: false });
 const BeatDeckApp = dynamic(() => import("@/components/apps/BeatDeckApp/BeatDeckApp"), { ssr: false });
 
 const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
@@ -58,6 +63,9 @@ const APP_COMPONENTS: Record<WindowKind, React.ComponentType> = {
   vault: VaultApp,
   release: ReleaseApp,
   welcome: WelcomeCenter,
+  footage: FootageApp,
+  pictures: PicturesApp,
+  radio: RadioApp,
 };
 
 export default function Desktop() {
@@ -249,6 +257,7 @@ export default function Desktop() {
 
       {menu && <DesktopContextMenu x={menu.x} y={menu.y} onClose={closeMenu} onRefresh={refresh} />}
       {startOpen && <StartMenu onClose={closeStart} onRestart={restart} onLock={() => setLocked(true)} onRoom={() => setRoom(true)} />}
+      <Haunts atmosphere={atmosphere} reducedMotion={reducedMotion} active={!booting && !room && !showScreensaver} />
       <TrayBalloon />
       <Taskbar onStartClick={() => setStartOpen((v) => !v)} startOpen={startOpen} />
       {showScreensaver && <ScreensaverOverlay onDismiss={locked ? unlock : undefined} />}

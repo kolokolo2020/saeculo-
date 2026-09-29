@@ -89,3 +89,30 @@ export function playBlip(ctx: BaseAudioContext, dest: AudioNode, time: number, f
   osc.start(time);
   osc.stop(time + 0.09);
 }
+
+/** A quiet relay click with a low thump, like an old set switching on (or,
+ *  a little higher, off). */
+export function playRelayClick(ctx: BaseAudioContext, dest: AudioNode, time: number, off = false) {
+  const noise = ctx.createBufferSource();
+  noise.buffer = getNoiseBuffer(ctx);
+  const band = ctx.createBiquadFilter();
+  band.type = "bandpass";
+  band.frequency.value = off ? 3200 : 2400;
+  band.Q.value = 1.4;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.09, time);
+  g.gain.exponentialRampToValueAtTime(0.001, time + 0.018);
+  noise.connect(band).connect(g).connect(dest);
+  noise.start(time, Math.random());
+  noise.stop(time + 0.03);
+
+  const thump = ctx.createOscillator();
+  const tg = ctx.createGain();
+  thump.frequency.setValueAtTime(off ? 90 : 70, time);
+  thump.frequency.exponentialRampToValueAtTime(40, time + 0.06);
+  tg.gain.setValueAtTime(0.05, time);
+  tg.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+  thump.connect(tg).connect(dest);
+  thump.start(time);
+  thump.stop(time + 0.09);
+}

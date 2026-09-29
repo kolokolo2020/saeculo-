@@ -10,10 +10,11 @@ export const H = 1000;
 export const SCREEN = { x: 780, y: 373, w: 300, h: 195 };
 export const EMBER = { x: 977, y: 565 };
 
+import { TapesPoster, WarehouseFlyer } from "./posters";
+
 const INK = "#05060a";
 const RIM = "#8fe4ff"; // laptop light
 const MOON = "#a8bce6";
-const FILM = { fontFamily: "var(--font-film)" } as const;
 const TYPE = { fontFamily: "var(--font-type)" } as const;
 
 /** Halftone dots, rotated like a comic print. */
@@ -149,58 +150,12 @@ export function BackArt() {
 
       {/* flyer: a warehouse show, photocopied too many times */}
       <g transform="translate(1000 124) rotate(-5)">
-        <rect width="150" height="206" fill="#e9e3d2" stroke={INK} strokeWidth="3" />
-        <rect x="12" y="12" width="126" height="70" fill="url(#rb-dots)" />
-        <rect x="12" y="12" width="126" height="70" fill="none" stroke={INK} strokeWidth="2" />
-        <text x="75" y="108" textAnchor="middle" fontSize="21" fill={INK} style={{ ...TYPE, fontWeight: 700 }}>
-          WAREHOUSE
-        </text>
-        <text x="75" y="130" textAnchor="middle" fontSize="13" fill={INK} style={TYPE}>
-          SAT · 3 AM
-        </text>
-        <text x="75" y="152" textAnchor="middle" fontSize="13" fill="#8e1b1b" style={TYPE}>
-          saeculo (live)
-        </text>
-        <text x="75" y="172" textAnchor="middle" fontSize="11" fill={INK} style={TYPE}>
-          + tape swap
-        </text>
-        <text x="75" y="192" textAnchor="middle" fontSize="11" fill={INK} style={TYPE}>
-          no phones. no names.
-        </text>
-        <rect x="58" y="-8" width="34" height="14" fill="#e6dcb8" opacity="0.7" transform="rotate(4 75 0)" />
+        <WarehouseFlyer dots="rb-dots" />
       </g>
 
       {/* the poster: a horror film that doesn't exist */}
       <g transform="translate(1180 106) rotate(2.5)">
-        <rect width="244" height="336" fill="#cbbf9f" stroke={INK} strokeWidth="4" />
-        <rect x="12" y="12" width="220" height="312" fill="#120808" />
-        <rect x="12" y="12" width="220" height="312" fill="url(#rb-dots)" opacity="0.5" />
-        <ellipse cx="122" cy="128" rx="72" ry="34" fill="#e7dcc3" stroke={INK} strokeWidth="3" />
-        <circle cx="122" cy="128" r="27" fill="#7e1414" stroke={INK} strokeWidth="3" />
-        <circle cx="122" cy="128" r="11" fill="#000" />
-        <circle cx="114" cy="120" r="5" fill="#fff" opacity="0.8" />
-        {Array.from({ length: 9 }, (_, i) => {
-          const x = 60 + i * 15.5;
-          return <line key={i} x1={x} y1={98 - Math.sin((i / 8) * Math.PI) * 8} x2={x - 4 + i} y2={78 - Math.sin((i / 8) * Math.PI) * 14} stroke="#e7dcc3" strokeWidth="3" />;
-        })}
-        <path d="M104 160 C106 176 100 196 104 214 C108 196 104 178 112 162 Z M136 160 C140 170 138 184 141 196 C144 184 142 170 146 160 Z" fill="#8e1b1b" />
-        <text x="122" y="244" textAnchor="middle" fontSize="27" fill="#e7dcc3" style={FILM}>
-          THE SAECULO
-        </text>
-        <text x="122" y="280" textAnchor="middle" fontSize="40" fill="#e7dcc3" style={FILM}>
-          TAPES
-        </text>
-        <text x="122" y="302" textAnchor="middle" fontSize="10.5" fill="#c43b3b" letterSpacing="3" style={TYPE}>
-          NOBODY SLEEPS ON TAPE
-        </text>
-        <text x="122" y="316" textAnchor="middle" fontSize="8" fill="#8a7d63" letterSpacing="2" style={TYPE}>
-          IN COLOR · 1987 · RATED X
-        </text>
-        {/* torn corner */}
-        <polygon points="244,296 244,336 204,336" fill="#10141d" />
-        <polygon points="244,296 204,336 214,300" fill="#a3967a" stroke={INK} strokeWidth="2" />
-        <rect x="-8" y="-6" width="44" height="16" fill="#e6dcb8" opacity="0.7" transform="rotate(-20 14 2)" />
-        <rect x="208" y="-6" width="44" height="16" fill="#e6dcb8" opacity="0.7" transform="rotate(18 230 2)" />
+        <TapesPoster dots="rb-dots" />
       </g>
 
       {/* a line of light under the door, far right */}

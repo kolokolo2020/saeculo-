@@ -7,6 +7,7 @@ import { paletteFor } from "@/components/player/analysis";
 import { useWindowStore } from "@/components/window-manager/windowStore";
 import Glyph from "@/components/ui/Glyph";
 import { useNow } from "@/hooks/useNow";
+import { useClockNow } from "./hauntStore";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { PROFILE } from "@/data/profile";
 import { formatLeft, releaseProgress } from "@/lib/release";
@@ -17,7 +18,7 @@ import { readWaveform } from "@/components/player/spectrum";
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 function ClockGadget() {
-  const now = useNow();
+  const { now } = useClockNow();
   const d = new Date(now || 0);
   const sec = d.getSeconds();
   const min = d.getMinutes() + sec / 60;

@@ -8,7 +8,10 @@ export type WindowKind =
   | "personalize"
   | "vault"
   | "release"
-  | "welcome";
+  | "welcome"
+  | "footage"
+  | "pictures"
+  | "radio";
 
 export interface WindowState {
   kind: WindowKind;

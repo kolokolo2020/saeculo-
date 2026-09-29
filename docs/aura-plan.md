@@ -160,7 +160,7 @@ takes one click or tap.
 
 ---
 
-## Phase 4: Mystique across the desktop
+## Phase 4: Mystique across the desktop (done)
 
 1. **Events** (rare; more often in Midnight):
    - a window title briefly changes ("don't turn around")
@@ -186,9 +186,14 @@ takes one click or tap.
 5. **Boot and lock screens:** a Tape-mode boot with a VHS "PLAY" OSD and
    a tracking-line wipe.
 
+**Built:** the four events (title, clock, cat, Recycle Bin file), the CRT
+windows with relay clicks, ghosting icons, found_footage.txt and Pictures.
+**Left for later:** the next_single.exe apology and the screensaver haunt,
+the Midnight cursor trail, and the Tape-mode boot OSD.
+
 ---
 
-## Phase 5: Pirate radio (a new app, underground-scene flavour)
+## Phase 5: Pirate radio (a new app, underground-scene flavour) (done)
 
 - **"Night Radio":** an old portable receiver window.
   - **Tuning:** drag or scroll the dial. Between stations it's static,
@@ -203,7 +208,7 @@ takes one click or tap.
 
 ---
 
-## Phase 6: Finish
+## Phase 6: Finish (done)
 
 - **Performance:**
   - the intro stays under about 60 KB of code

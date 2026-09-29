@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TASKBAR_HEIGHT, useWindowStore } from "./windowStore";
 import { useDraggable } from "./useDraggable";
 import { useResizable } from "./useResizable";
@@ -8,6 +8,20 @@ import { APP_BY_KIND } from "./windowRegistry";
 import AppIcon from "@/components/ui/AppIcon";
 import Glyph from "@/components/ui/Glyph";
 import type { WindowKind } from "@/lib/types";
+import { useHauntStore } from "@/components/desktop/hauntStore";
+import { usePersonalizeStore } from "@/components/desktop/personalizeStore";
+import { usePlayerStore } from "@/components/player/playerStore";
+import { playRelayClick } from "@/lib/synth";
+import { peekAudioContext } from "@/lib/audioContext";
+
+/** A soft relay click as a tube window switches on or off (Tape and
+ *  Midnight only, and only once something else has woken the audio). */
+function relayClick(closing: boolean) {
+  if (usePersonalizeStore.getState().atmosphere === "clean" || usePlayerStore.getState().muted) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const ctx = peekAudioContext();
+  if (ctx) playRelayClick(ctx, ctx.destination, ctx.currentTime, closing);
+}
 
 interface WindowFrameProps {
   kind: WindowKind;
@@ -27,6 +41,11 @@ export default function WindowFrame({ kind, isMobile, children }: WindowFramePro
   const resize = useResizable(kind);
   // closing plays a short shrink-and-fade first, like Vista did
   const [closing, setClosing] = useState(false);
+  const spoof = useHauntStore((s) => (s.title?.kind === kind ? s.title.text : null));
+  const exists = !!win;
+  useEffect(() => {
+    if (exists) relayClick(false);
+  }, [exists]);
 
   if (!win) return null;
 
@@ -53,9 +72,9 @@ export default function WindowFrame({ kind, isMobile, children }: WindowFramePro
       style={style}
       onPointerDown={() => useWindowStore.getState().focusWindow(kind)}
       onAnimationEnd={(e) => {
-        if (closing && e.animationName === "aero-close") closeWindow(kind);
+        if (closing && (e.animationName === "aero-close" || e.animationName === "crt-off")) closeWindow(kind);
       }}
-      className={`aero-glass absolute flex flex-col transition-[opacity,scale,translate,visibility] duration-200 ease-out motion-reduce:transition-none ${
+      className={`aero-glass aero-window absolute flex flex-col transition-[opacity,scale,translate,visibility] duration-200 ease-out motion-reduce:transition-none ${
         closing ? "aero-closing pointer-events-none" : "aero-open"
       } ${focused ? "" : "aero-glass-inactive"} ${fill ? "rounded-none!" : ""} ${
         hidden ? "pointer-events-none invisible translate-y-10 scale-90 opacity-0" : "visible"
@@ -74,7 +93,16 @@ export default function WindowFrame({ kind, isMobile, children }: WindowFramePro
           <AppIcon kind={kind} size={16} />
         </span>
         <h2 className={`aero-title-text mt-[6px] flex-1 truncate text-[13px] ${focused ? "" : "opacity-70"}`}>
-          {title}
+          {spoof ? (
+            <>
+              <span className="haunt-title" aria-hidden>
+                {spoof}
+              </span>
+              <span className="sr-only">{title}</span>
+            </>
+          ) : (
+            title
+          )}
         </h2>
         <div className={`aero-caption ${focused ? "" : "aero-caption-inactive"}`}>
           <button
@@ -96,7 +124,10 @@ export default function WindowFrame({ kind, isMobile, children }: WindowFramePro
           <button
             onClick={() => {
               if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) closeWindow(kind);
-              else setClosing(true);
+              else {
+                setClosing(true);
+                relayClick(true);
+              }
             }}
             aria-label={`Close ${title}`}
             className="aero-caption-btn aero-caption-close"

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { playBlip, playSnare } from "@/lib/synth";
 import { useWindowStore } from "@/components/window-manager/windowStore";
 import { getAudioContext } from "@/lib/audioContext";
+import { useHauntStore } from "@/components/desktop/hauntStore";
 
 interface Scrap {
   name: string;
@@ -37,6 +38,7 @@ export default function RecycleBinApp() {
   const [note, setNote] = useState<string | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const openWindow = useWindowStore((s) => s.openWindow);
+  const ghostFile = useHauntStore((s) => s.ghostFile);
 
   const ctx = () => {
     ctxRef.current = getAudioContext();
@@ -87,6 +89,14 @@ export default function RecycleBinApp() {
             </tr>
           </thead>
           <tbody>
+            {ghostFile && (
+              <tr aria-hidden className="haunt-row" data-testid="haunt-row">
+                <td className="px-2 py-1">{ghostFile}</td>
+                <td className="px-2 py-1 text-mute max-sm:hidden">C:\saeculo\Room</td>
+                <td className="px-2 py-1 text-mute">tonight</td>
+                <td className="px-2 py-1 text-right text-mute">0 bytes</td>
+              </tr>
+            )}
             <tr
               tabIndex={0}
               onClick={() => setSelected(VAULT.name)}

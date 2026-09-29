@@ -25,3 +25,9 @@ export function getAudioContext(): AudioContext {
   if (shared.state === "suspended") void shared.resume();
   return shared;
 }
+
+/** The shared context if something already started it, without creating
+ *  one: for incidental sounds that shouldn't be the first to wake audio. */
+export function peekAudioContext(): AudioContext | null {
+  return shared?.state === "running" ? shared : null;
+}
