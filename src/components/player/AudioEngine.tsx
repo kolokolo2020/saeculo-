@@ -74,7 +74,13 @@ export default function AudioEngine() {
       ref={ref}
       preload="metadata"
       data-testid="player-audio"
-      onPlay={() => sync({ playing: true })}
+      onPlay={(e) => {
+        // nothing starts the site's music under the game (a media key, say): it waits its turn
+        if (usePlayerStore.getState().heldBy) {
+          e.currentTarget.pause();
+          usePlayerStore.setState({ resumeOnRelease: true });
+        } else sync({ playing: true });
+      }}
       onPause={() => sync({ playing: false })}
       onLoadStart={() => sync({ status: "loading" })}
       onWaiting={() => sync({ status: "loading" })}

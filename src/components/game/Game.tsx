@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePlayerStore } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { draw, VIEW_H, VIEW_W } from "./render";
+import { camera, draw, VIEW_H, VIEW_W } from "./render";
 import { loadSave, migrateOldTapes, writeSave, type SaveData } from "./save";
 import { duck, setPlace, setRing, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
 import { Engine } from "./studio/engine";
@@ -15,6 +15,9 @@ import { FINDABLE, playVoice, voiceById, VOICES } from "./studio/voices";
 import { clearSmoke } from "./actors";
 import { lifeBlocks, lifeTarget, makeLife, updateLife, type Actor } from "./life";
 import { clone, type Project } from "./studio/project";
+import { sampleProject } from "./studio/sample";
+import { TRACKS } from "@/data/tracks";
+import { formatTime } from "@/lib/audio";
 import { blocked, inside, SCENES, START, tileAt, TILE, type Dir, type Door } from "./world";
 
 // The game: a bedroom, the street outside, the corner store and a basement
@@ -72,6 +75,14 @@ const LINES: Record<string, string[][]> = {
 };
 /** How many saved projects there are (they show as tapes on the shelf). */
 const savedProjects = () => loadStore().slots.filter(Boolean).length;
+
+/** What someone makes of a tape, from how it actually goes. */
+function verdict(p: Project): string[] {
+  const t = p.tempo;
+  const says = t < 80 ? "\u201cSlow. Like walking home the long way.\u201d" : t < 100 ? "\u201cThat's a Sunday. That's a whole Sunday.\u201d" : t < 130 ? "\u201cNow my knee's going. Look at it.\u201d" : "\u201cToo fast for me. But I'll allow it.\u201d";
+  const feel = p.swing >= 0.2 ? "\u201cIt limps. The good kind.\u201d" : p.channels.some((c) => c.voice.startsWith("cut:") || c.voice.startsWith("chop:")) ? "\u201cI know that sample from somewhere.\u201d" : null;
+  return feel ? [says, feel] : [says];
+}
 
 export default function Game({ onExit }: { onExit: () => void }) {
   const [phase, setPhase] = useState<Phase>("closing");
@@ -133,9 +144,21 @@ export default function Game({ onExit }: { onExit: () => void }) {
     catUntil: 0,
     trans: null as null | { door: Door; t: number; swapped: boolean },
     target: null as string | null,
+    // this visit's small events
+    outside: false,
+    strangeTape: false,
+    callPending: false,
+    playedLedge: false,
+    counterVisits: 0,
   });
+  // the payphone playing your beat back down the line
+  const call = useRef<{ engine: Engine; until: number } | null>(null);
   // the latest UI state, for the loop and key handlers
   const ui = useRef({ dialog, studio, help, phase });
+  const view = useRef({ scale, below });
+  useLayoutEffect(() => {
+    view.current = { scale, below };
+  }, [scale, below]);
   useLayoutEffect(() => {
     ui.current = { dialog, studio, help, phase };
   }, [dialog, studio, help, phase]);
@@ -166,6 +189,16 @@ export default function Game({ onExit }: { onExit: () => void }) {
     return true;
   };
 
+  /** They'll remember what you played them. */
+  const remember = (who: string, tape: Project) => updateSave((v) => ({ ...v, heard: { ...v.heard, [who]: tape.name } }));
+  const happened = (id: string) => saveRef.current.seen.includes(id);
+  const markSeen = (id: string) => !happened(id) && updateSave((v) => ({ ...v, seen: [...v.seen, id] }));
+
+  const stopCall = () => {
+    call.current?.engine.dispose();
+    call.current = null;
+  };
+
   const stopTape = () => {
     if (!tape.current) return;
     tape.current.engine.dispose();
@@ -184,6 +217,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     music.current?.engine.dispose();
     music.current = null;
     stopTape();
+    stopCall();
     stopGameAudio();
     usePlayerStore.getState().release("game");
     const el = lid.current;
@@ -236,13 +270,43 @@ export default function Game({ onExit }: { onExit: () => void }) {
       engine.current?.dispose();
       tape.current?.engine.dispose();
       music.current?.engine.dispose();
+      call.current?.engine.dispose();
       clearSmoke();
       stopGameAudio();
       usePlayerStore.getState().release("game");
     };
   }, []);
 
+  /** Walking into a place: what's waiting there this time. */
+  const arriveAt = (to: Place, from: Place) => {
+    const s = st.current;
+    const v = saveRef.current;
+    if (from === "street" && to !== "street") stopCall();
+    if (from === "rooftop" && to !== "rooftop") delete musicPick.current.rooftop;
+    if (to !== "bedroom") s.outside = true;
+    // back from outside, with tapes of your own: one on the shelf you didn't make
+    if (to === "bedroom" && s.outside && shelfRef.current > 0 && !v.seen.includes("unlabelled")) s.strangeTape = true;
+    // once you've played your beat for someone, the payphone rings again
+    if (to === "street" && v.found.includes("phone") && Object.keys(v.heard).length > 0 && shelfRef.current > 0 && !v.seen.includes("callback")) s.callPending = true;
+    // she was on the ledge while your tape played; come back up and she isn't
+    const ledge = life.current.find((a) => a.id === "ledge");
+    if (to === "rooftop" && ledge && s.playedLedge) ledge.hidden = true;
+  };
+
+  const arriveRef = useRef(arriveAt);
+  useLayoutEffect(() => {
+    arriveRef.current = arriveAt;
+  });
+
   // ------------------------------------------------------------ the studio
+
+  // "sample this" from the Beats window: the project waiting to be opened
+  const [sampled, setSampled] = useState<{ project: Project; msg: string } | null>(() => {
+    const want = useSiteStore.getState().sample;
+    const track = want && TRACKS.find((t) => t.id === want.trackId);
+    const project = track && sampleProject(track.id, want.at, track.key);
+    return project ? { project, msg: `Cut two bars of ${track.title} from ${formatTime(want.at)}. Undo brings back what you had.` } : null;
+  });
 
   const openStudio = () => {
     stopTape();
@@ -268,6 +332,15 @@ export default function Game({ onExit }: { onExit: () => void }) {
     openStudio();
   };
 
+  // arriving from "sample this": skip the room, straight to the sampler with the cut
+  useEffect(() => {
+    useSiteStore.setState({ sample: null });
+    if (!sampled) return;
+    const t = window.setTimeout(goToStudio, 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ------------------------------------------------------------ people
 
   const latestTape = (): Project | null => {
@@ -283,7 +356,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
   };
 
   /** Play something on the boombox (street) or the studio monitors. */
-  const playFor = (where: "street" | "studio", project: Project) => {
+  const playFor = (where: "street" | "studio" | "rooftop", project: Project) => {
     musicPick.current[where] = clone(project);
     if (music.current?.key === where) {
       music.current.engine.dispose();
@@ -292,16 +365,27 @@ export default function Game({ onExit }: { onExit: () => void }) {
   };
 
   const talkTo = (a: Actor) => {
+    const s = st.current;
     const n = talks.current[a.id] ?? 0;
     talks.current[a.id] = n + 1;
     const lines = LINES[a.id];
     const next = lines ? lines[n % lines.length] : ["…"];
     const tape = latestTape();
+    const heard = saveRef.current.heard;
+    // someone who's heard an older tape notices there's a new one
+    const newer = (who: string) => !!tape && !!heard[who] && heard[who] !== tape.name;
     switch (a.id) {
       case "dog":
         say(["The dog leans on your leg for a second, then remembers the walk."]);
         return;
       case "crew-smoke":
+        if (heard.crew && n % 2 === 0) {
+          say([`\u201cMilo won't stop playing \u2018${heard.crew}\u2019. Whole block knows it now.\u201d`], [
+            { label: "Hit the joint", run: smokeWith },
+            { label: "I'm good", run: () => say(["\u201cSuit yourself.\u201d"]) },
+          ]);
+          return;
+        }
         say(next, [
           { label: "Hit the joint", run: smokeWith },
           { label: "I'm good", run: () => say(["\u201cSuit yourself.\u201d"]) },
@@ -317,6 +401,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
         boombox();
         return;
       case "couch-cup":
+        if (heard.couch && n % 2 === 0) {
+          say([`\u201cThat \u2018${heard.couch}\u2019. Run it again sometime.\u201d`, "He taps the cup against his knee, somewhere near the beat."]);
+          return;
+        }
         say(next, [
           { label: "Pour me one?", run: () => say(["\u201cNah. Not while you're working.\u201d", "He takes a long sip, eyes half shut."]) },
           { label: "Just looking", run: () => setDialog(null) },
@@ -330,17 +418,57 @@ export default function Game({ onExit }: { onExit: () => void }) {
         return;
       case "couch-phones":
         if (tape)
-          say([...next, "\u201cPlay me something you made.\u201d"], [
+          say([...next, heard.couch ? (newer("couch") ? `\u201cStill got \u2018${heard.couch}\u2019 in my head. That a new one?\u201d` : `\u201c\u2018${heard.couch}\u2019 again? Go on then.\u201d`) : "\u201cPlay me something you made.\u201d"], [
             {
               label: `Play \u201c${tape.name}\u201d`,
               run: () => {
                 playFor("studio", tape);
-                say(["It comes out of the monitors, loud.", "The whole couch starts nodding."]);
+                remember("couch", tape);
+                say(["It comes out of the monitors, loud.", "The whole couch starts nodding.", newer("couch") || !heard.couch ? "Nobody talks till it loops." : "\u201cYeah. That one.\u201d"]);
               },
             },
             { label: "Not yet", run: () => say(["\u201cThen go make something.\u201d"]) },
           ]);
         else say([...next, "\u201cMake something first. The sampler's right there.\u201d"]);
+        return;
+      case "oldman":
+        if (tape && (!heard.oldman || newer("oldman"))) {
+          say(heard.oldman ? [`\u201cYou again. Still humming your \u2018${heard.oldman}\u2019.\u201d`, "\u201cGot another?\u201d"] : ["\u201cYou're the one with the light on all night. Making noise up there.\u201d", "\u201cLet me hear it, then.\u201d"], [
+            {
+              label: `Give him your headphones`,
+              run: () => {
+                sfx.select();
+                remember("oldman", tape);
+                say(["He holds one side to his ear and looks at the pigeons.", "His foot finds it after a bar.", ...verdict(tape), "He hands them back. \u201cDon't stop.\u201d"]);
+              },
+            },
+            { label: "Not now", run: () => say(["\u201cI'm here most nights.\u201d"]) },
+          ]);
+          return;
+        }
+        if (heard.oldman && n % 2 === 0) {
+          say([`\u201cThat \u2018${heard.oldman}\u2019 of yours. The pigeons liked it too.\u201d`]);
+          return;
+        }
+        say(next);
+        return;
+      case "ledge":
+        if (tape && !s.playedLedge) {
+          say(heard.ledge ? [`\u201cYou played me \u2018${heard.ledge}\u2019 once.\u201d`, "\u201cPlay it again. Or something new.\u201d"] : ["She doesn't turn around.", "\u201cYou make them, don't you. The sounds from your window.\u201d"], [
+            {
+              label: `Play \u201c${tape.name}\u201d on your phone`,
+              run: () => {
+                s.playedLedge = true;
+                playFor("rooftop", tape);
+                remember("ledge", tape);
+                say(["You put it on, quiet, and set the phone on the ledge between you.", "Across the street, windows start coming on."]);
+              },
+            },
+            { label: "Just sit", run: () => say(["You sit a while. Neither of you says anything. It's fine."]) },
+          ]);
+          return;
+        }
+        say(s.playedLedge ? ["\u201cLeave it on.\u201d"] : next);
         return;
       case "hooper-1":
       case "hooper-2":
@@ -363,7 +491,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
               label: `Play them \u201c${tape.name}\u201d`,
               run: () => {
                 playFor("street", tape);
-                say(["Milo slots your tape in and turns it up.", "\u201cWait. You made this?\u201d", "Nobody says anything else. Heads start going."]);
+                const before = saveRef.current.heard.crew;
+                remember("crew", tape);
+                say(before ? ["Milo swaps it in without a word.", before === tape.name ? "\u201cThis again? Good.\u201d" : `\u201cBetter than \u2018${before}\u2019. Don't tell \u2018${before}\u2019.\u201d`] : ["Milo slots your tape in and turns it up.", "\u201cWait. You made this?\u201d", "Nobody says anything else. Heads start going."]);
               },
             },
           ]
@@ -400,6 +530,29 @@ export default function Game({ onExit }: { onExit: () => void }) {
           break;
         case "shelf": {
           const store = loadStore();
+          if (s.strangeTape) {
+            // a tape you don't remember making: your own beat, slower, from further away
+            s.strangeTape = false;
+            markSeen("unlabelled");
+            const mine = latestTape();
+            stopTape();
+            if (mine) {
+              const slow = clone(mine);
+              slow.tempo = Math.max(60, Math.round(mine.tempo * 0.72));
+              slow.channels.forEach((c) => {
+                c.pitch -= 4;
+                c.rev = Math.min(1, c.rev + 0.35);
+              });
+              slow.master = { ...slow.master, cutoff: 0.42, drive: 0.5, reverb: 0.9 };
+              slow.mode = "pattern";
+              const player = new Engine(slow);
+              void player.start();
+              tape.current = { engine: player, slot: -1 };
+              duck(true);
+            }
+            say(["A black tape at the end of the shelf. No label. You don't remember it.", "It's yours. Slower, and from further away, like through a wall.", "When it stops, the tape isn't on the shelf any more."]);
+            break;
+          }
           const slots = store.slots.map((t, i) => (t ? i : -1)).filter((i) => i >= 0);
           if (!slots.length) {
             say(["A shelf for tapes. It's empty.", "Beats you save in the studio end up here."]);
@@ -448,7 +601,20 @@ export default function Game({ onExit }: { onExit: () => void }) {
           ]);
           break;
         case "phone":
-          if (!found.includes("phone")) {
+          if (s.callPending) {
+            s.callPending = false;
+            markSeen("callback");
+            const mine = latestTape();
+            if (mine) {
+              const line = clone(mine);
+              line.mode = "pattern";
+              line.master = { ...line.master, cutoff: 0.33, drive: 0.7, vol: 0.5, reverb: 0.1 };
+              const e = new Engine(line);
+              void e.start();
+              call.current = { engine: e, until: s.t + ((60 / line.tempo) * line.length) / 4 * 2 + 0.3 };
+            }
+            say(["You pick up.", "Someone on the other end is playing your beat. Tinny, far off, like it's coming from the next street.", "Then the line goes dead."]);
+          } else if (!found.includes("phone")) {
             find("phone");
             say(["You pick up. Nobody speaks.", "Just a chord, held down the line. You keep it."]);
           } else say(["Dial tone. Nobody's calling back."]);
@@ -467,10 +633,20 @@ export default function Game({ onExit }: { onExit: () => void }) {
             if (find("bottle")) say(["The bottle clinks on the counter. A good sound. You keep it."]);
             else say(["The clerk slides it over without looking up."]);
           };
-          say(["“You again.”"], [
+          s.counterVisits++;
+          const radio = () => {
+            // between two stations, for a second, one of the real tracks
+            const track = TRACKS[Math.floor(Math.random() * TRACKS.length)];
+            const i = 1 + Math.floor(Math.random() * 7);
+            void sfx.radio([`chop:${track.id}:${i}`, `chop:${track.id}:${i + 1}`]);
+            say(["The clerk shrugs and rolls the dial.", "Static, a preacher, static. Then something you know, for a second, between stations.", "\u201cThat one comes in at night. Nobody knows what station.\u201d"]);
+          };
+          const friend = s.counterVisits === 3 && !happened("friend");
+          if (friend) markSeen("friend");
+          say(friend ? ["\u201cYour friend was in earlier.\u201d", "\u201cSame jacket as you. Bought the same thing, too.\u201d", "You don't have a friend with that jacket."] : ["\u201cYou again.\u201d"], [
             { label: "A beer", run: bottle },
             { label: "Just water", run: bottle },
-            { label: "Just looking", run: () => say(["The clerk turns the radio down a little and goes back to it."]) },
+            { label: "Turn the radio up", run: radio },
           ]);
           break;
         }
@@ -527,7 +703,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       case "window":
         return s.windowOpen ? "close the window" : "open the window";
       case "shelf":
-        return shelfRef.current ? (tape.current ? "next tape" : "play a tape") : "look at the shelf";
+        return s.strangeTape ? "the tape at the end of the shelf" : shelfRef.current ? (tape.current ? "next tape" : "play a tape") : "look at the shelf";
       case "bed":
         return "lie down";
       case "crate":
@@ -659,6 +835,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
       const h = window.innerHeight - 48 - (coarse && portrait ? 190 : 0);
       let k = Math.min(w / VIEW_W, h / VIEW_H);
       if (k >= 2) k = Math.floor(k);
+      // a phone held upright would show the whole view at postcard size:
+      // zoom in instead and let the picture follow you sideways
+      if (coarse && portrait) k = Math.max(k, Math.floor(Math.min(2.5, h / VIEW_H) * 2) / 2);
       setScale(Math.max(1, k));
       setBelow(coarse && portrait);
     };
@@ -673,7 +852,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
   // walk up. Returns whether it's on the beat right now, for the nodding.
   const musicClock = useRef(0);
   const placeMusic = (place: Place, inStudio: boolean, dt: number): boolean => {
-    const want = place === "street" ? "street" : place === "studio" && !inStudio ? "studio" : null;
+    const want = place === "street" ? "street" : place === "studio" && !inStudio ? "studio" : place === "rooftop" && musicPick.current.rooftop ? "rooftop" : null;
     if (music.current && music.current.key !== want) {
       music.current.engine.dispose();
       music.current = null;
@@ -696,8 +875,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
       const base = m.engine.project;
       const d = want === "street" ? Math.hypot(s.x - BOOMBOX.x, s.y - BOOMBOX.y) : 60;
       const near = Math.max(0, 1 - d / 230);
-      const vol = want === "street" ? 0.75 * near * near : 0.4;
-      const cutoff = want === "street" ? 0.3 + 0.7 * near : 0.62;
+      // the boombox drops back while the payphone has your ear
+      const vol = want === "street" ? 0.75 * near * near * (call.current ? 0.2 : 1) : want === "rooftop" ? 0.32 : 0.4;
+      const cutoff = want === "street" ? 0.3 + 0.7 * near : want === "rooftop" ? 0.5 : 0.62;
       m.engine.setProject({ ...base, master: { ...base.master, vol, cutoff } });
     }
     const p = m.engine.position();
@@ -713,6 +893,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       teleport: (place: Place, x: number, y: number, dir: Dir = "up") => {
         const s = st.current;
         if (s.place === "bedroom" && place !== "bedroom") stopTape();
+        if (place !== s.place) arriveRef.current(place, s.place);
         Object.assign(s, { place, x: x * TILE, y: y * TILE, dir });
         setPlace(place, s.windowOpen);
         setPlaceName(place);
@@ -738,8 +919,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
       },
       life: () => ({
         music: music.current?.key ?? null,
+        call: !!call.current,
         musicProject: music.current?.engine.project.name ?? null,
-        actors: life.current.map((a) => ({ id: a.id, kind: a.kind, place: a.place, x: a.x, y: a.y, stopped: a.stopped ?? 0, fly: a.fly ?? null })),
+        actors: life.current.map((a) => ({ id: a.id, kind: a.kind, place: a.place, x: a.x, y: a.y, stopped: a.stopped ?? 0, fly: a.fly ?? null, hidden: !!a.hidden })),
       }),
       studio: () => {
         const e = engine.current;
@@ -810,6 +992,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         if (!s.trans.swapped && s.trans.t >= 0.22) {
           const { to, spawn } = s.trans.door;
           if (s.place === "bedroom") stopTape();
+          arriveRef.current(to, s.place);
           s.place = to;
           s.x = spawn.x;
           s.y = spawn.y;
@@ -853,7 +1036,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
       s.figure += (figureWanted - s.figure) * Math.min(1, dt * (figureWanted ? 0.6 : 3));
       const hazeTarget = s.t < s.hazeUntil ? 1 : 0;
       s.haze += (hazeTarget - s.haze) * Math.min(1, dt * 0.5);
-      const ringing = !saveRef.current.found.includes("phone");
+      const ringing = !saveRef.current.found.includes("phone") || s.callPending;
+      if (call.current && (s.place !== "street" || s.t > call.current.until)) stopCall();
       setRing(s.place === "street" && ringing ? Math.max(0, 1 - Math.abs(s.x - 26.5 * TILE) / (16 * TILE)) : 0);
 
       draw(g, {
@@ -878,8 +1062,21 @@ export default function Game({ onExit }: { onExit: () => void }) {
         actors: life.current,
         beat,
         boombox: music.current?.key === "street",
+        strangeTape: s.place === "bedroom" && s.strangeTape,
+        ember: !!life.current.find((a) => a.id === "ledge")?.hidden,
+        roofMusic: music.current?.key === "rooftop",
         dt,
       });
+      // zoomed in (phones held upright): keep you in the middle of the picture
+      const vw = view.current;
+      const box = c.parentElement;
+      if (box) {
+        const full = VIEW_W * vw.scale;
+        const bw = box.clientWidth;
+        const off = full > bw ? Math.min(0, Math.max(bw - full, bw / 2 - (s.x - camera(SCENES[s.place], s.x, s.y).cx) * vw.scale)) : (bw - full) / 2;
+        const tf = vw.below ? `translateX(${Math.round(off)}px)` : "";
+        if (c.style.transform !== tf) c.style.transform = tf;
+      }
       if (s.trans) {
         const k = s.trans.t < 0.22 ? s.trans.t / 0.22 : 1 - (s.trans.t - 0.22) / 0.22;
         g.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, k)).toFixed(3)})`;
@@ -941,7 +1138,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     >
       {/* top bar: where you are, what you've found, the way out */}
       <div className={`relative z-40 flex min-h-0 flex-1 flex-col ${phase === "closing" || revealing ? "invisible" : ""}`}>
-      <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-[#1d1b19] px-3 font-lcd text-[20px] leading-none">
+      <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-[#1d1b19] px-3 font-lcd text-[20px] leading-none whitespace-nowrap">
         <span data-testid="game-place">{PLACE_NAMES[place]}</span>
         <span className="text-[#8a8170]" aria-label={`${foundCount} of ${FINDABLE.length} sounds found`}>
           sounds {foundCount}/{FINDABLE.length}
@@ -952,7 +1149,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
             onClick={goToStudio}
             data-testid="game-to-studio"
           >
-            Go to the studio
+            <span className="sm:hidden">Studio</span>
+            <span className="hidden sm:inline">Go to the studio</span>
           </button>
         )}
         <button
@@ -960,7 +1158,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
           onClick={leave}
           data-testid="game-exit"
         >
-          Back to the site <span className="text-[#948b7a]">Esc</span>
+          <span className="sm:hidden">Exit</span>
+          <span className="hidden sm:inline">Back to the site</span> <span className="hidden text-[#948b7a] sm:inline">Esc</span>
         </button>
       </div>
 
@@ -969,7 +1168,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
           ref={canvas}
           width={VIEW_W}
           height={VIEW_H}
-          className="pixel block"
+          className={`pixel block shrink-0 ${below ? "self-start" : ""}`}
           style={{ width: VIEW_W * scale, height: VIEW_H * scale }}
           aria-hidden
         />
@@ -1110,7 +1309,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         )}
 
         {studio && studioEngine && (
-          <Studio engine={studioEngine} found={save.found} fresh={save.unseen} onSeen={() => updateSave((s) => ({ ...s, unseen: [] }))} onClose={closeStudio} />
+          <Studio engine={studioEngine} load={sampled} onLoaded={() => setSampled(null)} found={save.found} fresh={save.unseen} onSeen={() => updateSave((s) => ({ ...s, unseen: [] }))} onClose={closeStudio} />
         )}
       </div>
       </div>

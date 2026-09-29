@@ -31,6 +31,8 @@ interface SiteState {
   /** The moving visualizer's look (when not calm). */
   vis: VisMode;
   shortcutsOpen: boolean;
+  /** "Sample this": a track and a moment, waiting for the studio to pick it up. */
+  sample: { trackId: string; at: number } | null;
 
   openWindow: (id: WindowId) => void;
   closeWindow: (id: WindowId) => void;
@@ -46,6 +48,8 @@ interface SiteState {
   /** Remember where the windows sit, for the next visit. */
   rememberPositions: () => void;
   setShortcutsOpen: (open: boolean) => void;
+  /** Take the playing beat into the game's studio, cut from this moment. */
+  sampleInStudio: (trackId: string, at: number) => void;
 }
 
 const CALM_KEY = "saeculo-calm";
@@ -66,6 +70,7 @@ export const useSiteStore = create<SiteState>((set, get) => ({
   calm: false,
   vis: "reveal",
   shortcutsOpen: false,
+  sample: null,
 
   openWindow: (id) =>
     set((s) => ({
@@ -127,6 +132,7 @@ export const useSiteStore = create<SiteState>((set, get) => ({
     }
   },
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+  sampleInStudio: (trackId, at) => set({ sample: { trackId, at }, gameOpen: true }),
 }));
 
 /** Saved look and window positions, applied after the first render. */

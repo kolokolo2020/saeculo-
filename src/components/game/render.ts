@@ -1,6 +1,6 @@
 import { actorLights, drawActor, drawBoombox, drawChimes, drawSmoke } from "./actors";
 import type { Actor } from "./life";
-import { paintForeground, paintPlace, sceneSize, SCENES, TILE, type Dir, type Scene } from "./world";
+import { paintForeground, paintPlace, sceneSize, SCENES, skylineWindows, TILE, type Dir, type Scene } from "./world";
 import type { Place } from "./sfx";
 
 // Per-frame drawing: the pre-painted place, the people and small moving
@@ -108,6 +108,12 @@ export interface View {
   beat: boolean;
   /** Is the corner-store boombox playing? */
   boombox: boolean;
+  /** A tape on the shelf you didn't make. */
+  strangeTape: boolean;
+  /** Someone was sitting on the roof's ledge: what's left of her cigarette. */
+  ember: boolean;
+  /** Your tape playing on the roof: the city's windows answer it. */
+  roofMusic: boolean;
   dt: number;
 }
 
@@ -161,6 +167,17 @@ export function draw(g: G, v: View) {
       g.fillStyle = "#1c140f";
       g.fillRect(x + 2, y + 3, 7, 2);
     });
+    if (v.strangeTape) {
+      // black, no label, lying a little crooked at the end of the shelf
+      const x = 11 * TILE + 30;
+      const y = 3 * TILE - 11;
+      g.fillStyle = "#3a383e";
+      g.fillRect(x, y + 1, 11, 7);
+      g.fillStyle = "#0b0b0d";
+      g.fillRect(x + 1, y + 2, 9, 5);
+      g.fillStyle = "#26252a";
+      g.fillRect(x + 2, y + 3, 7, 2);
+    }
     // rain on the glass; the window open lets a little in on the sill
     if (!v.reduced) {
       g.fillStyle = "rgba(170,190,235,0.35)";
@@ -217,10 +234,26 @@ export function draw(g: G, v: View) {
   }
 
   if (v.place === "street") drawBoombox(g, v.beat, v.boombox);
-  if (v.place === "rooftop") drawChimes(g, v.t, v.reduced);
+  if (v.place === "rooftop") {
+    drawChimes(g, v.t, v.reduced);
+    if (v.roofMusic) {
+      // windows across the way come on with the beat, a different few each bar
+      const wins = skylineWindows();
+      const bar = Math.floor(v.t * 0.6);
+      g.fillStyle = v.beat ? "#f0c070" : "#8a6a3a";
+      for (let i = 0; i < wins.length; i++) if ((i * 7 + bar * 13) % 11 < (v.reduced ? 2 : v.beat ? 4 : 2)) g.fillRect(wins[i][0], wins[i][1], 1, 2);
+    }
+    if (v.ember) {
+      const glow = v.reduced || Math.sin(v.t * 2.3) > -0.3 ? "#ff7a2e" : "#8a2e12";
+      g.fillStyle = glow;
+      g.fillRect(11 * TILE + 3, 3 * TILE + 13, 1, 1);
+      g.fillStyle = "#ece8de";
+      g.fillRect(11 * TILE + 1, 3 * TILE + 13, 2, 1);
+    }
+  }
 
   // --- everyone, back to front, you included
-  const here = v.actors.filter((a) => a.place === v.place);
+  const here = v.actors.filter((a) => a.place === v.place && !a.hidden);
   const order: (Actor | null)[] = [...here, null].sort((a, b) => (a ? a.y : v.y) - (b ? b.y : v.y));
   for (const a of order) {
     if (a) {

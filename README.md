@@ -39,6 +39,11 @@ visitors with reduced motion. On iPhones, where routing audio through Web
 Audio would stop it on lock, the visualizer follows the measured tempo
 instead.
 
+**sample this** (in the status bar) takes the two bars playing right now
+into the game's studio: cut into four two-beat pieces at the track's own
+tempo and key, over a plain drum part (pattern A as played, B flipped).
+One undo brings back the project you had.
+
 States: "LOADING…" while a file buffers; "FILE UNAVAILABLE" (and the row
 marked) if a file fails, with next/previous still working and play retrying;
 an empty-folder message if there are no tracks. Nothing is decoded ahead of
@@ -114,7 +119,13 @@ or Esc, at any time) lifts the lid back onto the site.
   antenna, a water tank, a pigeon coop, someone sitting on the ledge.
 
 The loop: find a sound → take it to the studio → make a beat → save it
-→ it's a tape on your shelf, and something to play for people. Six
+→ it's a tape on your shelf, and something to play for people. They
+remember what you played them (the crew, the couch, the old man in the
+park, who asks to hear it and says what he makes of its tempo, and the
+girl on the roof, where the city's windows come on with your tape). The
+clerk's radio finds one of the real tracks between stations. A few
+things happen once, quietly: the payphone rings again and it's your
+beat down the line; a tape you didn't make turns up on your shelf. Six
 sounds are hidden around the neighbourhood (the window, the payphone,
 the store, the bench, the court, the roof); each turns up in the studio
 under **Found**. People and animals are drawn from a few pixel templates
@@ -136,6 +147,10 @@ the game's top bar (or on the first-visit card) jumps straight there.
 - **Channel rack:** up to 16 channels, each with mute/solo and volume.
   Drums get a 16- or 32-step grid (Shift-click or right-click for a soft
   hit); melodic sounds show their notes and open the piano roll.
+- **Playing live:** the on-screen keyboard, or the computer's home row
+  (A S D F…, W E T Y U for the black keys, Z/X octave), plays the selected
+  channel over the loop; **rec** writes it into the pattern on the nearest
+  step. First visits get one line of hints that crosses itself off.
 - **Piano roll:** two octaves (shift with oct −/+), out-of-key rows
   shaded, click or drag to draw notes, drag a note's edge to stretch it,
   click to delete. **Chord: triad / 7th** stamps a chord from the key on

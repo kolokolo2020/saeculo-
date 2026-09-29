@@ -1,5 +1,5 @@
 import { getAudioContext } from "@/lib/audioContext";
-import { playVoice } from "./studio/voices";
+import { ensureLoaded, playVoice, trackTiming } from "./studio/voices";
 
 // The neighbourhood's sound: a room tone per place (rain, a fridge hum, a
 // quiet studio), footsteps, and small cues. One bus, torn down on exit.
@@ -247,6 +247,53 @@ export const sfx = {
   creak() {
     blip(310, 0.35, "sawtooth", 0.02);
     setTimeout(() => blip(260, 0.3, "sawtooth", 0.015), 380);
+  },
+  /**
+   * The clerk's radio: static, then for a moment one of the real tracks
+   * comes through between stations, then static again.
+   */
+  async radio(voiceIds: string[]) {
+    if (!bus) return;
+    const c = ctx();
+    const out = bus;
+    const hiss = (at: number, len: number, lvl: number) => {
+      const src = c.createBufferSource();
+      const n = Math.floor(c.sampleRate * len);
+      const buf = c.createBuffer(1, n, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.min(1, i / 800, (n - i) / 800);
+      src.buffer = buf;
+      const f = c.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = 2200;
+      f.Q.value = 0.5;
+      const g = c.createGain();
+      g.gain.value = lvl;
+      src.connect(f).connect(g).connect(out);
+      src.start(at);
+    };
+    hiss(c.currentTime, 0.7, 0.06);
+    await ensureLoaded(voiceIds);
+    if (bus !== out) return;
+    const t = c.currentTime + 0.05;
+    // a small speaker in a shop: no lows, no highs
+    const hp = c.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 450;
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 2600;
+    const lvl = c.createGain();
+    lvl.gain.value = 0.55;
+    hp.connect(lp).connect(lvl).connect(out);
+    let at = t;
+    for (const id of voiceIds) {
+      playVoice(c, hp, id, at, { vel: 0.9 });
+      // each chop is two beats of its track
+      at += 2 * (trackTiming(id.split(":")[1])?.beat ?? 0.42);
+    }
+    hiss(at - 0.1, 0.9, 0.05);
+    setTimeout(() => hp.disconnect(), (at - c.currentTime + 2) * 1000);
   },
   splash() {
     blip(1800, 0.05, "sine", 0.04);

@@ -19,6 +19,8 @@ export interface Actor {
   look?: Look;
   pose?: Pose;
   item?: Item;
+  /** Not there right now. */
+  hidden?: boolean;
   /** Nods along when there's music in the room. */
   bob?: boolean;
   /** Can be talked to; the label is the prompt. */
@@ -275,7 +277,7 @@ export function lifeBlocks(actors: Actor[], place: Place, box: Rect): boolean {
     if (a.place !== place) continue;
     let r: Rect | null = null;
     if (a.kind === "car") r = carRect(a);
-    else if (a.kind === "person" && a.solid && !a.path) r = { x: a.x - 4, y: a.y - 3, w: 8, h: 4 };
+    else if (a.kind === "person" && a.solid && !a.path && !a.hidden) r = { x: a.x - 4, y: a.y - 3, w: 8, h: 4 };
     if (r && box.x < r.x + r.w && box.x + box.w > r.x && box.y < r.y + r.h && box.y + box.h > r.y) return true;
   }
   return false;
@@ -286,7 +288,7 @@ export function lifeTarget(actors: Actor[], place: Place, px: number, py: number
   let best: Actor | null = null;
   let bestD = 18;
   for (const a of actors) {
-    if (a.place !== place || !a.talk) continue;
+    if (a.place !== place || !a.talk || a.hidden) continue;
     const d = Math.min(Math.hypot(a.x - fx, a.y - 3 - fy), Math.hypot(a.x - px, a.y - py) + 4);
     if (d < bestD) {
       bestD = d;

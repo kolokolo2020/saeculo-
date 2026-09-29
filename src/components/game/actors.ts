@@ -221,7 +221,7 @@ export function clearSmoke() {
 export function actorLights(actors: Actor[], place: string): Light[] {
   const out: Light[] = [];
   for (const a of actors) {
-    if (a.place !== place) continue;
+    if (a.place !== place || a.hidden) continue;
     if (a.kind === "car") {
       const right = (a.vx ?? 0) > 0;
       out.push({ x: a.x + (right ? CAR_W / 2 + 18 : -CAR_W / 2 - 18), y: a.y - 8, r: 42, color: "rgba(255,240,200,0.5)" });
