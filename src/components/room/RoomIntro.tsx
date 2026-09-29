@@ -5,18 +5,18 @@ import { usePlayerStore, setMuffle } from "@/components/player/playerStore";
 import { beatInfo } from "@/components/player/spectrum";
 import { startAmbience, stopAmbience } from "@/lib/ambience";
 import { PROFILE } from "@/data/profile";
-import StartMark from "@/components/ui/StartMark";
+import { BeatsIcon } from "@/components/site/Icons";
 import { ArtistArt, ArtistHead, BackArt, CatHead, CatTail, DeskArt, EMBER, H, LavaBlobs, SCREEN, W } from "./art";
 
-// The way in: a title card, then the room: 3 am, rain, a man at his laptop
-// with a joint and a black-and-white cat. The camera rises over his
-// shoulder and into the laptop's screen, which is showing the boot screen,
-// and the desktop takes over. The song you hear muffled through his
-// headphones opens up as you go in and keeps playing on the desktop.
+// The way in, once: a title card, then the room (night, rain, someone at a
+// laptop, the cat on the desk). The camera moves over his shoulder into the
+// laptop screen and the desktop takes over. The song you hear muffled
+// through his headphones opens up as you go in and keeps playing. Skippable
+// at any point; returning visitors don't see it (Site.tsx), and the clock
+// menu in the taskbar replays it.
 
 type Phase = "title" | "room" | "push";
-const PUSH_MS = 3800;
-const SEEN_KEY = "saeculo-room-seen";
+const PUSH_MS = 3200;
 const S = { x: SCREEN.x + SCREEN.w / 2, y: SCREEN.y + SCREEN.h / 2 };
 /** What must stay in frame on narrow screens: his head, the laptop, the cat. */
 const FOCUS_X = 930;
@@ -92,20 +92,12 @@ function useSmoke(canvas: React.RefObject<HTMLCanvasElement | null>, active: boo
   }, [canvas, active, puff]);
 }
 
-export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; onSkip: () => void }) {
+export default function RoomIntro({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<Phase>("title");
   const [fit, setFit] = useState({ k: 1, ox: 0, oy: 0, vw: 1, vh: 1 });
   const [catLooking, setCatLooking] = useState(false);
   const [inhale, setInhale] = useState(false);
   const [sweep, setSweep] = useState(0);
-  const [typed, setTyped] = useState("");
-  const [returning] = useState(() => {
-    try {
-      return localStorage.getItem(SEEN_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
   const [{ time, date }] = useState(stamp);
   const reduced = useRef(false);
   const back = useRef<HTMLDivElement>(null);
@@ -119,8 +111,6 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
   const puff = useRef(0);
   const mouse = useRef({ x: 0, y: 0 });
   const done = useRef(false);
-
-  const caption = `${time}. the rain hasn't stopped. neither has he.`;
 
   // cover the viewport with the artboard, keeping the laptop in frame
   useEffect(() => {
@@ -162,18 +152,6 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
 
   useSmoke(smoke, phase !== "title", puff);
 
-  // the caption types itself out
-  useEffect(() => {
-    if (phase !== "room") return;
-    let i = 0;
-    const id = setInterval(() => {
-      i += 1;
-      setTyped(caption.slice(0, i));
-      if (i >= caption.length) clearInterval(id);
-    }, 45);
-    return () => clearInterval(id);
-  }, [phase, caption]);
-
   // head nod, playhead, parallax: one loop, straight to the DOM
   useEffect(() => {
     if (phase === "title") return;
@@ -200,15 +178,10 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
   const finish = useCallback(() => {
     if (done.current) return;
     done.current = true;
-    try {
-      localStorage.setItem(SEEN_KEY, "1");
-    } catch {
-      // not remembered
-    }
     stopAmbience(1.2);
     setMuffle(0, 0.2);
-    onEnter();
-  }, [onEnter]);
+    onDone();
+  }, [onDone]);
 
   const push = useCallback(() => {
     if (phase !== "room") return;
@@ -253,23 +226,19 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
     setPhase("room");
   };
 
-  // auto-advance so nobody's stuck; returning visitors get a shorter visit
+  // it moves on by itself after a short look around
   useEffect(() => {
     if (phase !== "room") return;
-    const id = setTimeout(push, returning ? 4500 : 11000);
+    const id = setTimeout(push, 7000);
     return () => clearTimeout(id);
-  }, [phase, push, returning]);
+  }, [phase, push]);
 
   const skip = () => {
+    if (done.current) return;
     done.current = true;
     stopAmbience(0.5);
     setMuffle(0, 0.2);
-    try {
-      localStorage.setItem(SEEN_KEY, "1");
-    } catch {
-      // not remembered
-    }
-    onSkip();
+    onDone();
   };
 
   useEffect(() => {
@@ -289,9 +258,9 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
 
   return (
     <div
-      className="fixed inset-0 z-[10000] cursor-default overflow-hidden bg-black select-none"
+      className="fixed inset-0 z-[10000] cursor-default overflow-clip bg-black select-none"
       role="dialog"
-      aria-label="The room"
+      aria-label="Intro"
       onClick={() => (phase === "title" ? enter() : push())}
       onPointerMove={(e) => {
         mouse.current = { x: e.clientX / window.innerWidth - 0.5, y: e.clientY / window.innerHeight - 0.5 };
@@ -317,11 +286,7 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
           <DeskArt />
           {/* what's on his screen: a beat in progress, then (as we go in) the boot screen */}
           <div className="room-screen absolute overflow-hidden" style={{ left: SCREEN.x, top: SCREEN.y, width: SCREEN.w, height: SCREEN.h }}>
-            <div className="flex h-[14px] items-center gap-1 bg-[#1b2230] px-1.5 font-mono text-[7px] text-[#9fb2c9]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#ff5f56]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-[#ffbd2e]" />
-              <span className="ml-1 truncate">untitled_{time.replace(/\D/g, "")}_final_v7.flp</span>
-            </div>
+            <div className="h-[14px] bg-[linear-gradient(90deg,#4a120d,#6e1f18_45%,#a4452f)]" />
             <div className="relative h-[181px] bg-[#0b1018] px-1.5 pt-1">
               {["#ffc07a", "#9fd3ff", "#b8f0a7", "#ffb3d6", "#d9c6ff", "#ffe7a3"].map((c, i) => (
                 <div key={i} className="mb-[3px] flex h-[24px] items-center gap-[3px]">
@@ -337,9 +302,10 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
               ))}
               <div ref={playhead} className="absolute top-0 bottom-0 left-[42px] w-[2px] bg-white shadow-[0_0_8px_#fff]" />
             </div>
-            <div ref={bootOverlay} className="absolute inset-0 grid place-items-center bg-black opacity-0">
-              <div className="grid h-16 w-16 place-items-center rounded-full bg-[radial-gradient(circle,rgba(80,170,255,0.55),rgba(30,90,200,0.15)_55%,transparent_70%)]">
-                <StartMark size={26} />
+            <div ref={bootOverlay} className="absolute inset-0 bg-[#0c0d0d] opacity-0">
+              <div className="absolute top-2 left-2 flex flex-col items-center gap-0.5 text-[6px] text-[#f1ece2]">
+                <BeatsIcon size={18} />
+                beats
               </div>
             </div>
           </div>
@@ -367,24 +333,17 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
 
       <div ref={flash} className="pointer-events-none absolute inset-0 bg-[#cfefff] opacity-0 mix-blend-screen" />
 
-      {/* camcorder readout, letterbox, caption */}
+      {/* letterbox and a camcorder date stamp */}
       {phase !== "title" && (
         <>
           <div className={`room-bars ${phase === "push" ? "room-bars-open" : ""}`} aria-hidden />
-          <p className="pointer-events-none absolute top-5 left-6 font-mono text-[13px] tracking-widest text-white/80 [text-shadow:0_0_6px_rgba(255,255,255,0.6)]">
-            ▶ PLAY
-          </p>
-          <p className="pointer-events-none absolute bottom-5 left-6 font-mono text-[13px] tracking-widest text-white/80 [text-shadow:0_0_6px_rgba(255,255,255,0.6)]">
+          <p className="pointer-events-none absolute bottom-5 left-6 font-mono text-[13px] tracking-widest text-white/70 [text-shadow:0_0_6px_rgba(255,255,255,0.5)]" aria-hidden>
             {date} {time}
           </p>
           {phase === "room" && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-[12vh] flex flex-col items-center gap-3 px-6 text-center">
-              <p className="font-type text-[clamp(14px,2vw,20px)] text-[#e9e3d2] [text-shadow:0_2px_8px_#000]" aria-live="polite">
-                {typed}
-                <span className="room-caret">▌</span>
-              </p>
-              <p className="room-hint font-type text-[13px] tracking-[0.2em] text-white/60 uppercase">click to step inside</p>
-            </div>
+            <p className="room-hint pointer-events-none absolute inset-x-0 bottom-[12vh] text-center font-mono text-[12px] tracking-[0.3em] text-white/70 uppercase">
+              click to go in
+            </p>
           )}
         </>
       )}
@@ -392,14 +351,12 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
       {phase === "title" && (
         <div className="room-titlecard absolute inset-0 grid place-items-center bg-black text-center">
           <div className="flex flex-col items-center gap-4 px-6">
-            <p className="font-type text-[12px] tracking-[0.5em] text-[#8a7d63] uppercase">{returning ? "welcome back" : "reel one"}</p>
             <h1 className="font-film text-[clamp(56px,10vw,120px)] leading-none text-[#e9e3d2] [text-shadow:0_0_24px_rgba(233,227,210,0.25)]">{PROFILE.artistName}</h1>
-            <p className="font-type text-[clamp(13px,1.6vw,16px)] text-[#b3a88e]">instrumentals, recorded after hours</p>
             <div className="mt-6 h-px w-40 bg-[#8a7d63]/50" />
-            <button onClick={enter} className="room-hint mt-2 font-type text-[14px] tracking-[0.3em] text-[#e9e3d2] uppercase">
-              ▸ click to enter
+            <button onClick={enter} className="room-hint mt-2 font-mono text-[14px] tracking-[0.3em] text-[#e9e3d2] uppercase">
+              ▸ enter
             </button>
-            <p className="font-type text-[11px] text-[#6b6150]">sound on</p>
+            <p className="font-mono text-[11px] text-[#8f846e]">sound on</p>
           </div>
         </div>
       )}
@@ -409,9 +366,9 @@ export default function RoomIntro({ onEnter, onSkip }: { onEnter: () => void; on
           e.stopPropagation();
           skip();
         }}
-        className="absolute top-4 right-5 z-10 font-type text-[12px] tracking-widest text-white/50 uppercase hover:text-white"
+        className="absolute top-4 right-5 z-10 px-2 py-1 font-mono text-[12px] tracking-widest text-white/60 uppercase hover:text-white"
       >
-        Skip intro ›
+        Skip ›
       </button>
     </div>
   );

@@ -1,48 +1,21 @@
-export type WindowKind =
-  | "player"
-  | "beatmaker"
-  | "beatdeck"
-  | "about"
-  | "contact"
-  | "recycle"
-  | "personalize"
-  | "vault"
-  | "release"
-  | "welcome"
-  | "footage"
-  | "pictures"
-  | "radio";
-
-export interface WindowState {
-  kind: WindowKind;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  zIndex: number;
-  minimized: boolean;
-  maximized: boolean;
-}
-
 export interface Track {
+  /** Lowercase, dashes only. Used in share links (#track=<id>). */
   id: string;
   title: string;
-  /** Tempo as shown to visitors. */
-  bpm: number;
-  /** Exact tempo of the audio file, measured, when it differs from `bpm` —
-   *  Beat Deck's chops and the player's beat sync use this. */
+  /** Tempo as shown to visitors. Optional. */
+  bpm?: number;
+  /** Exact tempo of the audio, measured by scripts/analyze-tracks.mjs. */
   tempo?: number;
-  /** Seconds from the start of the file to the first beat. */
+  /** Seconds from the start of the file to the first beat (measured). */
   beatOffset?: number;
-  /** Short subtitle: key, mood or genre. */
-  mood: string;
-  /** Square cover art under public/. */
+  /** Key or a short note, shown next to the title. Optional. */
+  key?: string;
+  /** Square cover art under public/. Optional: a plain sleeve is drawn without it. */
   cover?: string;
+  /** The MP3 under public/. */
   src: string;
-  /** Optional looping clip under public/ (MP4/H.264 or WebM, ~10–20 s, muted),
-   *  shown by the player's Film visualizer. */
-  video?: string;
-  streamingLinks: { label: string; url: string }[];
+  /** When it went up (YYYY-MM-DD). Tracks from the last 30 days get a "new" tag. */
+  added?: string;
 }
 
 export interface SocialLink {

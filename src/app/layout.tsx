@@ -1,73 +1,31 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IM_Fell_English_SC, Open_Sans, Press_Start_2P, Special_Elite } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, IM_Fell_English_SC, VT323 } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
 import { TRACKS } from "@/data/tracks";
 import "./globals.css";
 
-// Segoe UI is the real Vista face, but it can't be served from Google
-// Fonts — it's listed first in --font-ui (see globals.css) so Windows
-// visitors get it, and Open Sans is the loaded stand-in everywhere else.
-const uiFont = Open_Sans({
-  subsets: ["latin"],
-  variable: "--nf-ui",
-});
-
-// Consolas stand-in for Notepad and numeric readouts.
-const monoFont = IBM_Plex_Mono({
-  weight: ["400", "500"],
-  subsets: ["latin"],
-  variable: "--nf-mono",
-});
-
-// Arcade scoreboards inside the games only — the OS chrome stays Segoe.
-const pixelFont = Press_Start_2P({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--nf-pixel",
-});
-
-// The late-night layer: a typewriter for notes and captions, and an old
-// film-title face for the intro's cards.
-const typeFont = Special_Elite({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--nf-type",
-});
-const filmFont = IM_Fell_English_SC({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--nf-film",
-});
+// Tahoma leads --font-ui (see globals.css) for the old-Windows feel where
+// it's installed; Plex Sans is the loaded stand-in everywhere else.
+const uiFont = IBM_Plex_Sans({ weight: ["400", "500", "700"], subsets: ["latin"], variable: "--nf-ui" });
+const monoFont = IBM_Plex_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "--nf-mono" });
+// the player's display and the game's text
+const lcdFont = VT323({ weight: "400", subsets: ["latin"], variable: "--nf-lcd" });
+// the intro's title card
+const filmFont = IM_Fell_English_SC({ weight: "400", subsets: ["latin"], variable: "--nf-film" });
 
 const title = "saeculo — instrumentals & beats";
-const description =
-  "The desktop of saeculo: a glassy mid-2000s desktop where you can play the instrumentals, build a loop in the groovebox, and play Beat Deck, a card game where every hand is a beat.";
+const description = "Instrumentals by saeculo. Listen to the beats, find the socials, get in touch, or walk around the neighbourhood and make a beat.";
 const siteUrl = "https://saeculo.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title,
   description,
-  alternates: {
-    canonical: "/",
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-  openGraph: {
-    title,
-    description,
-    url: siteUrl,
-    siteName: PROFILE.artistName,
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title,
-    description,
-  },
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
+  openGraph: { title, description, url: siteUrl, siteName: PROFILE.artistName, type: "website" },
+  twitter: { card: "summary_large_image", title, description },
 };
 
 const jsonLd = {
@@ -87,25 +45,26 @@ const jsonLd = {
   })),
 };
 
+// Runs before first paint: returning visitors and share links skip the
+// intro, and the visitor's "calm visuals" choice applies immediately.
+const bootScript = `try{var s=localStorage;if(s.getItem("saeculo-intro-seen")==="1"||/track=/.test(location.hash))document.documentElement.dataset.intro="skip";if(s.getItem("saeculo-calm")==="1")document.documentElement.dataset.calm="true"}catch(e){}`;
+
 export const viewport: Viewport = {
-  themeColor: "#0b2a5b",
+  themeColor: "#0c0d0d",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"
-      className={`${uiFont.variable} ${monoFont.variable} ${pixelFont.variable} ${typeFont.variable} ${filmFont.variable} h-full`}
+      suppressHydrationWarning
+      className={`${uiFont.variable} ${monoFont.variable} ${lcdFont.variable} ${filmFont.variable} h-full`}
     >
       <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <script dangerouslySetInnerHTML={{ __html: bootScript }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
-      <body className="h-full overflow-clip">
+      <body className="h-full overflow-hidden">
         {children}
         <SpeedInsights />
       </body>

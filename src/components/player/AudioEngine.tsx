@@ -3,14 +3,13 @@
 import { useEffect, useRef } from "react";
 import { usePlayerStore, useCurrentTrack } from "./playerStore";
 
-// The session's single <audio> element. Mounted once by the desktop and
+// The session's single <audio> element. Mounted once by the site and
 // never unmounted, so playback survives every window opening and closing.
 // src is managed imperatively by the store — rendering it as a prop would
 // make React re-set the attribute after selectTrack() already did, which
 // restarts the load and aborts the pending play().
 export default function AudioEngine() {
   const ref = useRef<HTMLAudioElement>(null);
-  const repeatOne = usePlayerStore((s) => s.repeatOne);
   const playing = usePlayerStore((s) => s.playing);
   const track = useCurrentTrack();
 
@@ -24,7 +23,7 @@ export default function AudioEngine() {
   // Lock-screen / notification controls with the cover art, on phones and
   // in desktop browsers' media hubs.
   useEffect(() => {
-    if (!("mediaSession" in navigator)) return;
+    if (!("mediaSession" in navigator) || !track) return;
     const session = navigator.mediaSession;
     const cover = track.cover ? new URL(track.cover, window.location.href).href : undefined;
     session.metadata = new MediaMetadata({
@@ -74,15 +73,17 @@ export default function AudioEngine() {
     <audio
       ref={ref}
       preload="metadata"
-      loop={repeatOne}
       data-testid="player-audio"
       onPlay={() => sync({ playing: true })}
       onPause={() => sync({ playing: false })}
+      onLoadStart={() => sync({ status: "loading" })}
+      onWaiting={() => sync({ status: "loading" })}
+      onCanPlay={() => sync({ status: "ready" })}
+      onPlaying={() => sync({ status: "ready" })}
+      onError={() => usePlayerStore.getState().markFailed()}
       onTimeUpdate={(e) => sync({ currentTime: e.currentTarget.currentTime })}
-      onLoadedMetadata={(e) => sync({ duration: e.currentTarget.duration })}
-      onEnded={() => {
-        if (!usePlayerStore.getState().repeatOne) usePlayerStore.getState().next();
-      }}
+      onLoadedMetadata={(e) => sync({ duration: e.currentTarget.duration, status: "ready" })}
+      onEnded={() => usePlayerStore.getState().next()}
     />
   );
 }
