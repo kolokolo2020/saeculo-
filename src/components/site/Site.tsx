@@ -128,7 +128,7 @@ export default function Site() {
         <Window id="beats" width={720} height={560} icon={<BeatsIcon size={16} />}>
           <BeatsWindow />
         </Window>
-        <Window id="socials" width={400} height={400} icon={<SocialsIcon size={16} />}>
+        <Window id="socials" width={400} height={344} icon={<SocialsIcon size={16} />}>
           <SocialsWindow />
         </Window>
         <Window id="contact" width={440} height={500} icon={<ContactIcon size={16} />}>
