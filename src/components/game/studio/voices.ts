@@ -215,7 +215,7 @@ const tambourine: Play = (ctx, out, t, { vel, midi }) => {
   const k = tune(midi);
   for (let i = 0; i < 3; i++) {
     const at = t + i * 0.012;
-    noiseSrc(ctx, at, at + 0.2, filter(ctx, "bandpass", 7500 * k, 3, perc(ctx, out, at, (0.22 - i * 0.05) * vel, 0.001, 0.14)));
+    noiseSrc(ctx, at, at + 0.2, filter(ctx, "bandpass", 7500 * k, 3, perc(ctx, out, at, (0.4 - i * 0.09) * vel, 0.001, 0.14)));
   }
 };
 
@@ -275,35 +275,64 @@ const synthBass: Play = (ctx, out, t, { vel, midi, dur }) => {
   lp.frequency.exponentialRampToValueAtTime(320, t + 0.25);
   osc(ctx, "sawtooth", hz(midi), t, stopAt, lp);
   osc(ctx, "square", hz(midi - 12), t, stopAt, lp);
+  // a clean sine under the grit, for weight
+  const low = ctx.createGain();
+  low.gain.value = 0.9;
+  low.connect(g);
+  osc(ctx, "sine", hz(midi), t, stopAt, low);
 };
 
 // ------------------------------------------------------------ keys
 
 const rhodes: Play = (ctx, out, t, { vel, midi, dur }) => {
-  const lp = filter(ctx, "lowpass", 3200, 0.7, out);
-  lp.frequency.setValueAtTime(3200, t);
-  lp.frequency.setTargetAtTime(900, t, 0.4);
-  const { g, stopAt } = held(ctx, lp, t, 0.2 * vel, 0.006, 1.4, 0.35, dur, 0.35);
-  osc(ctx, "sine", hz(midi), t, stopAt, g);
+  // an electric piano is a struck tine: a sine carrier, frequency-modulated
+  // hard at the strike (the bark) and softly after, under a slow tremolo
+  const f = hz(midi);
+  const lp = filter(ctx, "lowpass", 5200, 0.6, out);
+  const { g, stopAt } = held(ctx, lp, t, 0.26 * vel, 0.004, 1.8, 0.3, dur, 0.4);
+  const trem = ctx.createGain();
+  trem.gain.value = 0.88;
+  trem.connect(g);
+  const depth = ctx.createGain();
+  depth.gain.value = 0.12;
+  depth.connect(trem.gain);
+  osc(ctx, "sine", 4.6, t, stopAt, depth);
+  const car = osc(ctx, "sine", f, t, stopAt, trem);
+  const mod = ctx.createOscillator();
+  mod.frequency.value = f;
+  const idx = ctx.createGain();
+  idx.gain.setValueAtTime(f * (0.6 + 1.6 * vel), t);
+  idx.gain.setTargetAtTime(f * 0.12, t + 0.005, 0.18);
+  mod.connect(idx).connect(car.frequency);
+  mod.start(t);
+  mod.stop(stopAt);
+  // the tine's ping, gone in a blink
+  osc(ctx, "sine", f * 7.02, t, t + 0.12, perc(ctx, lp, t, 0.05 * vel, 0.001, 0.07));
   const warm = ctx.createGain();
-  warm.gain.value = 0.3;
-  warm.connect(g);
-  osc(ctx, "triangle", hz(midi - 12), t, stopAt, warm);
-  osc(ctx, "sine", hz(midi) * 4.01, t, t + 0.4, perc(ctx, lp, t, 0.06 * vel, 0.002, 0.3));
+  warm.gain.value = 0.22;
+  warm.connect(trem);
+  osc(ctx, "triangle", f / 2, t, stopAt, warm);
 };
 
-const PIANO_PARTIALS = [1, 0.45, 0.25, 0.12, 0.06];
+// hammer, then strings: each partial a pair of slightly detuned strings
+// that beat against each other, the higher ones dying first
+const PIANO_PARTIALS = [1, 0.5, 0.3, 0.18, 0.1, 0.05];
 const piano: Play = (ctx, out, t, { vel, midi, dur }) => {
-  const decay = Math.max(0.6, 2.4 - (midi - 48) * 0.03);
-  const { g, stopAt } = held(ctx, out, t, 0.2 * vel, 0.003, decay, 0.05, Math.min(dur, decay), 0.25);
+  const f = hz(midi);
+  const decay = Math.max(0.8, 3.4 - (midi - 48) * 0.045);
+  const tone = filter(ctx, "lowpass", 2000, 0.5, out);
+  tone.frequency.setValueAtTime(1800 + 7000 * vel, t);
+  tone.frequency.setTargetAtTime(700 + f * 2.5, t + 0.01, decay * 0.3);
+  const { g, stopAt } = held(ctx, tone, t, 0.25 * vel, 0.002, decay, 0.12, Math.min(dur, decay * 1.5), 0.3);
   PIANO_PARTIALS.forEach((a, i) => {
     const n = i + 1;
-    const pg = ctx.createGain();
-    pg.gain.value = a;
-    pg.connect(g);
-    osc(ctx, "sine", hz(midi) * n * (1 + 0.0004 * n * n), t, stopAt, pg);
+    const pg = perc(ctx, g, t, a * 0.5, 0.002, decay / (1 + i * 0.7));
+    const fn = f * n * (1 + 0.0004 * n * n);
+    osc(ctx, "sine", fn, t, stopAt, pg, -1.5 - i * 0.4);
+    osc(ctx, "sine", fn, t, stopAt, pg, 1.5 + i * 0.4);
   });
-  noiseSrc(ctx, t, t + 0.03, filter(ctx, "bandpass", 2400, 1, perc(ctx, out, t, 0.04 * vel, 0.001, 0.02)));
+  noiseSrc(ctx, t, t + 0.03, filter(ctx, "bandpass", 2600, 1, perc(ctx, out, t, 0.07 * vel, 0.001, 0.02)));
+  osc(ctx, "sine", f, t, t + 0.08, perc(ctx, out, t, 0.08 * vel, 0.001, 0.05));
 };
 
 const ORGAN = [
@@ -329,12 +358,17 @@ const organ: Play = (ctx, out, t, { vel, midi, dur }) => {
     pg.connect(trem);
     osc(ctx, "sine", hz(midi) * r, t, stopAt, pg);
   }
+  // the percussion tab (a quick third harmonic) and the key click
+  osc(ctx, "sine", hz(midi) * 3, t, t + 0.4, perc(ctx, g, t, 0.5, 0.002, 0.25));
+  noiseSrc(ctx, t, t + 0.02, filter(ctx, "bandpass", 3200, 1.2, perc(ctx, out, t, 0.05 * vel, 0.0005, 0.008)));
 };
 
 const musicBox: Play = (ctx, out, t, { vel, midi }) => {
   const f = hz(midi + 12);
   osc(ctx, "sine", f, t, t + 1.3, perc(ctx, out, t, 0.2 * vel, 0.002, 1.1));
   osc(ctx, "sine", f * 3, t, t + 0.5, perc(ctx, out, t, 0.05 * vel, 0.001, 0.35));
+  osc(ctx, "sine", f * 5.43, t, t + 0.25, perc(ctx, out, t, 0.04 * vel, 0.001, 0.16));
+  noiseSrc(ctx, t, t + 0.015, filter(ctx, "highpass", 6000, 0.7, perc(ctx, out, t, 0.05 * vel, 0.0005, 0.006)));
 };
 
 const bell: Play = (ctx, out, t, { vel, midi }) => {
@@ -353,22 +387,65 @@ const bell: Play = (ctx, out, t, { vel, midi }) => {
 
 // ------------------------------------------------------------ synths
 
-function stack(p: { waves: [OscillatorType, number, number][]; lp: number; q?: number; a: number; d: number; s: number; r: number; lvl: number; vib?: number; formants?: number[] }): Play {
+interface StackOpts {
+  waves: [OscillatorType, number, number][];
+  lp: number;
+  q?: number;
+  a: number;
+  d: number;
+  s: number;
+  r: number;
+  lvl: number;
+  vib?: number;
+  formants?: number[];
+  /** The filter opens from here to `lp` over `lpTime`. */
+  lpFrom?: number;
+  lpTime?: number;
+  /** A slow wander on the filter, in Hz. */
+  drift?: number;
+  /** A sine an octave down, at this level. */
+  sub?: number;
+  hp?: number;
+}
+function stack(p: StackOpts): Play {
   return (ctx, out, t, { vel, midi, dur }) => {
-    const { g, stopAt } = held(ctx, out, t, p.lvl * vel, p.a, p.d, p.s, dur, p.r);
+    const dest = p.hp ? filter(ctx, "highpass", p.hp, 0.6, out) : out;
+    const { g, stopAt } = held(ctx, dest, t, p.lvl * vel, p.a, p.d, p.s, dur, p.r);
     let into: AudioNode;
     if (p.formants) {
       const sum = ctx.createGain();
       sum.gain.value = 1;
       for (const f of p.formants) sum.connect(filter(ctx, "bandpass", f, 7, g));
       into = sum;
-    } else into = filter(ctx, "lowpass", p.lp, p.q ?? 0.7, g);
+    } else {
+      const lp = filter(ctx, "lowpass", p.lp, p.q ?? 0.7, g);
+      if (p.lpFrom) {
+        lp.frequency.setValueAtTime(p.lpFrom, t);
+        lp.frequency.setTargetAtTime(p.lp, t, (p.lpTime ?? 0.5) / 3);
+      }
+      if (p.drift) {
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 0.23 + Math.random() * 0.1;
+        const amt = ctx.createGain();
+        amt.gain.value = p.drift;
+        lfo.connect(amt).connect(lp.frequency);
+        lfo.start(t);
+        lfo.stop(stopAt);
+      }
+      into = lp;
+    }
     const oscs = p.waves.map(([type, detune, level]) => {
       const lg = ctx.createGain();
       lg.gain.value = level;
       lg.connect(into);
       return osc(ctx, type, hz(midi), t, stopAt, lg, detune);
     });
+    if (p.sub) {
+      const sg = ctx.createGain();
+      sg.gain.value = p.sub;
+      sg.connect(g);
+      oscs.push(osc(ctx, "sine", hz(midi - 12), t, stopAt, sg));
+    }
     if (p.vib) {
       const lfo = ctx.createOscillator();
       lfo.frequency.value = 5.2;
@@ -385,12 +462,18 @@ function stack(p: { waves: [OscillatorType, number, number][]; lp: number; q?: n
 }
 
 const pluck: Play = (ctx, out, t, { vel, midi, dur }) => {
-  const g = perc(ctx, out, t, 0.24 * vel, 0.002, Math.min(0.9, 0.35 + dur));
-  const lp = filter(ctx, "lowpass", 4000, 2, g);
-  lp.frequency.setValueAtTime(4200, t);
-  lp.frequency.exponentialRampToValueAtTime(280, t + 0.28);
-  osc(ctx, "sawtooth", hz(midi), t, t + 1.2, lp);
-  osc(ctx, "square", hz(midi), t, t + 1.2, lp, 7);
+  const f = hz(midi);
+  const g = perc(ctx, out, t, 0.3 * vel, 0.002, Math.min(1.1, 0.4 + dur));
+  const lp = filter(ctx, "lowpass", 4000, 3, g);
+  lp.frequency.setValueAtTime(2500 + 5000 * vel, t);
+  lp.frequency.setTargetAtTime(Math.max(260, f * 1.5), t, 0.07);
+  osc(ctx, "sawtooth", f, t, t + 1.4, lp, -6);
+  osc(ctx, "sawtooth", f, t, t + 1.4, lp, 6);
+  const body = ctx.createGain();
+  body.gain.value = 0.5;
+  body.connect(g);
+  osc(ctx, "triangle", f, t, t + 1.4, body);
+  noiseSrc(ctx, t, t + 0.02, filter(ctx, "bandpass", 3000, 1, perc(ctx, out, t, 0.06 * vel, 0.0005, 0.01)));
 };
 
 const flute: Play = (ctx, out, t, { vel, midi, dur }) => {
@@ -597,11 +680,11 @@ export const VOICES: Voice[] = [
   m("music-box", "music box", "Keys", musicBox),
   m("bell", "bell", "Keys", bell),
 
-  m("pad", "warm pad", "Synths", stack({ waves: [["sawtooth", -8, 0.4], ["sawtooth", 8, 0.4], ["sawtooth", 0, 0.3]], lp: 1300, a: 0.35, d: 0.4, s: 0.8, r: 0.9, lvl: 0.17 })),
-  m("strings", "strings", "Synths", stack({ waves: [["sawtooth", -12, 0.3], ["sawtooth", 12, 0.3], ["sawtooth", -4, 0.3], ["sawtooth", 5, 0.3]], lp: 2600, a: 0.18, d: 0.3, s: 0.85, r: 0.5, lvl: 0.16, vib: 8 })),
+  m("pad", "warm pad", "Synths", stack({ waves: [["sawtooth", -15, 0.3], ["sawtooth", -7, 0.3], ["sawtooth", -2, 0.3], ["sawtooth", 3, 0.3], ["sawtooth", 8, 0.3], ["sawtooth", 14, 0.3]], lp: 1700, lpFrom: 400, lpTime: 1.4, drift: 260, sub: 0.35, a: 0.4, d: 0.5, s: 0.85, r: 1.1, lvl: 0.2 })),
+  m("strings", "strings", "Synths", stack({ waves: [["sawtooth", -14, 0.25], ["sawtooth", -6, 0.25], ["sawtooth", -1, 0.25], ["sawtooth", 5, 0.25], ["sawtooth", 11, 0.25], ["triangle", 0, 0.3]], lp: 3400, lpFrom: 900, lpTime: 0.5, hp: 220, a: 0.22, d: 0.3, s: 0.9, r: 0.6, lvl: 0.26, vib: 9 })),
   m("choir", "choir", "Synths", stack({ waves: [["sawtooth", -6, 0.5], ["sawtooth", 6, 0.5]], lp: 0, a: 0.25, d: 0.3, s: 0.9, r: 0.6, lvl: 0.55, vib: 10, formants: [730, 1090, 2440] })),
   m("pluck", "pluck", "Synths", pluck),
-  m("lead", "lead", "Synths", stack({ waves: [["square", 0, 0.4], ["sawtooth", 5, 0.3]], lp: 3000, a: 0.01, d: 0.2, s: 0.7, r: 0.12, lvl: 0.2, vib: 14 })),
+  m("lead", "lead", "Synths", stack({ waves: [["square", 0, 0.4], ["sawtooth", 7, 0.3], ["sawtooth", -7, 0.3]], lp: 2400, lpFrom: 5200, lpTime: 0.25, q: 1.6, sub: 0.3, a: 0.01, d: 0.2, s: 0.75, r: 0.14, lvl: 0.24, vib: 14 })),
   m("flute", "flute", "Synths", flute),
 
   d("rain", "rain on the sill", "Found", rain, "the bedroom window"),

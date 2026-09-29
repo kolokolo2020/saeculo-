@@ -263,6 +263,9 @@ try {
     const held = await audio(page);
     check("game: site music paused, position kept", held.paused && held.t > 0);
     check("game: controls card on first visit", await page.getByTestId("game-help").isVisible());
+    await page.evaluate(() => document.querySelector("audio").play());
+    await page.waitForTimeout(300);
+    check("game: nothing can start the site music underneath (a media key, say)", (await audio(page)).paused);
     await page.keyboard.press("e");
     await page.waitForTimeout(200);
     check("game: starts at the laptop", (await page.getByTestId("game-prompt").textContent()).includes("laptop"));
@@ -316,6 +319,7 @@ try {
     await page.waitForTimeout(1000);
     const p1 = (await st()).position;
     check("studio: plays, playhead moving", (await st()).playing && p1.step >= 0);
+    check("studio: first-time hints, crossed off as you go", (await studio.getByTestId("studio-tips").isVisible()) && (await studio.locator("[data-testid=studio-tips] [data-done=true]").count()) === 1);
     check("studio: rack shows the playhead", (await studio.locator("[data-now=true]").count()) >= 1);
     check("studio: no website music underneath", (await audio(page)).paused);
     const n0 = (await st()).project.channels.length;
@@ -333,6 +337,30 @@ try {
     await roll.click({ position: { x: 31 * (rb.width / 32) + 4, y: 16 * 5 + 5 } });
     const after = Number(await roll.getAttribute("data-notes"));
     check("piano roll: the chord tool stamps a 7th chord", after - before === 4, `${before} → ${after}`);
+    // playing live over the loop, and recording it
+    const rhodesId = (await st()).project.channels.find((c) => c.voice === "rhodes").id;
+    const notesOf = async () => ((await st()).project.patterns[(await st()).position.pattern].notes[rhodesId] ?? []).length;
+    const nLive = await notesOf();
+    await page.keyboard.down("KeyG");
+    await page.waitForTimeout(150);
+    check("studio: the computer keyboard plays notes live", (await studio.locator("[data-testid=studio-keys] [data-down=true]").count()) === 1);
+    await page.keyboard.up("KeyG");
+    const n0rec = await notesOf();
+    check("studio: live notes aren't written unless recording", n0rec === nLive);
+    await page.getByTestId("studio-rec").click();
+    await page.keyboard.down("KeyH");
+    await page.waitForTimeout(400);
+    await page.keyboard.up("KeyH");
+    await page.waitForTimeout(100);
+    check("studio: rec writes what you play into the pattern", (await notesOf()) === n0rec + 1, `${n0rec} → ${await notesOf()}`);
+    await page.keyboard.press("KeyX");
+    check("studio: X moves the keyboard up an octave", (await studio.getByRole("button", { name: /^C4 \(A\)/ }).count()) === 1);
+    await page.keyboard.press("KeyZ");
+    await page.getByTestId("studio-rec").click();
+    check("studio: tips cross off steps and keys", (await studio.locator("[data-testid=studio-tips] [data-done=true]").count()) === 3);
+    const kit = await page.evaluate(() => window.__game.kitLevels());
+    const off = Object.entries(kit).filter(([, v]) => v.peak < 0.08 || v.peak > 0.95);
+    check("studio: every synthesized sound is audible and none clips", off.length === 0, off.map(([k, v]) => `${k} ${v.peak}`).join(", "));
     await studio.getByRole("button", { name: "Mute dusty kick" }).click();
     check("studio: mute", (await st()).project.channels.find((c) => c.voice === "kick-dusty").mute === true);
     await studio.getByRole("button", { name: "Faster" }).click();
@@ -345,7 +373,7 @@ try {
     check("studio: mixer", await studio.getByTestId("studio-mixer").isVisible());
     await studio.getByRole("tab", { name: "song" }).click();
     check("studio: song arranger", (await studio.getByTestId("studio-song").locator("button[aria-label^=Slot]").count()) === 16);
-    await studio.getByText("project ▾").click();
+    await studio.getByText("project ▾", { exact: true }).click();
     await studio.getByRole("button", { name: "save", exact: true }).first().click();
     const slots = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-studio")).slots);
     check("studio: save to a slot", slots[0] && slots[0].tempo === 85);
@@ -457,6 +485,11 @@ try {
     await page.waitForTimeout(600);
     await pad.dispatchEvent("pointerup", { pointerId: 1 });
     check("phone: pad walks", (await game(page)).x > x0 + 15);
+    const cw = await page.locator("[data-testid=game] canvas").boundingBox();
+    check("phone: the picture is zoomed in, not postcard-sized", cw.width >= 390 * 1.5 && cw.height >= 300, `${Math.round(cw.width)}×${Math.round(cw.height)}`);
+    check("phone: game still has no sideways scroll", await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    const exitBox = await page.getByTestId("game-exit").boundingBox();
+    check("phone: the game's top bar fits on one line", exitBox.height < 44 && exitBox.y < 48);
     await ctx.close();
   }
 
@@ -474,6 +507,11 @@ try {
     const g = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
     check("axe: no violations in the game", g.length === 0, g.join(", "));
     if (g.length) console.log(await page.evaluate(async () => JSON.stringify((await window.axe.run(document, { resultTypes: ["violations"] })).violations.flatMap((x) => x.nodes.map((n) => [n.target, n.any?.[0]?.message])))));
+    await page.getByTestId("game-to-studio").click();
+    await page.waitForTimeout(800);
+    const sv = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+    check("axe: no violations in the studio", sv.length === 0, sv.join(", "));
+    if (sv.length) console.log(await page.evaluate(async () => JSON.stringify((await window.axe.run(document, { resultTypes: ["violations"] })).violations.flatMap((x) => x.nodes.map((n) => [n.target, n.any?.[0]?.message])))));
     await ctx.close();
   }
 } catch (err) {

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CloseGlyph, PlayGlyph, StopGlyph } from "@/components/site/Icons";
 import Browser from "./Browser";
 import { render, type Engine } from "./engine";
+import Keys, { KEY_CODES } from "./Keys";
 import Mixer from "./Mixer";
 import PianoRoll from "./PianoRoll";
 import { PRESETS } from "./presets";
@@ -12,7 +13,7 @@ import Rack from "./Rack";
 import { KEY_NAMES, SCALES } from "./scales";
 import Song from "./Song";
 import { chip } from "./ui";
-import type { Voice } from "./voices";
+import { voiceById, type Voice } from "./voices";
 import { encodeWav } from "./wav";
 
 // The studio: a transport across the top, the sound browser on the left,
@@ -21,6 +22,25 @@ import { encodeWav } from "./wav";
 
 type Tab = "roll" | "mixer" | "song";
 
+// First visit: four small things, one line, each crossed off as you do it.
+// Not a tutorial: it never blocks anything and it goes away for good.
+const TIPS_KEY = "saeculo-studio-tips";
+const TIPS: [string, string, string][] = [
+  ["play", "press play (Space)", "press play"],
+  ["step", "click squares to add hits", "tap squares to add hits"],
+  ["keys", "play notes on A S D F… over the loop", "play the keyboard over the loop"],
+  ["save", "project ▾ → save: it becomes a tape on your shelf", "project ▾ → save: it becomes a tape on your shelf"],
+];
+function loadTips(): { done: string[]; hidden: boolean } {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TIPS_KEY) ?? "null");
+    if (raw && Array.isArray(raw.done)) return { done: raw.done.filter((d: unknown) => typeof d === "string"), hidden: raw.hidden === true };
+  } catch {
+    // start over
+  }
+  return { done: [], hidden: false };
+}
+
 export default function Studio({ engine, found, fresh, onSeen, onClose }: { engine: Engine; found: string[]; fresh: string[]; onSeen: () => void; onClose: () => void }) {
   const [project, setProject] = useState<Project>(engine.project);
   const [pattern, setPatternState] = useState(engine.pattern);
@@ -28,7 +48,8 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
   const [loading, setLoading] = useState(engine.loading);
   const [pos, setPos] = useState({ step: -1, pattern: 0, slot: -1 });
   const [level, setLevel] = useState(0);
-  const [selected, setSelected] = useState<string | null>(engine.project.channels[0]?.id ?? null);
+  // start on something with notes, so the keyboard plays a tune rather than a kick
+  const [selected, setSelected] = useState<string | null>((engine.project.channels.find(isMelodic) ?? engine.project.channels[0])?.id ?? null);
   const [rollCh, setRollCh] = useState<string | null>(engine.project.channels.find(isMelodic)?.id ?? null);
   const [tab, setTab] = useState<Tab>("roll");
   const [sounds, setSounds] = useState(false);
@@ -41,11 +62,46 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
   const history = useRef<Project[]>([]);
   const lastEdit = useRef({ key: "", at: 0 });
   const saveTimer = useRef(0);
+  // playing live
+  const [octave, setOctave] = useState(0);
+  const [rec, setRec] = useState(false);
+  const [held, setHeld] = useState<number[]>([]);
+  const live = useRef(new Map<number, { release: () => void; step: number; pattern: number; midi: number; at: number; channel: string }>());
+  const [tips, setTips] = useState(loadTips);
+  const [touch] = useState(() => window.matchMedia("(pointer: coarse)").matches);
+  const tick = useCallback((id: string) => {
+    setTips((t) => {
+      if (t.done.includes(id)) return t;
+      const next = { ...t, done: [...t.done, id] };
+      try {
+        localStorage.setItem(TIPS_KEY, JSON.stringify(next));
+      } catch {
+        // this visit only
+      }
+      return next;
+    });
+  }, []);
+  const hideTips = () => {
+    const next = { ...tips, hidden: true };
+    setTips(next);
+    try {
+      localStorage.setItem(TIPS_KEY, JSON.stringify(next));
+    } catch {
+      // this visit only
+    }
+  };
 
   useEffect(() => engine.listen(() => {
     setPlaying(engine.playing);
     setLoading(engine.loading);
-  }), [engine]);
+    if (engine.playing) tick("play");
+  }), [engine, tick]);
+
+  // let go of anything still sounding when the studio closes
+  useEffect(() => {
+    const held = live.current;
+    return () => held.forEach((n) => n.release());
+  }, []);
 
   useEffect(() => {
     root.current?.focus();
@@ -134,7 +190,7 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
     setProject(next);
     engine.setProject(next);
     persist(next);
-    setSelected(next.channels[0]?.id ?? null);
+    setSelected((next.channels.find(isMelodic) ?? next.channels[0])?.id ?? null);
     setRollCh(next.channels.find(isMelodic)?.id ?? null);
     setPattern(0);
     flash(msg);
@@ -156,6 +212,7 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
       pat.steps[id] = s;
       const c = p.channels.find((x) => x.id === id);
       if (c && s[step] > 0 && !engine.playing) void engine.preview(c.voice, { midi: 60 + c.pitch, channel: id });
+      if (s[step] > 0) tick("step");
     });
 
   const addChannel = (v: Voice) => {
@@ -250,7 +307,57 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
     const next = { current: project, slots };
     setStore(next);
     saveStore(next);
+    tick("save");
     flash(`Saved to slot ${i + 1}. It's on your shelf at home.`);
+  };
+
+  // ------------------------------------------------------------ playing live
+
+  const liveCh = project.channels.find((c) => c.id === selected) ?? project.channels.find((c) => c.id === rollCh) ?? null;
+  const liveMelodic = !!liveCh && isMelodic(liveCh);
+  const liveBase = liveMelodic ? (voiceById(liveCh!.voice)?.cat === "808 & bass" ? 36 : 48) + octave * 12 : 60 + octave * 12;
+
+  const noteDown = (semi: number, time: number) => {
+    if (!liveCh || live.current.has(semi)) return;
+    const midi = liveBase + semi;
+    const release = engine.noteOn(liveCh.voice, midi + liveCh.pitch, liveCh.id);
+    const at = rec ? engine.nearestStep() : null;
+    live.current.set(semi, { release, step: at?.step ?? -1, pattern: at?.pattern ?? pattern, midi, at: time, channel: liveCh.id });
+    setHeld([...live.current.keys()]);
+    tick("keys");
+    // a drum hit is written the moment it lands
+    if (at && !liveMelodic) {
+      edit((p) => {
+        const pat = p.patterns[at.pattern];
+        const s = stepsOf(pat, liveCh.id, p.length);
+        s[at.step] = 1;
+        pat.steps[liveCh.id] = s;
+      }, "rec");
+    }
+  };
+
+  const noteUp = (semi: number, time: number) => {
+    const n = live.current.get(semi);
+    if (!n) return;
+    live.current.delete(semi);
+    setHeld([...live.current.keys()]);
+    n.release();
+    if (n.step < 0 || !liveMelodic || n.channel !== liveCh?.id) return;
+    // a note is written when it's let go, as long as it was held (to the nearest step)
+    const stepMs = (60 / project.tempo / 4) * 1000;
+    const len = Math.max(1, Math.min(project.length - n.step, Math.round((time - n.at) / stepMs)));
+    edit((p) => {
+      const pat = p.patterns[n.pattern];
+      const notes = (pat.notes[n.channel] ?? []).filter((x) => !(x.step === n.step && x.midi === n.midi));
+      pat.notes[n.channel] = [...notes, { step: n.step, midi: n.midi, len, vel: 0.9 }];
+    }, "rec");
+  };
+
+  const toggleRec = () => {
+    const on = !rec;
+    setRec(on);
+    if (on && !engine.playing) void engine.start();
+    flash(on ? "Recording: what you play goes into the pattern. Ctrl+Z takes it back." : "Stopped recording.");
   };
 
   // ------------------------------------------------------------ keys
@@ -268,8 +375,32 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
       e.preventDefault();
       if (engine.playing) engine.stop();
       else void engine.start();
+    } else if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (e.code === "KeyZ" || e.code === "KeyX") {
+        e.preventDefault();
+        if (!e.repeat) setOctave((o) => Math.max(-2, Math.min(2, o + (e.code === "KeyZ" ? -1 : 1))));
+      } else if (e.code in KEY_CODES) {
+        e.preventDefault();
+        if (!e.repeat) noteDown(KEY_CODES[e.code], e.timeStamp);
+      }
     }
   };
+
+  // key-ups are caught anywhere (focus may have moved on while a key was held)
+  const noteUpRef = useRef(noteUp);
+  useLayoutEffect(() => {
+    noteUpRef.current = noteUp;
+  });
+  useEffect(() => {
+    const up = (e: KeyboardEvent) => e.code in KEY_CODES && noteUpRef.current(KEY_CODES[e.code], e.timeStamp);
+    const blur = () => [...live.current.keys()].forEach((k) => noteUpRef.current(k, performance.now()));
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
+  }, []);
 
   const now = playing && (project.mode === "song" ? pos.pattern === pattern : true) ? pos.step : -1;
   const shownPattern = pattern;
@@ -313,7 +444,7 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
               flash(v === "clear" ? `Cleared ${PATTERN_NAMES[pattern]}.` : `Copied ${PATTERN_NAMES[pattern]} to ${PATTERN_NAMES[Number(v)]}.`);
             }}
           >
-            <option value="">{PATTERN_NAMES[pattern]}…</option>
+            <option value="">copy / clear</option>
             {PATTERN_NAMES.map((n, i) => (i === pattern ? null : <option key={n} value={i}>copy to {n}</option>))}
             <option value="clear">clear {PATTERN_NAMES[pattern]}</option>
           </select>
@@ -433,9 +564,28 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
         </button>
       </div>
 
-      <p className="min-h-[1.4em] shrink-0 px-3 pt-1 text-[12.5px] text-amber" role="status">
-        {note}
-      </p>
+      <div className="flex min-h-[1.6em] shrink-0 flex-wrap items-baseline gap-x-3 px-3 pt-1 text-[12.5px]">
+        <p className="text-amber" role="status">
+          {note}
+        </p>
+        {!tips.hidden && (
+          <p className="flex flex-wrap items-baseline gap-x-2.5 text-[#b9b09e]" data-testid="studio-tips">
+            <span className="text-[#948b7a]">new here?</span>
+            {TIPS.map(([id, text, touchText], i) => {
+              const done = tips.done.includes(id);
+              return (
+                <span key={id} data-done={done} className={done ? "text-[#6d6558] line-through" : ""}>
+                  {i + 1}. {touch ? touchText : text}
+                </span>
+              );
+            })}
+            {tips.done.length >= TIPS.length && <span className="text-[#8fb37a]">that&apos;s it. the rest is yours.</span>}
+            <button className="text-[#948b7a] underline decoration-dotted underline-offset-2 hover:text-white" onClick={hideTips}>
+              hide
+            </button>
+          </p>
+        )}
+      </div>
 
       {/* body */}
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-3 lg:flex-row lg:overflow-hidden">
@@ -472,6 +622,19 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
               }}
             />
           </section>
+          <Keys
+            base={liveBase}
+            target={liveCh ? (voiceById(liveCh.voice)?.name ?? null) : null}
+            down={held}
+            rec={rec}
+            keyRoot={project.key}
+            scale={project.scale}
+            melodic={liveMelodic}
+            onDown={noteDown}
+            onUp={noteUp}
+            onOctave={(d) => setOctave((o) => Math.max(-2, Math.min(2, o + d)))}
+            onRec={toggleRec}
+          />
           <section className="flex min-h-[260px] flex-1 flex-col gap-2 lg:min-h-0">
             <div className="flex gap-1" role="tablist" aria-label="Editor">
               {(

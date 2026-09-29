@@ -194,6 +194,7 @@ export class Engine {
   private slotIdx = 0;
   private queue: (Position & { time: number })[] = [];
   private last: Position = { step: -1, pattern: 0, slot: -1 };
+  private lastTime = 0;
   private listeners = new Set<() => void>();
   private meter = new Float32Array(1024);
 
@@ -318,8 +319,44 @@ export class Engine {
     while (this.queue.length && this.queue[0].time <= ctx.currentTime) {
       const q = this.queue.shift()!;
       this.last = { step: q.step, pattern: q.pattern, slot: q.slot };
+      this.lastTime = q.time;
     }
     return this.last;
+  }
+
+  /** The playhead right now, to the nearest step: where a note played live lands when recording. */
+  nearestStep(): { step: number; pattern: number } | null {
+    const ctx = this.ctx;
+    if (!ctx || !this.playing) return null;
+    const pos = this.position();
+    if (pos.step < 0) return null;
+    const stepDur = 60 / this.project.tempo / 4;
+    const ahead = Math.round((ctx.currentTime - this.lastTime) / stepDur);
+    return { step: (pos.step + Math.max(0, ahead)) % this.project.length, pattern: pos.pattern };
+  }
+
+  /**
+   * Play a note now, held until the returned function is called (keys held
+   * down, a finger on the on-screen keyboard). Drums just hit.
+   */
+  noteOn(voice: string, midi: number, channel?: string, vel = 0.9): () => void {
+    const { ctx, graph } = this.ensure();
+    void ctx.resume();
+    const def = voiceById(voice);
+    if (!def) return () => {};
+    const gate = ctx.createGain();
+    gate.connect(channel && this.project.channels.some((c) => c.id === channel) ? graph.strip(channel).input : graph.input);
+    const melodic = def.kind === "melodic";
+    const go = () => playVoice(ctx, gate, voice, ctx.currentTime + 0.005, { midi, dur: melodic ? 4 : 0.4, vel });
+    if (def.load) void ensureLoaded([voice]).then(go);
+    else go();
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      if (melodic) gate.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+      setTimeout(() => gate.disconnect(), melodic ? 1500 : 3000);
+    };
   }
 
   /** The master's current loudness, 0..1. */

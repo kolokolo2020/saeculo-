@@ -211,7 +211,7 @@ export default function PianoRoll({
               <button
                 key={row}
                 tabIndex={-1}
-                className={`block w-10 border-b border-[#23211f] pr-1 text-right font-mono text-[9.5px] leading-none ${inScale(midi, project.key, project.scale) ? "text-[#cfc6b3]" : "text-[#6b6356]"} ${isC ? "font-bold" : ""}`}
+                className={`block w-10 border-b border-[#23211f] pr-1 text-right font-mono text-[9.5px] leading-none ${inScale(midi, project.key, project.scale) ? "text-[#cfc6b3]" : "text-[#968d7c]"} ${isC ? "font-bold" : ""}`}
                 style={{ height: ROW_H }}
                 onClick={() => onAudition(midi, 0.4)}
                 aria-hidden

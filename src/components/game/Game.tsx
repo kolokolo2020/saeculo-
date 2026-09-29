@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePlayerStore } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { draw, VIEW_H, VIEW_W } from "./render";
+import { camera, draw, VIEW_H, VIEW_W } from "./render";
 import { loadSave, migrateOldTapes, writeSave, type SaveData } from "./save";
 import { duck, setPlace, setRing, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
 import { Engine } from "./studio/engine";
@@ -136,6 +136,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
   });
   // the latest UI state, for the loop and key handlers
   const ui = useRef({ dialog, studio, help, phase });
+  const view = useRef({ scale, below });
+  useLayoutEffect(() => {
+    view.current = { scale, below };
+  }, [scale, below]);
   useLayoutEffect(() => {
     ui.current = { dialog, studio, help, phase };
   }, [dialog, studio, help, phase]);
@@ -659,6 +663,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
       const h = window.innerHeight - 48 - (coarse && portrait ? 190 : 0);
       let k = Math.min(w / VIEW_W, h / VIEW_H);
       if (k >= 2) k = Math.floor(k);
+      // a phone held upright would show the whole view at postcard size:
+      // zoom in instead and let the picture follow you sideways
+      if (coarse && portrait) k = Math.max(k, Math.floor(Math.min(2.5, h / VIEW_H) * 2) / 2);
       setScale(Math.max(1, k));
       setBelow(coarse && portrait);
     };
@@ -880,6 +887,16 @@ export default function Game({ onExit }: { onExit: () => void }) {
         boombox: music.current?.key === "street",
         dt,
       });
+      // zoomed in (phones held upright): keep you in the middle of the picture
+      const vw = view.current;
+      const box = c.parentElement;
+      if (box) {
+        const full = VIEW_W * vw.scale;
+        const bw = box.clientWidth;
+        const off = full > bw ? Math.min(0, Math.max(bw - full, bw / 2 - (s.x - camera(SCENES[s.place], s.x, s.y).cx) * vw.scale)) : (bw - full) / 2;
+        const tf = vw.below ? `translateX(${Math.round(off)}px)` : "";
+        if (c.style.transform !== tf) c.style.transform = tf;
+      }
       if (s.trans) {
         const k = s.trans.t < 0.22 ? s.trans.t / 0.22 : 1 - (s.trans.t - 0.22) / 0.22;
         g.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, k)).toFixed(3)})`;
@@ -941,7 +958,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     >
       {/* top bar: where you are, what you've found, the way out */}
       <div className={`relative z-40 flex min-h-0 flex-1 flex-col ${phase === "closing" || revealing ? "invisible" : ""}`}>
-      <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-[#1d1b19] px-3 font-lcd text-[20px] leading-none">
+      <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-[#1d1b19] px-3 font-lcd text-[20px] leading-none whitespace-nowrap">
         <span data-testid="game-place">{PLACE_NAMES[place]}</span>
         <span className="text-[#8a8170]" aria-label={`${foundCount} of ${FINDABLE.length} sounds found`}>
           sounds {foundCount}/{FINDABLE.length}
@@ -952,7 +969,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
             onClick={goToStudio}
             data-testid="game-to-studio"
           >
-            Go to the studio
+            <span className="sm:hidden">Studio</span>
+            <span className="hidden sm:inline">Go to the studio</span>
           </button>
         )}
         <button
@@ -960,7 +978,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
           onClick={leave}
           data-testid="game-exit"
         >
-          Back to the site <span className="text-[#948b7a]">Esc</span>
+          <span className="sm:hidden">Exit</span>
+          <span className="hidden sm:inline">Back to the site</span> <span className="hidden text-[#948b7a] sm:inline">Esc</span>
         </button>
       </div>
 
@@ -969,7 +988,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
           ref={canvas}
           width={VIEW_W}
           height={VIEW_H}
-          className="pixel block"
+          className={`pixel block shrink-0 ${below ? "self-start" : ""}`}
           style={{ width: VIEW_W * scale, height: VIEW_H * scale }}
           aria-hidden
         />

@@ -191,7 +191,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     play: () => {
-      const { audio } = get();
+      const { audio, heldBy } = get();
+      // something else has the speakers (the game): play when it hands them back
+      if (heldBy) return set({ resumeOnRelease: true });
       if (audio) startPlayback(audio);
     },
     pause: () => {
@@ -201,6 +203,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     toggle: () => {
       const { audio, status } = get();
       if (!audio) return;
+      if (get().heldBy) return set((s) => ({ resumeOnRelease: !s.resumeOnRelease }));
       if (status === "error") {
         // try the file again rather than sitting on a dead player
         load(audio, get().trackIndex);
@@ -216,7 +219,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       set({ trackIndex: index, currentTime: 0, duration: 0, status: "loading" });
       if (!audio) return;
       load(audio, index);
-      if (autoplay) startPlayback(audio);
+      if (autoplay && get().heldBy) set({ resumeOnRelease: true });
+      else if (autoplay) startPlayback(audio);
     },
     next: () => {
       if (!TRACKS.length) return;
