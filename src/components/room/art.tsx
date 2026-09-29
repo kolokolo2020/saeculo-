@@ -369,7 +369,7 @@ export function ArtistArt() {
         <path d="M700 660 C696 720 702 780 700 860" stroke="#151a20" strokeWidth="3" fill="none" />
       </g>
       {/* neck and the hood lying on his back */}
-      <path d="M678 612 L722 612 L726 652 L674 652 Z" fill="#4f3a31" stroke={INK} strokeWidth="3" />
+      <path d="M678 612 L722 612 L726 652 L674 652 Z" fill="#d09d80" stroke={INK} strokeWidth="3" />
       <path d="M632 648 C640 706 760 712 774 648 C752 670 656 672 632 648 Z" fill="#2a313b" stroke={INK} strokeWidth="4" />
       <path d="M650 660 C668 690 738 692 756 660" stroke="#161b22" strokeWidth="3" fill="none" />
       {/* backlight from the screen, moonlight from the window */}
@@ -378,15 +378,15 @@ export function ArtistArt() {
 
       {/* left arm, reaching for the pads */}
       <path d="M566 690 C592 690 620 670 644 650 L658 662 C632 690 602 714 574 724 Z" fill="#1d232b" stroke={INK} strokeWidth="4" />
-      <path d="M640 648 C646 638 660 636 668 644 C672 652 666 660 656 662 Z" fill="#5c4438" stroke={INK} strokeWidth="3" />
+      <path d="M640 648 C646 638 660 636 668 644 C672 652 666 660 656 662 Z" fill="#dca98c" stroke={INK} strokeWidth="3" />
 
       {/* right arm, raised, holding the joint */}
       <path d="M800 660 C852 664 902 702 932 770 L906 798 C880 760 850 732 800 714 Z" fill="#1d232b" stroke={INK} strokeWidth="4" />
       <path d="M906 798 L932 770 C956 720 952 662 930 614 L900 617 C916 662 913 732 906 798 Z" fill="#232a33" stroke={INK} strokeWidth="4" />
       <path d="M930 616 C950 664 954 720 932 770" stroke={RIM} strokeWidth="2.5" fill="none" opacity="0.55" />
       <path d="M898 612 L934 608 L936 624 L900 628 Z" fill="#151a20" stroke={INK} strokeWidth="3" />
-      <path d="M898 614 C890 598 896 584 910 579 C926 574 940 584 942 598 C944 610 934 620 918 622 Z" fill="#6a4e41" stroke={INK} strokeWidth="3" />
-      <path d="M912 590 L928 588 M914 600 L932 598" stroke="#3d2b24" strokeWidth="2" />
+      <path d="M898 614 C890 598 896 584 910 579 C926 574 940 584 942 598 C944 610 934 620 918 622 Z" fill="#e0ae91" stroke={INK} strokeWidth="3" />
+      <path d="M912 590 L928 588 M914 600 L932 598" stroke="#a9765c" strokeWidth="2" />
       {/* the joint */}
       <path d="M934 588 L975 567" stroke={INK} strokeWidth="9" strokeLinecap="round" />
       <path d="M934 588 L975 567" stroke="#ece6d8" strokeWidth="5.5" strokeLinecap="round" />
@@ -400,20 +400,88 @@ export function ArtistArt() {
   );
 }
 
-/** His head from behind: messy hair and headphones. Nods from the neck (90, 150). */
+/** His head from behind: short curly brown hair in a mullet (short sides,
+ *  curls on top, longer at the back down to the nape) and headphones.
+ *  Nods from the neck (90, 150). */
 export function ArtistHead() {
   return (
     <svg viewBox="0 0 190 180" width="190" height="180" aria-hidden className="overflow-visible">
       <path d="M30 80 C34 18 146 18 150 80" stroke={INK} strokeWidth="20" fill="none" strokeLinecap="round" />
+      {/* the head: skin, with the short sides as a close fade */}
       <path
-        d="M30 94 C22 52 55 18 92 18 C132 18 160 50 156 94 C160 122 140 144 120 152 L62 152 C42 142 30 122 30 94 Z"
-        fill="#0d0f14"
+        d="M34 96 C26 54 57 22 92 22 C130 22 158 52 154 96 C156 120 142 140 124 148 L60 148 C44 140 32 120 34 96 Z"
+        fill="#d8a78a"
         stroke={INK}
         strokeWidth="4"
       />
-      {/* hair: tufts and strands */}
-      <path d="M48 42 L36 22 L60 34 M80 22 L76 2 L94 20 M112 24 L126 6 L126 30 M138 44 L158 36 L146 56" fill="#0d0f14" stroke={INK} strokeWidth="3" strokeLinejoin="round" />
-      <path d="M60 60 C80 50 100 52 120 62 M52 90 C70 80 110 80 130 94 M64 124 C80 116 104 116 118 126" stroke="#1b1f29" strokeWidth="3" fill="none" />
+      <path d="M36 70 C34 90 38 118 54 138 L64 138 C52 118 48 92 50 70 Z" fill="#6b4a36" opacity="0.55" />
+      <path d="M152 70 C154 90 150 118 134 138 L124 138 C136 118 140 92 138 70 Z" fill="#6b4a36" opacity="0.55" />
+      {/* the back: longer hair falling to the start of the neck */}
+      <path
+        d="M52 70 C60 60 124 60 136 70 C142 96 138 124 128 146 C124 154 118 150 114 158 C108 150 102 158 96 162 C90 154 84 160 78 156 C72 150 66 156 62 148 C52 126 48 98 52 70 Z"
+        fill="#5e3b22"
+        stroke={INK}
+        strokeWidth="4"
+      />
+      <path d="M66 96 C70 112 70 128 66 142 M82 100 C86 118 86 136 82 150 M100 100 C104 118 104 136 100 152 M118 96 C122 112 122 128 118 144" stroke="#7a4e2c" strokeWidth="3" fill="none" />
+      {/* curls on top: one mass, then loose ringlets over it */}
+      <path d="M40 84 C34 52 58 20 94 18 C130 18 156 48 150 84 C144 76 138 80 132 74 C124 82 116 76 108 80 C100 74 92 80 84 76 C76 82 68 76 60 80 C54 74 46 82 40 84 Z" fill="#5e3b22" stroke={INK} strokeWidth="4" />
+      <path d="M61.3 27.9 A7.6 7.6 0 1 0 68.9 20.3" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M65.9 28.7 A3.4 3.4 0 1 1 70.5 25.6" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M77.2 30.2 A6.9 6.9 0 1 0 84.1 23.3" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M81.3 30.9 A3.1 3.1 0 1 1 85.5 28.1" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M94.6 30.0 A6.1 6.1 0 1 0 100.7 24.0" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M98.2 30.7 A2.7 2.7 0 1 1 101.9 28.2" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M113.4 27.4 A6.2 6.2 0 1 0 119.6 21.2" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M117.1 28.0 A2.8 2.8 0 1 1 120.8 25.6" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M47.2 44.0 A6.3 6.3 0 1 0 53.5 37.7" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M51.0 44.6 A2.8 2.8 0 1 1 54.8 42.1" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M58.0 42.8 A8.4 8.4 0 1 0 66.3 34.4" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M63.0 43.6 A3.8 3.8 0 1 1 68.0 40.3" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M74.0 41.4 A8.4 8.4 0 1 0 82.5 32.9" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M79.1 42.2 A3.8 3.8 0 1 1 84.2 38.8" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M86.6 44.2 A6.7 6.7 0 1 0 93.3 37.4" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M90.6 44.8 A3.0 3.0 0 1 1 94.6 42.1" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M101.1 39.7 A6.8 6.8 0 1 0 107.9 32.9" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M105.2 40.4 A3.0 3.0 0 1 1 109.2 37.7" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M118.4 40.1 A7.5 7.5 0 1 0 125.9 32.6" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M122.9 40.8 A3.4 3.4 0 1 1 127.4 37.8" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M131.5 41.2 A7.4 7.4 0 1 0 138.8 33.9" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M135.9 42.0 A3.3 3.3 0 1 1 140.3 39.0" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M36.9 52.4 A6.5 6.5 0 1 0 43.4 45.8" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M40.8 53.0 A2.9 2.9 0 1 1 44.7 50.4" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M54.6 54.6 A6.8 6.8 0 1 0 61.4 47.8" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M58.7 55.2 A3.1 3.1 0 1 1 62.7 52.5" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M68.3 54.7 A6.7 6.7 0 1 0 75.1 48.0" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M72.4 55.4 A3.0 3.0 0 1 1 76.4 52.7" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M84.0 56.2 A6.6 6.6 0 1 0 90.6 49.6" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M88.0 56.9 A3.0 3.0 0 1 1 91.9 54.2" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M95.4 55.2 A8.2 8.2 0 1 0 103.6 47.0" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M100.3 56.0 A3.7 3.7 0 1 1 105.2 52.7" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M110.4 53.7 A8.5 8.5 0 1 0 118.8 45.3" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M115.4 54.6 A3.8 3.8 0 1 1 120.5 51.2" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M121.5 54.5 A7.9 7.9 0 1 0 129.4 46.6" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M126.3 55.3 A3.6 3.6 0 1 1 131.0 52.1" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M137.8 54.9 A6.1 6.1 0 1 0 143.9 48.8" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M141.5 55.5 A2.7 2.7 0 1 1 145.1 53.1" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M37.6 69.6 A7.4 7.4 0 1 0 45.0 62.2" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M42.0 70.3 A3.3 3.3 0 1 1 46.5 67.4" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M51.5 66.9 A7.7 7.7 0 1 0 59.3 59.1" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M56.2 67.7 A3.5 3.5 0 1 1 60.8 64.6" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M63.4 68.5 A7.1 7.1 0 1 0 70.6 61.3" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M67.7 69.2 A3.2 3.2 0 1 1 72.0 66.3" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M77.9 70.7 A7.2 7.2 0 1 0 85.0 63.5" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M82.2 71.4 A3.2 3.2 0 1 1 86.5 68.5" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M89.2 65.4 A7.8 7.8 0 1 0 97.0 57.6" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M93.9 66.1 A3.5 3.5 0 1 1 98.5 63.0" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M101.8 71.0 A8.1 8.1 0 1 0 109.9 62.9" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M106.7 71.8 A3.6 3.6 0 1 1 111.5 68.5" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M113.0 67.3 A7.7 7.7 0 1 0 120.7 59.6" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M117.6 68.1 A3.5 3.5 0 1 1 122.2 65.0" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M125.7 67.8 A6.4 6.4 0 1 0 132.1 61.4" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M129.6 68.4 A2.9 2.9 0 1 1 133.4 65.8" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M137.8 65.4 A7.9 7.9 0 1 0 145.7 57.4" stroke="#8f5f37" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M142.5 66.1 A3.6 3.6 0 1 1 147.3 63.0" stroke="#2e1c10" strokeWidth="2" fill="none" strokeLinecap="round" />
       {/* headband */}
       <path d="M30 80 C34 18 146 18 150 80" stroke="#262a32" strokeWidth="12" fill="none" strokeLinecap="round" />
       <path d="M44 44 C70 18 112 18 138 44" stroke={RIM} strokeWidth="2" fill="none" opacity="0.5" />
@@ -423,8 +491,9 @@ export function ArtistHead() {
       <ellipse cx="152" cy="100" rx="9" ry="16" fill="#0b0c10" />
       <path d="M168 78 C176 92 176 110 168 124" stroke={RIM} strokeWidth="3" fill="none" opacity="0.8" />
       <path d="M12 82 C6 96 6 110 12 122" stroke={MOON} strokeWidth="2.5" fill="none" opacity="0.4" />
-      {/* backlit hair */}
-      <path d="M94 20 C132 20 158 50 158 90" stroke={RIM} strokeWidth="3" fill="none" opacity="0.65" />
+      {/* backlit curls */}
+      <path d="M96 18 C132 20 156 46 156 84" stroke={RIM} strokeWidth="3" fill="none" opacity="0.65" />
+      <path d="M136 72 C140 100 136 126 126 146" stroke={RIM} strokeWidth="2.5" fill="none" opacity="0.5" />
     </svg>
   );
 }
