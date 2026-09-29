@@ -1,9 +1,10 @@
-// Analyses every track in src/data/tracks.ts and writes
-// src/data/trackAnalysis.json, which the site reads for:
-//   - the waveform (peaks + loudness, 600 columns) in the media player
-//   - the exact tempo and first-beat offset (the Beat Deck chops and the
-//     visualizers' beat pulse follow these)
-//   - a colour palette from the cover art, which themes the player
+// Optional. Analyses every track in src/data/tracks.ts that lists a `bpm`
+// and writes src/data/trackAnalysis.json, which the site reads for:
+//   - the length shown in the Beats folder before a file is opened
+//   - the exact tempo and first-beat offset (the visualizer's fallback
+//     beat pulse on iPhones follows these)
+// (It also stores the waveform and a cover palette; the player pulls its
+// colours from the cover itself, so new tracks work without running this.)
 //
 // Run it after adding or replacing a track:
 //   node scripts/analyze-tracks.mjs
@@ -21,7 +22,7 @@ const sharp = require("sharp");
 const root = path.join(path.dirname(new URL(import.meta.url).pathname), "..");
 const tracksSrc = fs.readFileSync(path.join(root, "src/data/tracks.ts"), "utf8");
 // id, bpm, src and cover for each track entry
-const tracks = [...tracksSrc.matchAll(/\{\s*id: "([^"]+)",[\s\S]*?bpm: (\d+(?:\.\d+)?),[\s\S]*?(?:cover: "([^"]+)",[\s\S]*?)?src: "([^"]+)"/g)].map(
+const tracks = [...tracksSrc.matchAll(/\{\s*id: "([^"]+)",[^{}]*?(?:bpm: (\d+(?:\.\d+)?),[^{}]*?)?(?:cover: "([^"]+)",[^{}]*?)?src: "([^"]+)"/g)].map(
   ([, id, bpm, cover, src]) => ({ id, bpm: Number(bpm), cover, src }),
 );
 if (!tracks.length) throw new Error("no tracks found in src/data/tracks.ts");
@@ -184,6 +185,10 @@ async function palette(file) {
 
 const out = {};
 for (const t of tracks) {
+  if (!t.bpm) {
+    console.log(`${t.id}: no bpm listed, skipped (it plays fine; add a bpm to measure the exact tempo)`);
+    continue;
+  }
   const audio = await analyseAudio(path.join(root, "public", t.src), t.bpm);
   const colors = t.cover ? await palette(path.join(root, "public", t.cover)) : null;
   out[t.id] = { ...audio, palette: colors };
