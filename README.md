@@ -78,20 +78,12 @@ now, since no video was picked.
 
 ## Contact
 
-Name, email and message, validated in the browser and again on the server
-(`src/lib/contact.ts`), sent by `src/app/api/contact/route.ts` through
-[Resend](https://resend.com)'s HTTP API. The key never reaches the browser.
-Set these in Vercel → Project → Settings → Environment Variables:
-
-| Variable | |
-| --- | --- |
-| `RESEND_API_KEY` | **Required.** Without it the form tells visitors the message was *not* sent and gives them the address instead. |
-| `CONTACT_FROM_EMAIL` | A sender on a domain verified in Resend, e.g. `saeculo site <contact@saeculobeats.com>`. Without it, Resend's test sender is used, which only delivers to the Resend account's own address. |
-| `CONTACT_TO_EMAIL` | Optional. Defaults to the booking email in `profile.ts`. |
-
-Replies go straight to the visitor (the email's reply-to is theirs). A
-hidden field catches simple bots, and one address can send five messages
-per ten minutes.
+Name and message, checked in the browser (`src/lib/contact.ts`). **Send**
+opens the visitor's own email app with a new email to the booking address
+in `src/data/profile.ts`, subject and message already filled in; they press
+send there, and replies go to the address they wrote from. Nothing runs on
+a server and nothing needs configuring. The address is also shown (and
+copyable) for anyone without an email app set up.
 
 ## Game
 
@@ -193,7 +185,7 @@ panels), `sfx.ts` (room tone and cues), `save.ts`.
 ## Project structure
 
 - `src/app/`: layout (fonts, and a tiny script that decides before the
-  first paint whether to show the intro), page, `api/contact`, share image.
+  first paint whether to show the intro), page, share image.
 - `src/components/site/`: the desktop, windows, taskbar, icons, Socials,
   Contact, and the site store.
 - `src/components/beats/`: the Beats window, the visualizer, the palette.

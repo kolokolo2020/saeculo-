@@ -229,26 +229,30 @@ try {
     await page.getByTestId("icon-contact").click();
     const win = page.getByTestId("window-contact");
     await win.getByRole("button", { name: "Send" }).click();
-    check("contact: empty form shows three errors", (await win.locator("[aria-invalid=true]").count()) === 3);
+    check("contact: empty form shows two errors", (await win.locator("[aria-invalid=true]").count()) === 2);
     check("contact: focus goes to the first problem", await page.evaluate(() => document.activeElement?.id === "contact-name"));
     await win.getByLabel("Name").fill("Test");
-    await win.getByLabel("Email").fill("not-an-email");
+    await win.getByLabel("Message").fill("Hi");
+    await win.getByRole("button", { name: "Send" }).click();
+    check("contact: too-short message caught", (await win.getByText("A little more detail").count()) === 1);
+    // catch the mailto link instead of letting it leave for an email app
+    await page.evaluate(() => {
+      window.__mailto = null;
+      document.addEventListener("click", (e) => {
+        const a = e.target.closest?.("a[href^='mailto:']");
+        if (a) {
+          window.__mailto = a.href;
+          e.preventDefault();
+        }
+      }, true);
+    });
     await win.getByLabel("Message").fill("Hello, this is a test message.");
     await win.getByRole("button", { name: "Send" }).click();
-    check("contact: bad email caught", (await win.getByText("doesn't look right").count()) === 1);
-    await win.getByLabel("Email").fill("test@example.com");
-    const res = page.waitForResponse("**/api/contact");
-    await win.getByRole("button", { name: "Send" }).click();
-    const r = await res;
-    await page.waitForTimeout(300);
-    if (r.status() === 503) {
-      check("contact: unconfigured delivery is reported honestly", (await win.getByRole("alert").textContent()).includes("not sent"));
-      check("contact: no fake success", (await win.getByText("Sent. Thank you.").count()) === 0);
-    } else check("contact: delivery answered", r.status() === 200, String(r.status()));
-    await page.route("**/api/contact", (route) => route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }));
-    await win.getByRole("button", { name: "Send" }).click();
-    await page.waitForTimeout(300);
-    check("contact: success only when the server confirms", (await win.getByText("Sent. Thank you.").count()) === 1);
+    await page.waitForTimeout(200);
+    const mailto = await page.evaluate(() => window.__mailto);
+    check("contact: Send opens an email to saeculo with the message written", !!mailto && mailto.startsWith("mailto:saeculo888@gmail.com?") && decodeURIComponent(mailto).includes("Hello, this is a test message.") && decodeURIComponent(mailto).includes("Message from Test"), mailto?.slice(0, 80));
+    check("contact: says what happened, with the address as a fallback", (await win.getByTestId("contact-opened").isVisible()) && (await win.getByTestId("contact-opened").textContent()).includes("saeculo888@gmail.com"));
+    check("contact: no server involved", (await page.request.post(new URL("/api/contact", page.url()).href, { data: {} })).status() === 404);
     await ctx.close();
   }
 
@@ -403,12 +407,22 @@ try {
     await page.waitForTimeout(1200);
     check("street: your tape on the boombox", (await lifeNow()).musicProject === (await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-studio")).slots[0].name)));
     await page.keyboard.press("Escape");
-    // stand in the road until a car comes
-    await page.evaluate(() => window.__game.teleport("street", 20, 7.5, "down"));
+    // wait for a car, then step into its lane ahead of it
+    await page.evaluate(() => window.__game.teleport("street", 20, 5.4, "down"));
     let stoppedCar = false;
-    for (let i = 0; i < 40 && !stoppedCar; i++) {
+    let placed = false;
+    for (let i = 0; i < 60 && !stoppedCar; i++) {
       await page.waitForTimeout(500);
-      stoppedCar = (await lifeNow()).actors.some((a) => a.kind === "car" && a.stopped > 0.5);
+      const cars = (await lifeNow()).actors.filter((a) => a.kind === "car");
+      if (!placed) {
+        const car = cars.find((a) => (a.dir === "right" ? a.x > -20 && a.x < 400 : a.x > 120 && a.x < 700));
+        if (car) {
+          const ahead = car.dir === "right" ? car.x + 55 : car.x - 55;
+          await page.evaluate(([x, y]) => window.__game.teleport("street", x / 16, y / 16, "down"), [ahead, car.y - 4]);
+          placed = true;
+        }
+      }
+      stoppedCar = cars.some((a) => a.stopped > 0.5);
     }
     check("street: traffic stops for you", stoppedCar);
     check("street: the dog walker walks", (await lifeNow()).actors.some((a) => a.id === "walker"));
