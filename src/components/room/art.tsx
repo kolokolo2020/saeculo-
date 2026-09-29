@@ -10,12 +10,10 @@ export const H = 1000;
 export const SCREEN = { x: 780, y: 373, w: 300, h: 195 };
 export const EMBER = { x: 977, y: 565 };
 
-import { TapesPoster, WarehouseFlyer } from "./posters";
 
 const INK = "#05060a";
 const RIM = "#8fe4ff"; // laptop light
 const MOON = "#a8bce6";
-const TYPE = { fontFamily: "var(--font-type)" } as const;
 
 /** Halftone dots, rotated like a comic print. */
 function Dots({ id, r = 1.7, gap = 9, color = "#000" }: { id: string; r?: number; gap?: number; color?: string }) {
@@ -114,7 +112,7 @@ export function BackArt() {
       <rect x="94" y="538" width="492" height="22" fill="#10151f" stroke={INK} strokeWidth="5" />
       <path d="M103 73 L577 73" stroke={MOON} strokeWidth="2" opacity="0.4" />
 
-      {/* shelf: records, tapes, a skull, a plant */}
+      {/* shelf: records, tapes, a plant */}
       <g>
         {Array.from({ length: 17 }, (_, i) => {
           const x = 612 + i * 11 + (i > 8 ? 6 : 0);
@@ -129,14 +127,6 @@ export function BackArt() {
             <rect x={826} y={250 - i * 17} width="38" height="7" fill={i % 2 ? "#b33" : "#d9ceb2"} opacity="0.8" />
           </g>
         ))}
-        {/* the skull */}
-        <g transform="translate(893 215)">
-          <path d="M0 22 C-2 4 10 -6 22 -6 C34 -6 46 4 44 22 C44 30 38 34 36 36 L36 46 L8 46 L8 36 C6 34 0 30 0 22 Z" fill="#ddd3bd" stroke={INK} strokeWidth="3" />
-          <ellipse cx="13" cy="21" rx="6" ry="7" fill={INK} />
-          <ellipse cx="31" cy="21" rx="6" ry="7" fill={INK} />
-          <path d="M20 30 L22 26 L24 30 Z" fill={INK} />
-          <path d="M12 40 L32 40 M16 36 L16 46 M22 36 L22 46 M28 36 L28 46" stroke={INK} strokeWidth="2" />
-        </g>
         {/* plant */}
         <g transform="translate(950 262)">
           <path d="M-14 0 L-10 -30 L10 -30 L14 0 Z" fill="#3a2418" stroke={INK} strokeWidth="3" />
@@ -148,14 +138,12 @@ export function BackArt() {
         <path d="M620 276 L620 300 L646 276 M970 276 L970 300 L944 276" stroke={INK} strokeWidth="5" fill="none" />
       </g>
 
-      {/* flyer: a warehouse show, photocopied too many times */}
-      <g transform="translate(1000 124) rotate(-5)">
-        <WarehouseFlyer dots="rb-dots" />
-      </g>
-
-      {/* the poster: a horror film that doesn't exist */}
-      <g transform="translate(1180 106) rotate(2.5)">
-        <TapesPoster dots="rb-dots" />
+      {/* a print of the care4me cover, taped to the wall */}
+      <g transform="translate(1210 150) rotate(2.5)">
+        <rect x="-10" y="-10" width="200" height="226" fill="#d9d2c0" stroke={INK} strokeWidth="4" />
+        <image href="/covers/care4me.jpg" x="0" y="0" width="180" height="180" preserveAspectRatio="xMidYMid slice" opacity="0.8" style={{ filter: "grayscale(0.6) contrast(1.1)" }} />
+        <rect x="0" y="0" width="180" height="180" fill="#0b1020" opacity="0.35" />
+        <rect x="70" y="-18" width="44" height="14" fill="#cfc6ac" opacity="0.7" transform="rotate(-4 92 -11)" />
       </g>
 
       {/* a line of light under the door, far right */}
@@ -264,9 +252,6 @@ export function DeskArt() {
       <rect x="376" y="596" width="46" height="56" rx="4" fill="#2c1616" stroke={INK} strokeWidth="4" />
       <path d="M422 608 C446 610 446 638 422 640" stroke={INK} strokeWidth="5" fill="none" />
       <ellipse cx="399" cy="598" rx="23" ry="5" fill="#120a08" stroke={INK} strokeWidth="2" />
-      <text x="399" y="632" textAnchor="middle" fontSize="9" fill="#d9ceb2" style={TYPE}>
-        3AM
-      </text>
 
       {/* lava lamp (the blobs move in their own layer) */}
       <path d="M1478 646 L1540 646 L1530 600 L1488 600 Z" fill="#2a2d33" stroke={INK} strokeWidth="4" />

@@ -1,7 +1,8 @@
-// Browser smoke test for the desktop. Run against a local dev server:
-//   npm i --no-save playwright-core axe-core && npm run dev -- -p 3210
+// Browser checks for the site and the game. Run against a dev server:
+//   npm i --no-save playwright-core axe-core
+//   npx next dev -p 3210
 //   node scripts/verify.mjs
-// (axe-core is optional: without it the accessibility check is skipped.)
+// (axe-core is optional: without it the accessibility audit is skipped.)
 import { chromium } from "playwright-core";
 import { readFileSync } from "fs";
 import { createRequire } from "module";
@@ -18,831 +19,312 @@ const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome
 
 const results = [];
 function check(name, ok, extra = "") {
-  results.push({ name, ok });
+  results.push({ name, ok: !!ok });
   console.log(`${ok ? "PASS" : "FAIL"} — ${name}${extra ? " — " + extra : ""}`);
 }
-
-// Sandboxed/CI environments often can't reach Vercel's analytics script;
-// that's the network, not the site.
-// windows switch on like a CRT in Tape; wait until none is mid-animation
-const settle = (p) =>
-  p
-    .waitForFunction(
-      () => !document.getAnimations().some((a) => a.playState === "running" && a.effect?.target?.classList?.contains("aero-window")),
-      null,
-      { timeout: 3000 },
-    )
-    .catch(() => {});
-
-const isEnvNoise = (text) => /vercel-scripts|ERR_TUNNEL|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED/.test(text);
+const isEnvNoise = (t) => /vercel-scripts|speed-insights|ERR_TUNNEL|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED|ytimg|status of 503|status of 404/.test(t);
+const errors = [];
 
 const browser = await chromium.launch({ executablePath: CHROME, args: ["--autoplay-policy=no-user-gesture-required"] });
-const consoleErrors = [];
 
-// The Room intro plays once per visit; every context skips it except the
-// one that tests it. (The desktop marks it seen in sessionStorage.)
-const rawNewContext = browser.newContext.bind(browser);
-browser.newContext = async (opts) => {
-  const ctx = await rawNewContext(opts);
-  await ctx.addInitScript(() => sessionStorage.setItem("saeculo-room", "1"));
-  return ctx;
+async function open({ seen = true, viewport = { width: 1366, height: 800 }, hash = "", reduced = false, mobile = false, init } = {}) {
+  const ctx = await browser.newContext({
+    viewport,
+    reducedMotion: reduced ? "reduce" : "no-preference",
+    ...(mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}),
+  });
+  await ctx.addInitScript(
+    ([seen, init]) => {
+      if (sessionStorage.getItem("verify-init")) return;
+      sessionStorage.setItem("verify-init", "1");
+      if (seen) localStorage.setItem("saeculo-intro-seen", "1");
+      if (init) for (const [k, v] of Object.entries(init)) localStorage.setItem(k, v);
+    },
+    [seen, init ?? null],
+  );
+  const page = await ctx.newPage();
+  page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("console", (m) => m.type() === "error" && !isEnvNoise(m.text()) && errors.push(m.text()));
+  await page.goto(BASE + "/" + hash, { waitUntil: "networkidle" });
+  await page.waitForTimeout(400);
+  return { ctx, page };
+}
+const audio = (page) =>
+  page.evaluate(() => {
+    const a = document.querySelector("audio");
+    return { paused: a.paused, t: a.currentTime, src: a.getAttribute("src") ?? a.src };
+  });
+const game = (page) => page.evaluate(() => window.__game.state());
+const hold = async (page, key, ms) => {
+  await page.keyboard.down(key);
+  await page.waitForTimeout(ms);
+  await page.keyboard.up(key);
 };
 
 try {
-  // ---- the Room intro ----
+  // ---------------------------------------------------------------- intro
   {
-    const rc = await rawNewContext({ viewport: { width: 1366, height: 800 } });
-    await rc.addInitScript(() => localStorage.setItem("saeculo-welcome", "off"));
-    const rp = await rc.newPage();
-    rp.on("pageerror", (err) => consoleErrors.push(String(err)));
-    await rp.goto(BASE, { waitUntil: "networkidle" });
-    const room = rp.getByRole("dialog", { name: "The room" });
-    await room.waitFor({ timeout: 5000 }).catch(() => {});
-    check("a first visit opens on the Room's title card", await room.getByText("click to enter").isVisible().catch(() => false));
-    await rp.mouse.click(683, 400);
-    await rp.waitForTimeout(1500);
-    check(
-      "entering the room starts the music (muffled) and shows the scene",
-      (await rp.getByText("click to step inside").isVisible()) && (await rp.evaluate(() => !document.querySelector("audio")?.paused)),
-    );
-    await rp.mouse.click(683, 400);
-    await rp.getByLabel("Skip boot sequence").waitFor({ timeout: 8000 }).catch(() => {});
-    check("the camera push lands on the boot screen, music still playing", (await room.count()) === 0 && (await rp.evaluate(() => !document.querySelector("audio")?.paused)));
-    await rp.reload({ waitUntil: "networkidle" });
-    await rp.waitForTimeout(500);
-    check("the Room plays once per visit", (await room.count()) === 0);
-    const rp2 = await rc.newPage();
-    await rp2.goto(BASE + "/#track=elbtunnel", { waitUntil: "networkidle" });
-    await rp2.waitForTimeout(600);
-    check("a track link skips the Room", (await rp2.getByRole("dialog", { name: "The room" }).count()) === 0);
-    const rp3 = await (await rawNewContext({ viewport: { width: 1366, height: 800 } })).newPage();
-    await rp3.goto(BASE, { waitUntil: "networkidle" });
-    await rp3.getByRole("button", { name: "Skip intro ›" }).click();
-    await rp3.waitForTimeout(500);
-    check("Skip intro goes straight to the desktop", await rp3.getByRole("navigation", { name: "Desktop" }).isVisible());
-    await rc.close();
+    const { ctx, page } = await open({ seen: false });
+    const intro = page.getByRole("dialog", { name: "Intro" });
+    check("first visit: intro shows", await intro.isVisible());
+    await page.getByRole("button", { name: /enter/i }).click();
+    await page.waitForTimeout(700);
+    check("intro: entering starts the music", !(await audio(page)).paused);
+    await page.getByRole("button", { name: /skip/i }).click();
+    await page.waitForTimeout(500);
+    check("intro: skip lands on the desktop with Beats open", (await intro.count()) === 0 && (await page.getByTestId("window-beats").isVisible()));
+    check("intro: remembered", (await page.evaluate(() => localStorage.getItem("saeculo-intro-seen"))) === "1");
+    check("intro: music carries on after it", !(await audio(page)).paused);
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(400);
+    check("returning visit: no intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    await page.getByRole("menuitem", { name: "Replay intro" }).click();
+    await page.waitForTimeout(300);
+    check("replay intro from the clock menu", await page.getByRole("dialog", { name: "Intro" }).isVisible());
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    check("Escape skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
+    await ctx.close();
   }
 
-  const context = await browser.newContext({ viewport: { width: 1366, height: 800 }, acceptDownloads: true });
-  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(BASE).origin });
-  const page = await context.newPage();
-  page.on("console", (msg) => msg.type() === "error" && !isEnvNoise(msg.text()) && consoleErrors.push(msg.text()));
-  page.on("pageerror", (err) => consoleErrors.push(String(err)));
-
-  const desktop = page.getByRole("navigation", { name: "Desktop" });
-  const openFromDesktop = async (label) => {
-    await desktop.getByRole("button", { name: label, exact: true }).click();
-    await page.waitForTimeout(100);
-    await settle(page);
-  };
-  const win = (title) => page.getByRole("region", { name: title, exact: true });
-  const close = async (title) => {
-    await page.getByRole("button", { name: `Close ${title}`, exact: true }).click();
-    // windows play a short close animation before they go
-    await page.getByRole("region", { name: title, exact: true }).waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
-  };
-  const audioPaused = () => page.getByTestId("player-audio").evaluate((el) => el.paused);
-
-  await page.goto(BASE, { waitUntil: "networkidle" });
-
-  // ---- boot ----
-  check("boot screen appears", await page.getByLabel("Skip boot sequence").isVisible().catch(() => false));
-  await page.getByLabel("Skip boot sequence").click({ force: true });
-  await page.waitForTimeout(300);
-  check("desktop shows 10 icons", (await desktop.getByRole("button").count()) === 10);
-  const welcome = win("Welcome Center");
-  check("the Welcome Center greets a first visit", await welcome.getByRole("button", { name: "Play care4me" }).isVisible());
-  await welcome.getByRole("checkbox", { name: "Show at startup" }).uncheck();
-  await close("Welcome Center");
-
-  // ---- media player + global audio ----
-  await desktop.getByRole("button", { name: "Media Player", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await page.waitForTimeout(100);
-  await settle(page);
-  const player = win("saeculo Media Player");
-  check("player opens via keyboard Enter on icon", await player.isVisible());
-
-  const before = await player.boundingBox();
-  await player.locator("header").hover({ position: { x: 120, y: 12 } });
-  await page.mouse.down();
-  await page.mouse.move((before?.x ?? 0) + 260, (before?.y ?? 0) + 90, { steps: 10 });
-  await page.mouse.up();
-  const after = await player.boundingBox();
-  check("window drags by its title bar", !!before && !!after && Math.abs(after.x - before.x) > 40, `dx=${Math.round((after?.x ?? 0) - (before?.x ?? 0))}`);
-
-  const sizeBefore = await player.boundingBox();
-  await page.mouse.move(sizeBefore.x + sizeBefore.width - 5, sizeBefore.y + sizeBefore.height - 5);
-  await page.mouse.down();
-  await page.mouse.move(sizeBefore.x + sizeBefore.width + 80, sizeBefore.y + sizeBefore.height + 40, { steps: 8 });
-  await page.mouse.up();
-  const sizeAfter = await player.boundingBox();
-  check("window resizes from the corner grip", sizeAfter.width > sizeBefore.width + 40, `w ${Math.round(sizeBefore.width)}→${Math.round(sizeAfter.width)}`);
-
-  await player.getByRole("button", { name: "Play", exact: true }).click();
-  await page.waitForTimeout(600);
-  check("audio plays", (await audioPaused()) === false);
-
-  const canvas = player.getByRole("img", { name: "Audio visualizer" });
-  const f1 = await canvas.evaluate((c) => c.toDataURL());
-  await page.waitForTimeout(400);
-  const f2 = await canvas.evaluate((c) => c.toDataURL());
-  check("visualizer animates", f1 !== f2);
-
-  const vizBtn = player.getByRole("button", { name: "Cycle visualizer style" });
-  const m1 = await vizBtn.innerText();
-  check("the Cover Art visualizer is the default", m1.includes("Cover Art"), m1);
-  const seekBar = player.getByRole("slider", { name: "Seek" });
-  const tBefore = await page.getByTestId("player-audio").evaluate((a) => a.currentTime);
-  await seekBar.focus();
-  await page.keyboard.press("ArrowRight");
-  await page.waitForTimeout(200);
-  const tAfter = await page.getByTestId("player-audio").evaluate((a) => a.currentTime);
-  check("the waveform seek bar moves playback", tAfter - tBefore >= 4, `${tBefore.toFixed(1)} → ${tAfter.toFixed(1)}`);
-  await vizBtn.click();
-  check("visualizer mode cycles", (await vizBtn.innerText()) !== m1);
-  check("the Projector is next in the cycle", (await vizBtn.innerText()).includes("Projector"));
-  const pf1 = await canvas.evaluate((c) => c.toDataURL());
-  await page.waitForTimeout(300);
-  check("the Projector flickers and weaves", pf1 !== (await canvas.evaluate((c) => c.toDataURL())));
-  const labels = [];
-  for (let i = 0; i < 6; i++) {
-    labels.push(await vizBtn.innerText());
-    await vizBtn.click();
-  }
-  check("Film only appears for tracks with a video", !labels.some((l) => l.includes("Film")), labels.join(", "));
-  const tapeBtn = player.getByRole("button", { name: "Tape effect" });
-  const tapeWas = await tapeBtn.getAttribute("aria-pressed");
-  check("the Tape look is on by default on a Tape desktop", tapeWas === "true");
-  await tapeBtn.click();
-  check("Tape toggles off", (await tapeBtn.getAttribute("aria-pressed")) === "false");
-  await tapeBtn.click();
-
-  await page.getByRole("button", { name: "Maximize saeculo Media Player" }).click();
-  await page.waitForTimeout(200);
-  const maxBox = await player.boundingBox();
-  check("maximize fills the screen", maxBox.width >= 1360, `w=${Math.round(maxBox.width)}`);
-  await page.getByRole("button", { name: "Restore saeculo Media Player" }).click();
-
-  await page.getByRole("button", { name: "Minimize saeculo Media Player" }).click();
-  await page.waitForTimeout(200);
-  check("audio survives minimize", (await audioPaused()) === false);
-  await page.getByRole("button", { name: "Taskbar saeculo Media Player" }).click();
-  await page.waitForTimeout(400);
-  check("taskbar button restores the window", await player.isVisible());
-
-  await close("saeculo Media Player");
-  check("window closes", (await player.count()) === 0);
-  check("music keeps playing after the player window closes", (await audioPaused()) === false);
-  check("tray shows now-playing while music plays", await page.getByRole("button", { name: /^Now playing:/ }).isVisible());
-
-  await page.getByRole("button", { name: "Gadget pause" }).click();
-  await page.waitForTimeout(200);
-  check("sidebar gadget pauses the global player", (await audioPaused()) === true);
-
-  // ---- start menu search → Beat Deck ----
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  await page.keyboard.type("deck");
-  await page.keyboard.press("Enter");
-  await page.waitForTimeout(1200); // the game loads on demand
-  await settle(page);
-  const deck = win("Beat Deck");
-  check("start search + Enter launches Beat Deck", await deck.getByRole("button", { name: "New run" }).isVisible());
-  check("locked starting decks can't be picked yet", await deck.getByRole("radio", { name: "Trap House deck (locked)" }).isDisabled());
-  check(
-    "certifications start at Demo, the rest locked",
-    (await deck.getByRole("radio", { name: "Demo certification" }).getAttribute("aria-checked")) === "true" &&
-      (await deck.getByRole("radio", { name: "Mixtape certification (locked)" }).isDisabled()),
-  );
-  await deck.getByRole("button", { name: "The Crate" }).click();
-  check("the Crate lists every card, hidden until found", (await deck.getByText("???").count()) > 30);
-  await deck.getByRole("button", { name: "Back" }).click();
-  await deck.getByRole("button", { name: "New run" }).click();
-  await page.waitForTimeout(300);
-  const tour = page.getByRole("dialog", { name: "Tutorial" });
-  check("a first run starts with the tutorial", await tour.isVisible());
-  await tour.getByRole("button", { name: "Skip" }).click();
-  const handCards = deck.getByLabel("Your hand").getByRole("button", { name: / card$/ });
-  check("Beat Deck deals a hand of 8", (await handCards.count()) === 8);
-  // number keys pick cards while Beat Deck is the active window, even with
-  // nothing inside it focused (the tutorial's Skip button just unmounted)
-  for (const k of ["1", "2", "3"]) await page.keyboard.press(k);
-  check(
-    "keys 1–8 pick cards, and the selection previews the beat type",
-    (await deck.getByRole("button", { name: /^Play take \(3\/5\)/ }).isVisible()) && (await deck.getByText(/groove × \d+ hype base/).isVisible()),
-  );
-  await deck.getByRole("button", { name: /^Play take/ }).click();
-  await deck.getByLabel("Groove").waitFor({ timeout: 3000 });
-  await page.waitForTimeout(1500);
-  check("a take plays and counts up groove", Number((await deck.getByLabel("Groove").innerText()).replace(/,/g, "")) > 0);
-  await deck.getByRole("button", { name: "Skip ›" }).click();
-  await page.waitForTimeout(300);
-  check(
-    "the take's score lands in the round",
-    Number((await deck.getByLabel("Round score").innerText()).replace(/,/g, "")) > 0 && (await deck.getByLabel("Takes: 3 of 4 left").isVisible()),
-  );
-  const speedBtn = deck.getByRole("button", { name: /^Scoring speed/ });
-  await speedBtn.click();
-  check("scoring speed can be changed", (await speedBtn.getAttribute("aria-label")) === "Scoring speed: Fast");
-  await speedBtn.click();
-  await speedBtn.click();
-  await handCards.first().click();
-  await deck.getByRole("button", { name: /^Redraw selected/ }).click();
-  check("redraw swaps cards and uses a redraw", await deck.getByLabel("Redraws: 2 of 3 left").isVisible());
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForTimeout(300);
-  await openFromDesktop("Beat Deck");
-  await page.waitForTimeout(1000);
-  check("a run survives a reload (Continue)", await win("Beat Deck").getByRole("button", { name: /^Continue — round 1\/8/ }).isVisible());
-  await close("Beat Deck");
-
-  // ---- Beat Maker ----
-  await openFromDesktop("Beat Maker");
-  const bm = win("Beat Maker");
-  await bm.getByLabel("kick step 3").click();
-  check("Beat Maker step toggles on", (await bm.getByLabel("kick step 3").getAttribute("aria-pressed")) === "true");
-  await bm.getByRole("combobox", { name: "Load preset" }).selectOption("Trap");
-  check("Beat Maker preset sets the tempo", (await bm.getByText("140 bpm").count()) === 1);
-  await bm.getByRole("button", { name: "Play sequencer" }).click();
-  await page.waitForTimeout(500);
-  check("Beat Maker plays", await bm.getByRole("button", { name: "Stop sequencer" }).isVisible());
-  await bm.getByRole("button", { name: "Stop sequencer" }).click();
-
-  // painting: a drag lights a run of steps, and undoes as one edit
-  await bm.getByRole("button", { name: "Clear pattern" }).click();
-  const percOn = () => bm.getByRole("group", { name: "perc steps" }).locator('[aria-pressed="true"]').count();
-  const p1 = await bm.getByLabel("perc step 1", { exact: true }).boundingBox();
-  const p6 = await bm.getByLabel("perc step 6", { exact: true }).boundingBox();
-  await page.mouse.move(p1.x + p1.width / 2, p1.y + p1.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(p6.x + p6.width / 2, p6.y + p6.height / 2, { steps: 12 });
-  await page.mouse.up();
-  const painted = await percOn();
-  await bm.getByRole("button", { name: "Undo" }).click();
-  check("Beat Maker: a drag paints steps and undoes in one go", painted === 6 && (await percOn()) === 0, `${painted} painted`);
-  await bm.getByLabel("keys step 1", { exact: true }).click({ button: "right" });
-  check("Beat Maker: right-click accents a step", (await bm.getByLabel("keys step 1", { exact: true }).getAttribute("data-accent")) === "true");
-  const swingKnob = bm.getByRole("slider", { name: "Swing" });
-  const swing0 = Number(await swingKnob.getAttribute("aria-valuenow"));
-  await swingKnob.focus();
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("ArrowUp");
-  check("Beat Maker: the swing knob turns with the keyboard", Number(await swingKnob.getAttribute("aria-valuenow")) === swing0 + 2);
-  await bm.getByRole("combobox", { name: "Key" }).selectOption({ label: "A minor" });
-  check(
-    "Beat Maker: the chord display follows the key and progression",
-    (await bm.getByRole("list", { name: "Chord progression" }).getByRole("listitem").first().textContent()) === "Am7",
-  );
-
-  await bm.getByRole("combobox", { name: "Load preset" }).selectOption("House");
-  await bm.getByLabel("kick step 1", { exact: true }).click({ button: "right" });
-  await bm.getByRole("button", { name: "Mute Rim" }).click();
-  await bm.getByRole("button", { name: "Copy share link" }).click();
-  const shareLink = await bm.getByRole("textbox", { name: "Share link" }).inputValue();
-  // House: 124 bpm, swing 20, A♭ minor (8), progression 4, filter open
-  check("share link encodes the loop", /#beat=2\.124\.20\.8\.4\.100\.[A-Za-z0-9_-]{44}$/.test(shareLink), shareLink);
-
-  const [download] = await Promise.all([
-    page.waitForEvent("download"),
-    bm.getByRole("button", { name: "Export loop as WAV" }).click(),
-  ]);
-  const wav = readFileSync(await download.path());
-  check(
-    "Export .wav downloads a real WAV file",
-    wav.toString("ascii", 0, 4) === "RIFF" && wav.toString("ascii", 8, 12) === "WAVE" && wav.length > 500_000,
-    `${download.suggestedFilename()} ${wav.length} bytes`,
-  );
-  await close("Beat Maker");
-
-  const shared = await context.newPage();
-  await shared.goto(shareLink, { waitUntil: "networkidle" });
-  await shared.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
-  await shared.waitForTimeout(300);
-  const sharedBm = shared.getByRole("region", { name: "Beat Maker", exact: true });
-  check(
-    "opening a share link boots into the Beat Maker with that beat",
-    (await sharedBm.isVisible()) &&
-      (await sharedBm.getByText("124 bpm").count()) === 1 &&
-      (await sharedBm.getByLabel("bass step 4").getAttribute("aria-pressed")) === "true",
-  );
-  check(
-    "a share link carries accents, swing and mutes",
-    (await sharedBm.getByLabel("kick step 1", { exact: true }).getAttribute("data-accent")) === "true" &&
-      (await sharedBm.getByRole("slider", { name: "Swing" }).getAttribute("aria-valuenow")) === "20" &&
-      (await sharedBm.getByRole("button", { name: "Mute Rim" }).getAttribute("aria-pressed")) === "true",
-  );
-  check("share hash is cleared after import", (await shared.evaluate(() => location.hash)) === "");
-  // a link pasted into a tab that already has the site open only changes
-  // the hash (old four-lane links still load)
-  await shared.evaluate(() => (location.hash = "#beat=90-0001000000000000"));
-  await shared.waitForTimeout(300);
-  check(
-    "pasting a share link into an open Beat Maker swaps in that beat",
-    (await sharedBm.getByText("90 bpm").count()) === 1 &&
-      (await sharedBm.getByLabel("kick step 1", { exact: true }).getAttribute("aria-pressed")) === "true" &&
-      (await sharedBm.getByLabel("bass step 4").getAttribute("aria-pressed")) === "false",
-  );
-  await shared.getByRole("button", { name: "Close Beat Maker" }).click();
-  await sharedBm.waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
-  await shared.evaluate(() => (location.hash = "#beat=110-0000000100000000"));
-  await shared.waitForTimeout(400);
-  check(
-    "pasting a share link with the Beat Maker closed opens it with that beat",
-    (await sharedBm.isVisible()) &&
-      (await sharedBm.getByText("110 bpm").count()) === 1 &&
-      (await sharedBm.getByLabel("snare step 1", { exact: true }).getAttribute("aria-pressed")) === "true",
-  );
-  await shared.close();
-
-  // ---- right-click menu + Personalize ----
-  const root = page.locator("main");
-  await page.mouse.click(700, 420, { button: "right" });
-  check("right-click on the desktop opens a context menu", await page.getByRole("menu", { name: "Desktop menu" }).isVisible());
-  await page.getByRole("menuitem", { name: "Personalize" }).click();
-  await page.waitForTimeout(250);
-  await page.getByRole("button", { name: "Glass color Violet" }).click();
-  await page.getByRole("button", { name: "Background Dusk" }).click();
-  check(
-    "Personalize applies glass color and background live",
-    (await root.getAttribute("data-glass")) === "violet" && (await root.getAttribute("data-wall")) === "dusk",
-  );
-  const thumbBg = (label) =>
-    page.getByRole("button", { name: `Background ${label}` }).locator("span").first().evaluate((el) => getComputedStyle(el).backgroundImage);
-  check("wallpaper thumbnails preview their own background", (await thumbBg("Aurora")) !== (await thumbBg("Dusk")));
-  await page.getByRole("button", { name: "Background DreamScene" }).click();
-  await page.waitForTimeout(300);
-  const dreamPainted = await root.locator(":scope > canvas").evaluate((c) => {
-    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-    let lit = 0;
-    for (let i = 0; i < d.length; i += 4) lit += d[i] + d[i + 1] + d[i + 2];
-    return c.width > 0 && lit > 0;
-  });
-  check("the DreamScene wallpaper paints a live canvas", dreamPainted);
-  await page.getByRole("button", { name: "Background Dusk" }).click();
-  check("switching away from DreamScene removes its canvas", (await root.locator(":scope > canvas").count()) === 0);
-  await page.getByRole("button", { name: "OK", exact: true }).click();
-
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  await page.getByRole("navigation", { name: "Start menu" }).getByRole("button", { name: "Personalize" }).first().click();
-  await page.getByRole("button", { name: "Glass color Rose" }).click();
-  await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  check("Cancel restores the previous look", (await root.getAttribute("data-glass")) === "violet");
-
-  await page.reload({ waitUntil: "networkidle" });
-  await page.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
-  await page.waitForTimeout(300);
-  check(
-    "the chosen look survives a reload",
-    (await root.getAttribute("data-glass")) === "violet" && (await root.getAttribute("data-wall")) === "dusk",
-  );
-
-  // ---- content apps ----
-  await openFromDesktop("about.txt");
-  check("Notepad shows the bio", (await win("about.txt - Notepad").innerText()).includes("saeculo"));
-  await close("about.txt - Notepad");
-
-  await openFromDesktop("Contact");
-  const mail = win("New Message - Booking");
-  check("Contact is a compose form with a Send button", await mail.getByRole("button", { name: "Send" }).isVisible());
-  await close("New Message - Booking");
-
-  await openFromDesktop("Recycle Bin");
-  const bin = win("Recycle Bin");
-  await bin.getByRole("button", { name: "Empty Recycle Bin" }).click();
-  await bin.getByRole("button", { name: "Yes", exact: true }).click();
-  check(
-    "Recycle Bin empties, except vault.zip",
-    (await bin.getByRole("row").count()) === 2 &&
-      (await bin.getByText("vault.zip could not be deleted: the file is in use.").isVisible()),
-  );
-  await close("Recycle Bin");
-
-  // ---- mystique: the lore file, Pictures, tube windows, the haunts ----
-  await openFromDesktop("found_footage.txt");
-  const footage = win("found_footage.txt - Notepad");
-  check(
-    "found_footage.txt is a typed log from the night the tapes were made",
-    (await footage.innerText()).includes("REEL ONE") && (await footage.locator("dt").count()) >= 8,
-  );
-  check("on a Tape desktop, windows switch on like a CRT", (await footage.evaluate((el) => getComputedStyle(el).animationName)) === "crt-on");
-  const trueTitle = await footage.locator("h2").innerText();
-  check("a haunt can change a window title", (await page.evaluate(() => window.__saeculoHaunt("title"))) === true);
-  await page.waitForTimeout(100);
-  check(
-    "the haunted title shows something else, but the window keeps its name",
-    (await footage.locator("h2 [aria-hidden]").innerText()) !== trueTitle && (await footage.count()) === 1,
-  );
-  await page.waitForTimeout(2700);
-  check("…and goes back a moment later", (await footage.locator("h2").innerText()) === trueTitle);
-  await page.getByRole("button", { name: "Close found_footage.txt - Notepad" }).click();
-  await page.waitForTimeout(80);
-  check("closing a window collapses it like a tube switching off", (await footage.evaluate((el) => getComputedStyle(el).animationName).catch(() => "gone")) === "crt-off");
-  await footage.waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
-
-  await openFromDesktop("Pictures");
-  const pics = win("Pictures");
-  await pics.getByRole("list", { name: "Pictures" }).waitFor({ timeout: 4000 }).catch(() => {});
-  check("Pictures holds the Room's poster and three flyers", (await pics.getByRole("button", { name: /^Open .*\.jpg$/ }).count()) === 4);
-  await pics.getByRole("button", { name: "Open poster.jpg" }).click();
-  check("a picture opens with a description", await pics.getByRole("img", { name: /THE SAECULO TAPES/ }).isVisible());
-  await page.keyboard.press("ArrowRight");
-  check("the arrow keys step to the next picture", await pics.getByRole("img", { name: /WAREHOUSE/ }).isVisible());
-  await page.keyboard.press("Escape");
-  check("Escape goes back to the folder", await pics.getByRole("list", { name: "Pictures" }).isVisible());
-  await close("Pictures");
-
-  await openFromDesktop("Recycle Bin");
-  await page.evaluate(() => window.__saeculoHaunt("bin"));
-  await page.waitForTimeout(150);
-  const ghostRow = win("Recycle Bin").getByTestId("haunt-row");
-  check("a file flickers into the Recycle Bin…", (await ghostRow.isVisible()) && (await page.getByTestId("haunt-ghost").count()) === 1);
-  await page.waitForTimeout(2900);
-  check("…and vanishes", (await ghostRow.count()) === 0 && (await page.getByTestId("haunt-ghost").count()) === 0);
-  await close("Recycle Bin");
-
-  const trayClock = page.getByTestId("tray-clock");
-  const clockSecs = async () => {
-    const [h, m, sec] = (await trayClock.innerText()).match(/\d+/g).map(Number);
-    return h * 3600 + m * 60 + (sec ?? 0);
-  };
-  await page.evaluate(() => window.__saeculoHaunt("clock"));
-  await page.waitForTimeout(1100);
-  const c1 = await clockSecs();
-  await page.waitForTimeout(1100);
-  const c2 = await clockSecs();
-  check("the clock ticks backwards", c2 < c1, `${c1} → ${c2}`);
-  await page.waitForTimeout(2200);
-  check("…then the clock is right again", !/\d+:\d+:\d+/.test(await trayClock.innerText()));
-
-  await page.evaluate(() => window.__saeculoHaunt("cat"));
-  await page.waitForTimeout(300);
-  const cat = page.getByTestId("haunt-cat");
-  check(
-    "the cat walks along the taskbar without blocking anything",
-    (await cat.isVisible()) && (await cat.evaluate((el) => getComputedStyle(el).pointerEvents)) === "none",
-  );
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  check("the taskbar still works while the cat walks", await page.getByRole("navigation", { name: "Start menu" }).isVisible());
-  await page.keyboard.press("Escape");
-
-  // ---- Night Radio ----
-  await openFromDesktop("Night Radio");
-  const radio = win("Night Radio");
-  const dial = radio.getByRole("slider", { name: "Tuning dial" });
-  const dialSays = () => dial.getAttribute("aria-valuetext");
-  check("Night Radio starts switched off", (await dialSays()).includes("radio off"));
-  await radio.getByRole("button", { name: "Power" }).click();
-  await radio.getByRole("button", { name: /^Preset 2/ }).click();
-  await page.waitForTimeout(800);
-  check(
-    "a station plays its track through the global player",
-    (await dialSays()).includes("playing care4me") &&
-      (await audioPaused()) === false &&
-      (await page.getByRole("button", { name: "Now playing: care4me" }).isVisible()),
-    await dialSays(),
-  );
-  check("the DJ types out the station's line", (await radio.getByTestId("radio-dj").textContent()).includes("somebody asked for care4me"));
-  await dial.focus();
-  for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight");
-  check("the arrow keys tune off the station, into static", (await dialSays()) === "95.2 FM, static");
-  await page.keyboard.press("End");
-  for (let i = 0; i < 7; i++) await page.keyboard.press("ArrowLeft");
-  await page.waitForTimeout(300);
-  check(
-    "past the end of the scale there's an unlisted station with a clue",
-    (await dialSays()).includes("unlisted station") &&
-      (await radio.getByTestId("radio-dj").textContent()).includes("three words open the bin") &&
-      (await audioPaused()) === true,
-  );
-  await page.keyboard.press("Home");
-  await radio.getByRole("button", { name: /^Preset 1/ }).click();
-  await page.waitForTimeout(600);
-  check("leaving it hands back to the music", (await audioPaused()) === false && (await dialSays()).includes("elbtunnel"));
-  await radio.getByRole("button", { name: "Power" }).click();
-  check("switching off goes quiet on the dial", (await radio.getByTestId("radio-readout").innerText()) === "—");
-  await close("Night Radio");
-  await page.getByRole("button", { name: "Gadget pause" }).click();
-
-  // ---- release countdown ----
-  await openFromDesktop("next_single.exe");
-  const release = win("Downloading next_single.exe");
-  await page.waitForTimeout(1200); // the shared clock ticks once a second
-  check(
-    "next_single.exe counts down to the release",
-    /^\d+d \d\d:\d\d:\d\d$/.test(await release.getByLabel("Time left").innerText()) &&
-      Number(await release.getByRole("progressbar").getAttribute("aria-valuenow")) >= 0,
-    await release.getByLabel("Time left").innerText(),
-  );
-  await close("Downloading next_single.exe");
-
-  // ---- secret hunt: three hidden words open vault.zip ----
-  const balloon = page.getByRole("status").filter({ hasText: "Hidden word found" });
-  await openFromDesktop("about.txt");
-  await win("about.txt - Notepad").getByRole("button", { name: "Edit" }).click();
-  await page.waitForTimeout(200);
-  check("selecting about.txt reveals word 1", (await balloon.innerText().catch(() => "")).includes("(1/3)"));
-  await close("about.txt - Notepad");
-
-  await page.mouse.click(700, 600);
-  for (const key of ["ArrowUp", "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"]) {
-    await page.keyboard.press(key);
-  }
-  await page.waitForTimeout(200);
-  check("the Konami code reveals word 3", (await balloon.innerText().catch(() => "")).includes("Word 3 is LOOPS"));
-
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  await page.getByRole("textbox", { name: "Start Search" }).fill("vault");
-  check("Start Search denies access to the vault", await page.getByText(/vault is not accessible/).isVisible());
-  await page.keyboard.press("Escape");
-
-  await openFromDesktop("Recycle Bin");
-  await win("Recycle Bin").getByRole("row", { name: /vault\.zip/ }).dblclick();
-  await page.waitForTimeout(250);
-  const vault = win("vault.zip");
-  await vault.getByLabel("Vault password").fill("letmein");
-  await vault.getByRole("button", { name: "Extract" }).click();
-  check("a wrong vault password is refused", await vault.getByText("The password is incorrect.", { exact: false }).isVisible());
-  await vault.getByLabel("Vault password").fill("Late Night Loops");
-  await vault.getByRole("button", { name: "Extract" }).click();
-  await page.waitForTimeout(200);
-  check("the right password opens the vault", await vault.getByRole("list", { name: "Unreleased snippets" }).isVisible());
-  await vault.getByRole("button", { name: /^Play untitled_0412/ }).click();
-  await page.waitForTimeout(300);
-  check("a vault snippet plays", await vault.getByRole("button", { name: /^Pause untitled_0412/ }).isVisible());
-  await vault.getByRole("button", { name: /^Pause untitled_0412/ }).click();
-  await close("vault.zip");
-  await close("Recycle Bin");
-
-  // ---- player polish: track links, saved volume, lock-screen info ----
-  await page.goto(`${BASE}/#track=elbtunnel`, { waitUntil: "networkidle" });
-  await page.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
-  await page.waitForTimeout(400);
-  const linked = win("saeculo Media Player");
-  check(
-    "a #track= link opens the player on that track",
-    (await linked.isVisible()) && (await linked.getByText("elbtunnel", { exact: true }).first().isVisible()),
-  );
-  check("the track hash is cleared after opening", (await page.evaluate(() => location.hash)) === "");
-  await linked.getByRole("tab", { name: "Library" }).click();
-  await linked.getByRole("button", { name: "Copy link to elbtunnel" }).click();
-  check(
-    "Copy link copies a direct track link",
-    (await page.evaluate(() => navigator.clipboard.readText())).endsWith("/#track=elbtunnel"),
-  );
-  await linked.getByRole("slider", { name: "Volume" }).fill("0.35");
-  await linked.getByRole("button", { name: "Play", exact: true }).click();
-  await page.waitForTimeout(600);
-  check(
-    "lock-screen controls show the track and cover",
-    await page.evaluate(
-      () => navigator.mediaSession.metadata?.title === "elbtunnel" && /covers\/elbtunnel\.jpg$/.test(navigator.mediaSession.metadata?.artwork[0]?.src ?? ""),
-    ),
-  );
-  await linked.getByRole("button", { name: "Pause", exact: true }).click();
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForTimeout(300);
-  check(
-    "the volume setting survives a reload",
-    Math.abs((await page.getByTestId("player-audio").evaluate((a) => a.volume)) - 0.35) < 0.01,
-  );
-  check(
-    "the player shows the track length before playing",
-    await page.waitForFunction(() => {
-      const a = document.querySelector("[data-testid=player-audio]");
-      return a && Number.isFinite(a.duration) && a.duration > 60;
-    }, null, { timeout: 5000 }).then(() => true, () => false),
-  );
-
-  // ---- Beat Deck: beating the first boss, the shop ----
-  await page.evaluate(() => {
-    const run = JSON.parse(localStorage.getItem("saeculo-beatdeck-run"));
-    Object.assign(run, { phase: "won", round: 3, score: 1000, target: 1000, reward: { base: 6, takes: 1, interest: 0, chain: 0, register: 0, total: 7, session: null }, money: 20, sessions: ["saturate"] });
-    run.plan[2] = "label";
-    localStorage.setItem("saeculo-beatdeck-run", JSON.stringify(run));
-  });
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForTimeout(300);
-  await openFromDesktop("Beat Deck");
-  await page.waitForTimeout(1000);
-  await win("Beat Deck").getByRole("button", { name: /^Continue/ }).click();
-  const won = page.getByRole("dialog", { name: "Round complete" });
-  check("beating the first boss drops the vault's word 2", (await won.innerText()).includes("SCRAP OF PAPER") && (await balloon.innerText().catch(() => "")).includes("Word 2 is NIGHT"));
-  await won.getByRole("button", { name: "Visit the shop ›" }).click();
-  const shop = win("Beat Deck").getByLabel("Shop");
-  const gearBuy = shop.getByRole("button", { name: /^Buy .* for \$/ }).first();
-  const gearName = (await gearBuy.getAttribute("aria-label")).replace(/^Buy (.*) for .*$/, "$1");
-  await gearBuy.click();
-  check("the shop sells gear", await win("Beat Deck").getByLabel("Gear").getByRole("button", { name: gearName }).isVisible(), gearName);
-  await shop.getByRole("button", { name: "Next client ›" }).click();
-  check("the next client starts round 4", await win("Beat Deck").getByText("ROUND 4/8").isVisible());
-  const bd = win("Beat Deck");
-  await bd.getByLabel("Your hand").getByRole("button", { name: / card$/ }).first().click();
-  await bd.getByLabel("Studio sessions").getByRole("button", { name: /Saturator/ }).click();
-  await bd.getByRole("button", { name: "Use", exact: true }).click();
-  check("a studio session upgrades a card", (await bd.getByLabel("Your hand").getByRole("button", { name: /\(Tape-saturated\)$/ }).count()) === 1);
-  await close("Beat Deck");
-
-  // ---- Beat Deck: winning the last round unlocks the next certification ----
-  await page.evaluate(() => {
-    const run = JSON.parse(localStorage.getItem("saeculo-beatdeck-run"));
-    run.plan[7] = "metronome";
-    Object.assign(run, { phase: "play", round: 8, target: 8400, score: 8399, takesLeft: 1, usedTypes: [] });
-    localStorage.setItem("saeculo-beatdeck-run", JSON.stringify(run));
-  });
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForTimeout(300);
-  await openFromDesktop("Beat Deck");
-  await page.waitForTimeout(1000);
-  await win("Beat Deck").getByRole("button", { name: /^Continue/ }).click();
-  await page.keyboard.press("1");
-  await page.keyboard.press("p");
-  await win("Beat Deck").getByRole("button", { name: "Skip ›" }).click();
-  const summary = page.getByRole("dialog", { name: "Run won" });
-  await summary.waitFor({ timeout: 3000 }).catch(() => {});
-  check("winning a run unlocks the Mixtape certification", (await summary.innerText().catch(() => "")).includes("Mixtape certification unlocked"));
-  await summary.getByRole("button", { name: "Title" }).click();
-  check(
-    "the next certification is ready on the title screen",
-    (await win("Beat Deck").getByRole("radio", { name: "Mixtape certification" }).getAttribute("aria-checked")) === "true" &&
-      (await win("Beat Deck").getByRole("button", { name: "New run · Mixtape" }).isVisible()),
-  );
-  await close("Beat Deck");
-
-  // ---- accessibility: axe over the desktop and the main windows ----
-  if (axeSource) {
-    await page.addScriptTag({ content: axeSource });
-    const problems = [];
-    const audit = async (label) => {
-      const found = await page.evaluate(async () => {
-        const r = await window.axe.run(document, { resultTypes: ["violations"] });
-        return r.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => `${v.id} (${v.nodes[0]?.target.join(" ")})`);
-      });
-      problems.push(...found.map((f) => `${label}: ${f}`));
-    };
-    await audit("desktop");
-    const titles = { "Media Player": "saeculo Media Player", "found_footage.txt": "found_footage.txt - Notepad" };
-    for (const app of ["Media Player", "Beat Maker", "Beat Deck", "Pictures", "found_footage.txt", "Night Radio"]) {
-      await openFromDesktop(app);
-      await page.waitForTimeout(900);
-      await audit(app);
-      await close(titles[app] ?? app);
-    }
-    check("no serious accessibility violations (axe)", problems.length === 0, problems.slice(0, 4).join("; "));
-  }
-
-  // ---- lock / restart ----
-  const saver = page.getByRole("status", { name: /Screensaver active/ });
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  await page.getByRole("button", { name: "Lock", exact: true }).click();
-  await page.waitForTimeout(300);
-  check("Lock shows the screensaver", await saver.isVisible());
-  await page.waitForTimeout(800);
-  await page.mouse.move(300, 300);
-  await page.mouse.move(420, 360);
-  await page.waitForTimeout(200);
-  check("screensaver unlocks on activity", !(await saver.isVisible()));
-
-  await page.getByRole("button", { name: "Start", exact: true }).click();
-  await page.getByRole("button", { name: "Restart", exact: true }).click();
-  await page.waitForTimeout(300);
-  check("Restart replays the boot screen", await page.getByLabel("Skip boot sequence").isVisible());
-  await page.getByText("Welcome").waitFor({ timeout: 4000 }).catch(() => {});
-  check("boot hands off to the Welcome screen", await page.getByText("Welcome").isVisible());
-  await page.getByLabel("Skip boot sequence").click({ force: true });
-
-  check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
-
-  // ---- idle screensaver (virtual clock, isolated context) ----
-  const noWelcome = () => localStorage.setItem("saeculo-welcome", "off");
-  const ssContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  await ssContext.addInitScript(noWelcome);
-  const ssPage = await ssContext.newPage();
-  await ssPage.clock.install();
-  await ssPage.goto(BASE, { waitUntil: "networkidle" });
-  await ssPage.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
-  const idleSaver = ssPage.getByRole("status", { name: /Screensaver active/ });
-  check("screensaver absent before idle", !(await idleSaver.isVisible().catch(() => false)));
-  await ssPage.clock.fastForward("00:46");
-  await ssPage.waitForTimeout(150);
-  check("screensaver appears after 45s idle", await idleSaver.isVisible().catch(() => false));
-  await ssPage.mouse.move(50, 50);
-  await ssPage.waitForTimeout(150);
-  check("idle screensaver dismisses on activity", !(await idleSaver.isVisible().catch(() => false)));
-  await ssContext.close();
-
-  // ---- haunts on their own: Midnight always gets one, Clean never ----
-  for (const atmosphere of ["midnight", "clean"]) {
-    const hc = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    await hc.addInitScript(noWelcome);
-    await hc.addInitScript(
-      (a) => localStorage.setItem("saeculo-look", JSON.stringify({ glass: "sky", wallpaper: "aurora", transparency: true, atmosphere: a })),
-      atmosphere,
-    );
-    const hp = await hc.newPage();
-    await hp.clock.install();
-    await hp.goto(BASE, { waitUntil: "networkidle" });
-    await hp.getByLabel("Skip boot sequence").click({ force: true }).catch(() => {});
-    await hp.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "about.txt", exact: true }).click();
-    await hp.waitForTimeout(100);
-    const anim = await hp.getByRole("region", { name: "about.txt - Notepad" }).evaluate((el) => getComputedStyle(el).animationName);
-    // in 40 s steps, moving the mouse so the idle screensaver stays away
-    for (let i = 0; i < 12; i++) {
-      await hp.mouse.move(600 + i * 5, 400);
-      await hp.clock.fastForward("00:40");
-    }
-    await hp.waitForTimeout(150);
-    const haunted = await hp.evaluate(() => sessionStorage.getItem("saeculo-haunted"));
-    if (atmosphere === "midnight") {
-      check("Midnight: a haunt happens within a few minutes, once per visit", haunted === "1");
-    } else {
-      check("Clean: no haunts, and windows keep the Vista animation", haunted === null && anim === "aero-open", anim);
-    }
-    await hc.close();
-  }
-
-  // ---- mobile ----
-  const mContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  await mContext.addInitScript(noWelcome);
-  const m = await mContext.newPage();
-  await m.goto(BASE, { waitUntil: "networkidle" });
-  await m.getByLabel("Skip boot sequence").click({ force: true });
-  const widget = m.getByRole("group", { name: "Now playing widget" });
-  check("mobile: the home screen shows a Now Playing widget", await widget.isVisible());
-  await widget.getByRole("button", { name: /^Play / }).tap();
-  await m.waitForTimeout(400);
-  check("mobile: the widget plays the music", await widget.getByRole("button", { name: /^Pause / }).isVisible());
-  await widget.getByRole("button", { name: /^Pause / }).tap();
-  await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Beat Deck", exact: true }).tap();
-  await m.waitForTimeout(1200); // the game loads on demand; the open animation (scale .94→1) settles
-  const gBox = await m.getByRole("region", { name: "Beat Deck", exact: true }).boundingBox();
-  check("mobile: windows open full-screen", gBox.width >= 389, `w=${gBox?.width}`);
-  await m.getByRole("button", { name: "New run" }).tap();
-  await m.getByRole("dialog", { name: "Tutorial" }).getByRole("button", { name: "Skip" }).tap();
-  const mHand = m.getByLabel("Your hand").getByRole("button", { name: / card$/ });
-  const firstCard = await mHand.first().boundingBox();
-  const lastCard = await mHand.last().boundingBox();
-  check(
-    "mobile: the whole hand fits on screen, in two rows",
-    lastCard.x + lastCard.width <= 390 && lastCard.y > firstCard.y + firstCard.height / 2,
-    `last card at x=${Math.round(lastCard.x)}`,
-  );
-  await mHand.first().tap();
-  check("mobile: Beat Deck plays with taps", await m.getByRole("button", { name: /^Play take \(1\/5\)/ }).isVisible());
-  await m.getByLabel("Taskbar").getByRole("button", { name: "Start", exact: true }).tap();
-  await m.getByRole("textbox", { name: "Start Search" }).fill("up up down down left right left right b a");
-  await m.waitForTimeout(200);
-  check(
-    "mobile: the cheat code typed into Start Search reveals word 3",
-    (await m.getByRole("status").filter({ hasText: "Hidden word found" }).innerText().catch(() => "")).includes("LOOPS"),
-  );
-  for (const title of ["Beat Deck"]) {
-    await m.getByRole("button", { name: `Close ${title}`, exact: true }).tap().catch(() => {});
-    await m.getByRole("region", { name: title, exact: true }).waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
-  }
-  await m.waitForTimeout(200);
-  await m.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Beat Maker", exact: true }).tap();
-  await m.waitForTimeout(300);
-  await settle(m);
-  const cell = await m.getByRole("button", { name: "kick step 1", exact: true }).boundingBox();
-  check("mobile: Beat Maker steps are big enough to tap", cell.width >= 28, `${Math.round(cell.width)}px`);
-  await mContext.close();
-
-  // ---- iPhone: plain <audio> (keeps playing with the screen locked) ----
-  const iContext = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-    userAgent:
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
-  });
-  await iContext.addInitScript(noWelcome);
-  const ip = await iContext.newPage();
-  await ip.goto(BASE, { waitUntil: "networkidle" });
-  await ip.getByLabel("Skip boot sequence").click({ force: true });
-  await ip.getByRole("navigation", { name: "Desktop" }).getByRole("button", { name: "Media Player", exact: true }).tap();
-  await ip.waitForTimeout(400);
-  await ip.getByRole("button", { name: "Play", exact: true }).tap();
-  await ip.waitForTimeout(800);
-  const canvasHash = () =>
-    ip.evaluate(() => {
-      const c = document.querySelector('section[aria-label="saeculo Media Player"] canvas');
+  // ---------------------------------------------------------------- beats
+  {
+    const { ctx, page } = await open();
+    check("Beats opens by default", await page.getByTestId("window-beats").isVisible());
+    check("folder lists the tracks", (await page.locator("[data-testid^=track-]").count()) === 3);
+    await page.getByTestId("deck-play").click();
+    await page.waitForTimeout(1200);
+    const a1 = await audio(page);
+    check("play", !a1.paused && a1.t > 0);
+    check("LCD says playing", (await page.getByTestId("lcd").textContent()).includes("PLAYING"));
+    await page.getByRole("slider", { name: "Seek" }).fill("60");
+    await page.waitForTimeout(300);
+    check("seek", (await audio(page)).t >= 59);
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await page.waitForTimeout(800);
+    const a2 = await audio(page);
+    check("next track", a2.src.includes("elbtunnel") && !a2.paused);
+    check("active row follows", (await page.getByTestId("track-elbtunnel").getAttribute("aria-current")) === "true");
+    await page.getByTestId("track-dull-knife").click();
+    await page.waitForTimeout(600);
+    check("pick from the folder", (await audio(page)).src.includes("dull-knife"));
+    await page.getByRole("slider", { name: "Seek" }).fill("20");
+    await page.getByRole("button", { name: "Previous" }).click();
+    await page.waitForTimeout(600);
+    const a3 = await audio(page);
+    check("previous restarts the track", a3.t < 2 && a3.src.includes("dull-knife"));
+    await page.waitForTimeout(600);
+    const drawn = await page.evaluate(() => {
+      const c = document.querySelector("[data-testid=window-beats] canvas");
       const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-      let h = 0;
-      for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) >>> 0;
-      return h;
+      let lit = 0;
+      for (let i = 0; i < d.length; i += 400) lit += d[i] + d[i + 1] + d[i + 2] > 60 ? 1 : 0;
+      return lit;
     });
-  const h1 = await canvasHash();
-  await ip.waitForTimeout(300);
-  const h2 = await canvasHash();
-  check(
-    "iPhone: music plays without the Web Audio graph, and the visualizer still moves",
-    !(await ip.getByTestId("player-audio").evaluate((a) => a.paused)) && h1 !== h2,
-  );
-  await iContext.close();
-} finally {
-  await browser.close();
+    check("visualizer draws the cover", drawn > 50, String(drawn));
+    await page.getByRole("button", { name: /visuals:/ }).click();
+    check("visuals: still mode", (await page.evaluate(() => document.documentElement.dataset.calm)) === "true");
+    await page.getByRole("button", { name: /visuals:/ }).click();
+    await page.getByRole("button", { name: "Close Beats" }).click();
+    await page.getByTestId("icon-socials").click();
+    await page.waitForTimeout(400);
+    check("music keeps playing with Beats closed", !(await audio(page)).paused);
+    check("compact player shows the track", (await page.getByTestId("mini-player").textContent()).includes("dull knife"));
+    await page.getByTestId("mini-play").click();
+    await page.waitForTimeout(200);
+    check("compact player pauses", (await audio(page)).paused);
+    await page.getByTestId("mini-play").click();
+    await page.waitForTimeout(300);
+    const links = await page.locator("[data-testid=window-socials] a").evaluateAll((as) => as.map((a) => [a.href, a.target]));
+    check("socials: five real links, new tab", links.length === 5 && links.every(([h, t]) => h.startsWith("https://") && t === "_blank"));
+    await page.getByTestId("icon-beats").click();
+    await page.getByRole("slider", { name: "Volume" }).fill("0.3");
+    check("volume", Math.abs((await page.evaluate(() => document.querySelector("audio").volume)) - 0.3) < 0.01);
+    await ctx.close();
+  }
+
+  // share link, unavailable file, reduced motion
+  {
+    const { ctx, page } = await open({ seen: false, hash: "#track=elbtunnel" });
+    check("share link skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
+    check("share link selects the track", (await page.getByTestId("track-elbtunnel").getAttribute("aria-current")) === "true");
+    await ctx.close();
+  }
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 800 } });
+    await ctx.addInitScript(() => localStorage.setItem("saeculo-intro-seen", "1"));
+    await ctx.route("**/audio/care4me.mp3", (r) => r.fulfill({ status: 404, body: "" }));
+    const page = await ctx.newPage();
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await page.getByTestId("deck-play").click();
+    await page.waitForTimeout(1000);
+    check("missing file: player says so", (await page.getByTestId("lcd").textContent()).includes("FILE UNAVAILABLE"));
+    check("missing file: row marked", (await page.getByTestId("track-care4me").textContent()).includes("unavailable"));
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await page.waitForTimeout(800);
+    check("missing file: next still plays", !(await audio(page)).paused);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await open({ reduced: true });
+    check("reduced motion: visuals start still", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("still"));
+    await ctx.close();
+  }
+
+  // ---------------------------------------------------------------- contact
+  {
+    const { ctx, page } = await open();
+    await page.getByTestId("icon-contact").click();
+    const win = page.getByTestId("window-contact");
+    await win.getByRole("button", { name: "Send" }).click();
+    check("contact: empty form shows three errors", (await win.locator("[aria-invalid=true]").count()) === 3);
+    check("contact: focus goes to the first problem", await page.evaluate(() => document.activeElement?.id === "contact-name"));
+    await win.getByLabel("Name").fill("Test");
+    await win.getByLabel("Email").fill("not-an-email");
+    await win.getByLabel("Message").fill("Hello, this is a test message.");
+    await win.getByRole("button", { name: "Send" }).click();
+    check("contact: bad email caught", (await win.getByText("doesn't look right").count()) === 1);
+    await win.getByLabel("Email").fill("test@example.com");
+    const res = page.waitForResponse("**/api/contact");
+    await win.getByRole("button", { name: "Send" }).click();
+    const r = await res;
+    await page.waitForTimeout(300);
+    if (r.status() === 503) {
+      check("contact: unconfigured delivery is reported honestly", (await win.getByRole("alert").textContent()).includes("not sent"));
+      check("contact: no fake success", (await win.getByText("Sent. Thank you.").count()) === 0);
+    } else check("contact: delivery answered", r.status() === 200, String(r.status()));
+    await page.route("**/api/contact", (route) => route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }));
+    await win.getByRole("button", { name: "Send" }).click();
+    await page.waitForTimeout(300);
+    check("contact: success only when the server confirms", (await win.getByText("Sent. Thank you.").count()) === 1);
+    await ctx.close();
+  }
+
+  // ---------------------------------------------------------------- game
+  {
+    const { ctx, page } = await open({ init: { "saeculo-game": JSON.stringify({ found: [], tapes: [null, null, null, null], seenHelp: false, unseen: [] }) } });
+    await page.getByTestId("deck-play").click();
+    await page.waitForTimeout(800);
+    await page.getByTestId("icon-game").click();
+    await page.waitForTimeout(1800);
+    check("game opens in the bedroom", (await page.getByTestId("game").getAttribute("data-place")) === "bedroom");
+    const held = await audio(page);
+    check("game: site music paused, position kept", held.paused && held.t > 0);
+    check("game: controls card on first visit", await page.getByTestId("game-help").isVisible());
+    await page.keyboard.press("e");
+    await page.waitForTimeout(200);
+    check("game: starts at the laptop", (await page.getByTestId("game-prompt").textContent()).includes("laptop"));
+    const x0 = (await game(page)).x;
+    await hold(page, "ArrowRight", 900);
+    check("game: walking", (await game(page)).x > x0 + 30);
+    await hold(page, "ArrowUp", 250);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(400);
+    const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-game")));
+    check("game: the window gives the rain sound", (await saved()).found.includes("rain"));
+    check("game: dialog shows", await page.getByTestId("game-dialog").isVisible());
+    await page.keyboard.press("e");
+    await page.evaluate(() => window.__game.teleport("bedroom", 18, 6.5, "right"));
+    await hold(page, "ArrowRight", 500);
+    await page.waitForTimeout(600);
+    check("game: door to the street", (await page.getByTestId("game").getAttribute("data-place")) === "street");
+    await page.evaluate(() => window.__game.teleport("street", 26.5, 4.6, "up"));
+    await page.waitForTimeout(200);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(300);
+    check("game: the payphone gives the phone sound", (await saved()).found.includes("phone"));
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => window.__game.teleport("store", 10.5, 5.6, "up"));
+    await page.waitForTimeout(200);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: "Just water" }).click();
+    await page.waitForTimeout(300);
+    check("game: the store gives the bottle sound", (await saved()).found.includes("bottle"));
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => window.__game.teleport("studio", 8, 3.7, "up"));
+    await page.waitForTimeout(200);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(400);
+    const studio = page.getByTestId("studio");
+    check("game: the sampler opens", await studio.isVisible());
+    const opts = await studio.getByLabel("Snare sound").locator("option").allTextContents();
+    check("sampler: found sounds are in the lists", opts.some((o) => o.includes("bottle")));
+    await studio.getByLabel("Snare sound").selectOption("bottle");
+    const step = studio.getByRole("button", { name: "Kick step 3", exact: true });
+    const before = await step.getAttribute("aria-pressed");
+    await step.click();
+    check("sampler: toggle a step", (await step.getAttribute("aria-pressed")) !== before);
+    await page.getByTestId("studio-play").click();
+    await page.waitForTimeout(900);
+    check("sampler: playhead moves with the beat", (await studio.locator("[data-now=true]").count()) === 4);
+    check("sampler: no website music underneath", (await audio(page)).paused);
+    await studio.getByRole("button", { name: "Save" }).first().click();
+    const tape = (await saved()).tapes[0];
+    check("sampler: save to tape", tape && tape.pattern.sounds[1] === "bottle");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    check("sampler: Escape back to the room", (await studio.count()) === 0);
+    await page.evaluate(() => window.__game.teleport("bedroom", 12, 4.6, "up"));
+    await page.waitForTimeout(250);
+    check("game: your tape is on the shelf", (await page.getByTestId("game-prompt").textContent()).includes("play a tape"));
+    await page.getByTestId("game-exit").click();
+    await page.waitForTimeout(1400);
+    check("game: exit returns to the site", (await page.getByTestId("game").count()) === 0);
+    check("game: music picks up where it was", !(await audio(page)).paused);
+    await page.getByTestId("icon-game").click();
+    await page.waitForTimeout(1600);
+    check("game: remembers found sounds", (await page.getByTestId("game").textContent()).includes("sounds 3/3"));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(1400);
+    check("game: Escape exits", (await page.getByTestId("game").count()) === 0);
+    await ctx.close();
+  }
+
+  // ---------------------------------------------------------------- phone
+  {
+    const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, mobile: true });
+    const w = await page.getByTestId("window-beats").boundingBox();
+    check("phone: windows fill the screen", w && w.width >= 385);
+    check("phone: no sideways scroll", await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    await page.getByRole("button", { name: "Close Beats" }).tap();
+    await page.getByTestId("icon-game").tap();
+    await page.waitForTimeout(1800);
+    check("phone: touch pad in the game", await page.getByRole("button", { name: "Walk right" }).isVisible());
+    await page.getByRole("button", { name: "Got it" }).tap();
+    const x0 = (await game(page)).x;
+    const pad = page.getByRole("button", { name: "Walk right" });
+    await pad.dispatchEvent("pointerdown", { pointerId: 1 });
+    await page.waitForTimeout(600);
+    await pad.dispatchEvent("pointerup", { pointerId: 1 });
+    check("phone: pad walks", (await game(page)).x > x0 + 15);
+    await ctx.close();
+  }
+
+  // ---------------------------------------------------------------- accessibility
+  if (axeSource) {
+    const { ctx, page } = await open();
+    await page.getByTestId("icon-socials").click();
+    await page.getByTestId("icon-contact").click();
+    await page.addScriptTag({ content: axeSource });
+    const v = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+    check("axe: no violations on the desktop", v.length === 0, v.join(", "));
+    if (v.length) console.log(await page.evaluate(async () => JSON.stringify((await window.axe.run(document, { resultTypes: ["violations"] })).violations.flatMap((x) => x.nodes.map((n) => [n.target, n.any?.[0]?.message])))));
+    await page.getByTestId("icon-game").click();
+    await page.waitForTimeout(1600);
+    const g = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+    check("axe: no violations in the game", g.length === 0, g.join(", "));
+    if (g.length) console.log(await page.evaluate(async () => JSON.stringify((await window.axe.run(document, { resultTypes: ["violations"] })).violations.flatMap((x) => x.nodes.map((n) => [n.target, n.any?.[0]?.message])))));
+    await ctx.close();
+  }
+} catch (err) {
+  check("script ran to the end", false, String(err).split("\n")[0]);
 }
 
+const real = errors.filter((e) => !isEnvNoise(e));
+check("no console errors", real.length === 0, real.slice(0, 3).join(" | "));
+await browser.close();
 const failed = results.filter((r) => !r.ok);
-console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
-if (failed.length) process.exit(1);
+console.log(`\n${results.length - failed.length}/${results.length} passed`);
+process.exit(failed.length ? 1 : 0);

@@ -15,6 +15,7 @@ export function beatInfo(): { pulse: number; phase: number; beat: number; bar: n
   const { audio, trackIndex, playing } = usePlayerStore.getState();
   if (!audio || !playing) return null;
   const track = TRACKS[trackIndex];
+  if (!track) return null;
   const beatLen = 60 / gridTempo(track);
   const t = audio.currentTime - (track.beatOffset ?? 0);
   if (t < 0) return null;
@@ -27,6 +28,7 @@ function beatClock() {
   const { audio, trackIndex } = usePlayerStore.getState();
   if (!audio) return null;
   const track = TRACKS[trackIndex];
+  if (!track) return null;
   const beat = 60 / gridTempo(track);
   const t = audio.currentTime - (track.beatOffset ?? 0);
   const frac = (x: number) => ((x % 1) + 1) % 1;
