@@ -586,6 +586,25 @@ function paintPark(g: G, s: Scene) {
   r(g, 15 * TILE - 1, 2 * TILE + 1, 12, 2, "#3f4a43");
 }
 
+/** The dark windows across the way from the roof, for lighting up. */
+let skyline: [number, number][] | null = null;
+export function skylineWindows(): [number, number][] {
+  if (skyline) return skyline;
+  const { w } = sceneSize(SCENES.rooftop);
+  const out: [number, number][] = [];
+  let x = 0;
+  let i = 0;
+  while (x < w) {
+    const bw = 10 + Math.floor(hash(i, 1) * 22);
+    const bh = 10 + Math.floor(hash(i, 2) * 26);
+    for (let wy = 3 * TILE - bh + 3; wy < 3 * TILE - 2; wy += 5) for (let wx = x + 2; wx < x + bw - 2; wx += 4) if (hash(wx, wy) <= 0.8 && hash(wx, wy) > 0.45) out.push([wx, wy]);
+    x += bw + 1;
+    i++;
+  }
+  skyline = out;
+  return out;
+}
+
 function paintRooftop(g: G, s: Scene) {
   const { w } = sceneSize(s);
   // sky and the city across

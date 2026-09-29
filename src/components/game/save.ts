@@ -2,13 +2,18 @@ import { fromOldTape, loadStore, saveStore } from "./studio/project";
 import { FINDABLE } from "./studio/voices";
 
 // What the game remembers between visits, in this browser only: the
-// sounds you've found and whether you've seen the controls card. Beats you
+// sounds you've found, whether you've seen the controls card, who you've
+// played your beats for, and the small things that only happen once. Beats you
 // make live in the studio's own store (studio/project.ts).
 export interface SaveData {
   found: string[];
   seenHelp: boolean;
   /** Findable sounds found but not yet looked at in the studio. */
   unseen: string[];
+  /** Who you've played a tape for, and which (they remember). */
+  heard: Record<string, string>;
+  /** Small one-time things that have already happened. */
+  seen: string[];
 }
 
 const KEY = "saeculo-game";
@@ -16,12 +21,15 @@ const KEY = "saeculo-game";
 export function loadSave(): SaveData {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    if (!raw || typeof raw !== "object") return { found: [], seenHelp: false, unseen: [] };
+    if (!raw || typeof raw !== "object") return { found: [], seenHelp: false, unseen: [], heard: {}, seen: [] };
     const found: string[] = Array.isArray(raw.found) ? raw.found.filter((s: unknown) => typeof s === "string" && FINDABLE.includes(s as string)) : [];
     const unseen = Array.isArray(raw.unseen) ? raw.unseen.filter((s: unknown) => found.includes(s as string)) : [];
-    return { found, seenHelp: raw.seenHelp === true, unseen };
+    const heard: Record<string, string> = {};
+    if (raw.heard && typeof raw.heard === "object") for (const [k, v] of Object.entries(raw.heard)) if (typeof v === "string") heard[k] = v;
+    const seen = Array.isArray(raw.seen) ? raw.seen.filter((x: unknown) => typeof x === "string") : [];
+    return { found, seenHelp: raw.seenHelp === true, unseen, heard, seen };
   } catch {
-    return { found: [], seenHelp: false, unseen: [] };
+    return { found: [], seenHelp: false, unseen: [], heard: {}, seen: [] };
   }
 }
 

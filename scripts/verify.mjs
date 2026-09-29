@@ -387,7 +387,7 @@ try {
     check("studio: Escape back to the room", (await studio.count()) === 0 && !(await st()).playing);
     await page.evaluate(() => window.__game.teleport("bedroom", 12, 4.6, "up"));
     await page.waitForTimeout(250);
-    check("game: your beat is on the shelf", (await page.getByTestId("game-prompt").textContent()).includes("play a tape"));
+    check("game: your beat is on the shelf", /play a tape|tape at the end/.test(await page.getByTestId("game-prompt").textContent()));
     // the neighbourhood: people, music, traffic, the park and the roof
     const lifeNow = () => page.evaluate(() => window.__game.life());
     await page.evaluate(() => window.__game.teleport("street", 18.4, 5.9, "up"));
@@ -449,6 +449,77 @@ try {
     check("roof: the wind chimes", (await saved()).found.includes("chimes"));
     await page.keyboard.press("Escape");
     check("roof: someone on the ledge", (await lifeNow()).actors.some((a) => a.id === "ledge"));
+    // people remember what you played them; a few things happen once
+    const dialogText = () => page.getByTestId("game-dialog").textContent();
+    const closeDialog = async () => {
+      if (await page.getByTestId("game-dialog").count()) await page.keyboard.press("Escape");
+    };
+    const readAll = async () => {
+      let text = "";
+      for (let i = 0; i < 8 && (await page.getByTestId("game-dialog").count()); i++) {
+        text += " " + (await dialogText());
+        if (await page.getByTestId("game-dialog").getByRole("button").count()) break;
+        await page.keyboard.press("e");
+        await page.waitForTimeout(120);
+      }
+      return text;
+    };
+    await page.evaluate(() => window.__game.teleport("rooftop", 11, 4.7, "up"));
+    await page.waitForTimeout(250);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(250);
+    await readAll();
+    await page.getByRole("button", { name: /on your phone$/ }).click();
+    await page.waitForTimeout(1200);
+    check("roof: play your tape for her, and the city answers", (await lifeNow()).music === "rooftop");
+    await closeDialog();
+    await page.evaluate(() => window.__game.teleport("street", 10.5, 4.5, "down"));
+    await page.waitForTimeout(300);
+    check("roof: leaving turns your phone off", (await lifeNow()).music !== "rooftop");
+    await page.evaluate(() => window.__game.teleport("rooftop", 6, 5.4, "up"));
+    await page.waitForTimeout(300);
+    check("roof: come back up and she isn't there", (await lifeNow()).actors.find((a) => a.id === "ledge").hidden);
+    await page.evaluate(() => window.__game.teleport("park", 5.6, 4.1, "up"));
+    await page.waitForTimeout(250);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(250);
+    check("park: the old man asks to hear your beat", (await readAll()).includes("Let me hear it"));
+    await page.getByRole("button", { name: "Give him your headphones" }).click();
+    await page.waitForTimeout(200);
+    const verdict = await readAll();
+    check("park: he says what he makes of it, from its tempo", verdict.includes("Sunday"), verdict.slice(0, 80));
+    await closeDialog();
+    check("park: he remembers the tape", (await saved()).heard.oldman === (await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-studio")).slots[0].name)));
+    await page.evaluate(() => window.__game.teleport("street", 26.5, 4.3, "up"));
+    await page.waitForTimeout(300);
+    check("street: after you've played for people, the payphone rings again", (await game(page)).callPending);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(1500);
+    check("street: it's your beat, down the line", (await readAll()).includes("your beat") && (await lifeNow()).call && (await saved()).seen.includes("callback"));
+    await closeDialog();
+    await page.evaluate(() => window.__game.teleport("street", 17.3, 3.9, "left"));
+    await page.waitForTimeout(250);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(250);
+    const crewAgain = await readAll();
+    check("street: the crew remember your tape", crewAgain.includes("won't stop playing"), crewAgain.slice(0, 90));
+    await closeDialog();
+    await page.evaluate(() => window.__game.teleport("store", 10.5, 5.6, "up"));
+    await page.waitForTimeout(250);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(250);
+    await readAll();
+    await page.getByRole("button", { name: "Turn the radio up" }).click();
+    await page.waitForTimeout(250);
+    check("store: the clerk's radio finds one of the real tracks between stations", (await readAll()).includes("between stations"));
+    await closeDialog();
+    await page.evaluate(() => window.__game.teleport("bedroom", 12, 4.6, "up"));
+    await page.waitForTimeout(300);
+    check("bedroom: a tape you didn't make is on the shelf", (await game(page)).strangeTape);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(300);
+    check("bedroom: it's yours, slower, from further away", (await readAll()).includes("No label") && (await saved()).seen.includes("unlabelled") && !(await game(page)).strangeTape);
+    await closeDialog();
 
     await page.getByTestId("game-exit").click();
     await page.waitForTimeout(1400);

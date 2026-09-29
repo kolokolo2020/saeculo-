@@ -646,7 +646,7 @@ export const VOICES: Voice[] = [
   d("snare-rim", "rimshot", "Snares & claps", snare({ tone: 330, bp: 2200, dec: 0.08, crack: 0.2, body: 0.8, lvl: 0.5 })),
   d("clap", "clap", "Snares & claps", clap({ bursts: 3, gap: 0.011, tail: 0.14, bp: 1200 })),
   d("clap-big", "big clap", "Snares & claps", clap({ bursts: 4, gap: 0.014, tail: 0.3, bp: 1000, lvl: 0.55 })),
-  d("snap", "finger snap", "Snares & claps", clap({ bursts: 1, gap: 0, tail: 0.05, bp: 2400, lvl: 0.7 })),
+  d("snap", "finger snap", "Snares & claps", clap({ bursts: 1, gap: 0, tail: 0.05, bp: 2400, lvl: 0.55 })),
 
   d("hat-tight", "tight hat", "Hats", hat({ dec: 0.04, hp: 8200 })),
   d("hat-dusty", "dusty hat", "Hats", hat({ dec: 0.06, hp: 6000, lp: 9000, lvl: 0.26 })),
