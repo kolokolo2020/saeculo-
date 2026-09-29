@@ -921,7 +921,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         music: music.current?.key ?? null,
         call: !!call.current,
         musicProject: music.current?.engine.project.name ?? null,
-        actors: life.current.map((a) => ({ id: a.id, kind: a.kind, place: a.place, x: a.x, y: a.y, stopped: a.stopped ?? 0, fly: a.fly ?? null, hidden: !!a.hidden })),
+        actors: life.current.map((a) => ({ id: a.id, kind: a.kind, place: a.place, x: a.x, y: a.y, stopped: a.stopped ?? 0, fly: a.fly ?? null, hidden: !!a.hidden, dir: a.dir })),
       }),
       studio: () => {
         const e = engine.current;
