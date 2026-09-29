@@ -41,7 +41,24 @@ function loadTips(): { done: string[]; hidden: boolean } {
   return { done: [], hidden: false };
 }
 
-export default function Studio({ engine, found, fresh, onSeen, onClose }: { engine: Engine; found: string[]; fresh: string[]; onSeen: () => void; onClose: () => void }) {
+export default function Studio({
+  engine,
+  load,
+  onLoaded,
+  found,
+  fresh,
+  onSeen,
+  onClose,
+}: {
+  engine: Engine;
+  /** A project to open on arrival (from "sample this"), undoable. */
+  load?: { project: Project; msg: string } | null;
+  onLoaded?: () => void;
+  found: string[];
+  fresh: string[];
+  onSeen: () => void;
+  onClose: () => void;
+}) {
   const [project, setProject] = useState<Project>(engine.project);
   const [pattern, setPatternState] = useState(engine.pattern);
   const [playing, setPlaying] = useState(engine.playing);
@@ -173,9 +190,9 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
     flash("Undone.");
   };
 
-  const flash = (msg: string) => {
+  const flash = (msg: string, ms = 2400) => {
     setNote(msg);
-    window.setTimeout(() => setNote((n) => (n === msg ? "" : n)), 2400);
+    window.setTimeout(() => setNote((n) => (n === msg ? "" : n)), ms);
   };
 
   const setPattern = (i: number) => {
@@ -183,7 +200,7 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
     engine.selectPattern(i);
   };
 
-  const loadProject = (p: Project, msg: string) => {
+  const loadProject = (p: Project, msg: string, ms?: number) => {
     history.current.push(project);
     setCanUndo(true);
     const next = clone(p);
@@ -193,8 +210,19 @@ export default function Studio({ engine, found, fresh, onSeen, onClose }: { engi
     setSelected((next.channels.find(isMelodic) ?? next.channels[0])?.id ?? null);
     setRollCh(next.channels.find(isMelodic)?.id ?? null);
     setPattern(0);
-    flash(msg);
+    flash(msg, ms);
   };
+
+  useEffect(() => {
+    if (!load) return;
+    const t = window.setTimeout(() => {
+      loadProject(load.project, load.msg, 7000);
+      onLoaded?.();
+      void engine.start();
+    }, 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load]);
 
   // ------------------------------------------------------------ channel edits
 

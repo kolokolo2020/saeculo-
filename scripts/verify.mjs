@@ -468,6 +468,30 @@ try {
     await ctx.close();
   }
 
+  // ---------------------------------------------------------------- sample this
+  {
+    const { ctx, page } = await open({ init: { "saeculo-game": JSON.stringify({ found: [], seenHelp: true, unseen: [] }) } });
+    await page.getByTestId("deck-play").click();
+    await page.waitForTimeout(800);
+    await seekTo(page, 40);
+    await page.waitForTimeout(300);
+    await page.getByTestId("sample-this").click();
+    await page.waitForTimeout(2500);
+    const st = await page.evaluate(() => window.__game?.studio());
+    const cuts = st?.project.channels.filter((c) => c.voice.startsWith("cut:care4me:")) ?? [];
+    check("sample this: opens the studio with the beat cut into four pieces", (await page.getByTestId("studio").isVisible()) && cuts.length === 4);
+    check("sample this: cut from where the player was", cuts.length > 0 && Math.abs(Number(cuts[0].voice.split(":")[2]) * (60 / 142.68) - 40) < 4, cuts[0]?.voice);
+    check("sample this: at the track's tempo and key, and playing", st.project.tempo === 143 && st.project.key === 5 && st.project.scale === "major" && st.playing);
+    check("sample this: the site player is paused, not underneath", (await audio(page)).paused);
+    await page.getByTestId("studio").getByRole("button", { name: "Undo" }).click();
+    check("sample this: undo brings back the project you had", !(await page.evaluate(() => window.__game.studio())).project.channels.some((c) => c.voice.startsWith("cut:")));
+    await page.keyboard.press("Escape");
+    await page.getByTestId("game-exit").click();
+    await page.waitForTimeout(1500);
+    check("sample this: back on the site, the music picks up", !(await audio(page)).paused);
+    await ctx.close();
+  }
+
   // ---------------------------------------------------------------- phone
   {
     const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, mobile: true });

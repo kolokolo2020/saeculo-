@@ -699,13 +699,53 @@ export const VOICES: Voice[] = [
 ];
 
 const byId = new Map(VOICES.map((v) => [v.id, v]));
-export const voiceById = (id: string) => byId.get(id);
+
+// "Sample this" from the Beats player: a two-beat cut of one of the tracks
+// from any beat, made on demand. The id says where: cut:<track>:<beat>.
+const timing = (trackId: string) => {
+  const track = TRACKS.find((t) => t.id === trackId);
+  const a = (analysis as Record<string, { tempo?: number; beatOffset?: number; duration?: number } | undefined>)[trackId];
+  return track ? { track, beat: 60 / (a?.tempo ?? track.bpm ?? 120), offset: a?.beatOffset ?? 0, duration: a?.duration } : null;
+};
+const clock = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+function cutVoice(id: string): Voice | undefined {
+  const m = /^cut:(.+):(\d+)$/.exec(id);
+  const tm = m && timing(m[1]);
+  if (!m || !tm) return undefined;
+  const start = tm.offset + Number(m[2]) * tm.beat;
+  const len = 2 * tm.beat;
+  const src = tm.track.src;
+  return {
+    id,
+    name: `${tm.track.title} ${clock(start)}`,
+    cat: "Chops",
+    kind: "drum",
+    load: async () => {
+      await loadFile(src);
+    },
+    play: (ctx, out, t, { vel, midi }) => {
+      const buf = buffers.get(src);
+      if (buf) playBuffer(ctx, out, t, buf, start, len, tune(midi), 0.8 * vel);
+    },
+  };
+}
+/** The tempo, first beat and length of a track, for cutting it into the studio. */
+export const trackTiming = timing;
+
+export const voiceById = (id: string) => {
+  let v = byId.get(id);
+  if (!v && id.startsWith("cut:")) {
+    v = cutVoice(id);
+    if (v) byId.set(id, v);
+  }
+  return v;
+};
 
 /** Load whatever file-backed voices these ids need (chops, your samples). */
 export async function ensureLoaded(ids: Iterable<string>) {
   const jobs = new Set<Promise<void>>();
   for (const id of ids) {
-    const v = byId.get(id);
+    const v = voiceById(id);
     if (v?.load) jobs.add(v.load());
   }
   await Promise.all(jobs);
@@ -713,7 +753,7 @@ export async function ensureLoaded(ids: Iterable<string>) {
 
 /** Play a voice by id; unknown ids are silent. */
 export function playVoice(ctx: BaseAudioContext, out: AudioNode, id: string, t: number, o: Partial<PlayOpts> = {}) {
-  const v = byId.get(id);
+  const v = voiceById(id);
   if (!v) return;
   v.play(ctx, out, t, { vel: o.vel ?? 1, midi: o.midi ?? 60, dur: o.dur ?? 0.4 });
 }

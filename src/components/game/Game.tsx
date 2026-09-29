@@ -15,6 +15,9 @@ import { FINDABLE, playVoice, voiceById, VOICES } from "./studio/voices";
 import { clearSmoke } from "./actors";
 import { lifeBlocks, lifeTarget, makeLife, updateLife, type Actor } from "./life";
 import { clone, type Project } from "./studio/project";
+import { sampleProject } from "./studio/sample";
+import { TRACKS } from "@/data/tracks";
+import { formatTime } from "@/lib/audio";
 import { blocked, inside, SCENES, START, tileAt, TILE, type Dir, type Door } from "./world";
 
 // The game: a bedroom, the street outside, the corner store and a basement
@@ -248,6 +251,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
 
   // ------------------------------------------------------------ the studio
 
+  // "sample this" from the Beats window: the project waiting to be opened
+  const [sampled, setSampled] = useState<{ project: Project; msg: string } | null>(() => {
+    const want = useSiteStore.getState().sample;
+    const track = want && TRACKS.find((t) => t.id === want.trackId);
+    const project = track && sampleProject(track.id, want.at, track.key);
+    return project ? { project, msg: `Cut two bars of ${track.title} from ${formatTime(want.at)}. Undo brings back what you had.` } : null;
+  });
+
   const openStudio = () => {
     stopTape();
     if (!engine.current) {
@@ -271,6 +282,15 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (!saveRef.current.seenHelp) updateSave((v) => ({ ...v, seenHelp: true }));
     openStudio();
   };
+
+  // arriving from "sample this": skip the room, straight to the sampler with the cut
+  useEffect(() => {
+    useSiteStore.setState({ sample: null });
+    if (!sampled) return;
+    const t = window.setTimeout(goToStudio, 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ------------------------------------------------------------ people
 
@@ -1129,7 +1149,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         )}
 
         {studio && studioEngine && (
-          <Studio engine={studioEngine} found={save.found} fresh={save.unseen} onSeen={() => updateSave((s) => ({ ...s, unseen: [] }))} onClose={closeStudio} />
+          <Studio engine={studioEngine} load={sampled} onLoaded={() => setSampled(null)} found={save.found} fresh={save.unseen} onSeen={() => updateSave((s) => ({ ...s, unseen: [] }))} onClose={closeStudio} />
         )}
       </div>
       </div>

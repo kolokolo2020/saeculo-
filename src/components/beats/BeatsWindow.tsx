@@ -259,9 +259,19 @@ export default function BeatsWindow() {
           {TRACKS.length} {TRACKS.length === 1 ? "beat" : "beats"}
         </span>
         {track && (
-          <button className="underline decoration-dotted underline-offset-2 hover:text-ink" onClick={copyLink}>
-            {copied ? "link copied" : "copy link to this beat"}
-          </button>
+          <span className="flex items-center gap-3">
+            <button
+              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+              onClick={() => useSiteStore.getState().sampleInStudio(track.id, usePlayerStore.getState().currentTime)}
+              title="Take the two bars playing now into the studio, in the game"
+              data-testid="sample-this"
+            >
+              sample this
+            </button>
+            <button className="underline decoration-dotted underline-offset-2 hover:text-ink" onClick={copyLink}>
+              {copied ? "link copied" : "copy link"}
+            </button>
+          </span>
         )}
       </div>
     </div>
