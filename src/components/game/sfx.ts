@@ -1,5 +1,5 @@
 import { getAudioContext } from "@/lib/audioContext";
-import { playSound } from "./kit";
+import { playVoice } from "./studio/voices";
 
 // The neighbourhood's sound: a room tone per place (rain, a fridge hum, a
 // quiet studio), footsteps, and small cues. One bus, torn down on exit.
@@ -201,14 +201,13 @@ export const sfx = {
     // a lighter
     if (!bus) return;
     const c = ctx();
-    playSound(c, bus, "hat", c.currentTime, 0, 0.9);
-    playSound(c, bus, "hat", c.currentTime + 0.05, 0, 0.5);
+    playVoice(c, bus, "lighter", c.currentTime, { vel: 0.9 });
   },
   /** A new sound: play it, then a small rising figure. */
   found(id: string) {
     if (!bus) return;
     const c = ctx();
-    playSound(c, bus, id, c.currentTime + 0.02, 0);
+    playVoice(c, bus, id, c.currentTime + 0.02, { midi: 60, dur: 0.5 });
     [0, 1, 2].forEach((i) => {
       const t = c.currentTime + 0.5 + i * 0.12;
       const o = c.createOscillator();

@@ -18,8 +18,11 @@ skip it.
 ## Beats
 
 The folder lists every track with its cover, key, tempo and length; the
-active one is highlighted. The player has play/pause, previous/next, a seek
-bar, elapsed/total time, volume and mute. Music lives in one `<audio>`
+active one is highlighted. The player has play/pause, previous/next,
+repeat-one, shuffle, elapsed/total time, volume and mute, and a seek bar
+drawn as the track's own waveform (hover for the time, click or drag to
+seek, arrow keys step five seconds; tracks without analysis get a plain
+slider). Music lives in one `<audio>`
 element for the whole visit, so it keeps playing while you close windows,
 open others or minimise the player; the taskbar keeps a compact player
 (cover, title, progress, play/pause, next) visible at all times.
@@ -28,8 +31,10 @@ The visualizer analyses the playing audio (Web Audio `AnalyserNode`). The
 cover sits dimmed underneath and the spectrum reveals it at full brightness,
 column by column, log-spaced so the kick and the hats both register; the low
 end breathes the image and lifts a glow in the cover's own colour, which is
-pulled from the artwork in the browser. **Visuals: still** (on the player,
-or in the clock menu) turns it into the plain cover; it starts still for
+pulled from the artwork in the browser. The visuals button cycles
+**reveal** (that), **scan** (the cover cut into scanlines that drift and
+brighten with their band) and **still** (the plain cover, also in the
+clock menu); it starts still for
 visitors with reduced motion. On iPhones, where routing audio through Web
 Audio would stop it on lock, the visualizer follows the measured tempo
 instead.
@@ -50,6 +55,14 @@ headers.
 3. Optional: `node scripts/analyze-tracks.mjs` (needs
    `npm i --no-save playwright-core sharp`) measures the exact tempo and
    first beat for tracks that list a `bpm`.
+
+## Keyboard
+
+On the desktop: Space play/pause, ←/→ five seconds back/forward,
+Shift+←/→ previous/next beat, M mute, 1–4 open Beats / Socials / Contact /
+Game, ? lists them (also in the clock menu). They never fire while typing
+or while the intro or the game is open. Double-click a title bar (or use
+□) to maximise a window; windows reopen where you left them.
 
 ## Socials
 
@@ -87,21 +100,54 @@ or Esc, at any time) lifts the lid back onto the site.
 - **Corner store**: the clerk.
 - **Studio** (the basement door with the red light): the sampler.
 
-The loop: find a sound → take it to the sampler → make a beat → save it
-to tape → it's on your shelf. Three sounds are hidden around the block
-(the window, the payphone, the store), each a variation for one lane.
+The loop: find a sound → take it to the studio → make a beat → save it
+→ it's a tape on your shelf. Four sounds are hidden around the block (the
+window, the payphone, the store, the bench); each turns up in the
+studio under **Found**.
 
-The sampler is four lanes (kick, snare, hat, keys) × sixteen steps, with a
-starter groove, tempo, swing, a sound picker per lane, and four tape slots
-saved in the browser. Everything plays in F minor over a four-bar
-progression, and the kick carries a sub on each chord's root, so any
-pattern sounds musical. Hits are scheduled ahead on the audio clock, so the
-timing holds while the page is busy. All sounds are synthesized
-(`src/components/game/kit.ts`).
+### The studio
+
+The sampler in the basement opens a small DAW. **Go to the studio** in
+the game's top bar (or on the first-visit card) jumps straight there.
+
+- **Sounds:** 55 synthesized sounds (8 kicks, 6 snares, claps and a snap,
+  8 hats, 10 percussion, 808s and bass, rhodes, piano, organ, music box,
+  bell, pad, strings, choir, pluck, lead, flute), 24 **chops** sliced on
+  the beat from care4me, elbtunnel and dull knife (each track loads the
+  first time one of its chops is used), four sounds you find around the
+  block, and your own samples. Browse by category or search; click to
+  hear, **+** to add a channel, **swap** to change the selected one.
+- **Channel rack:** up to 16 channels, each with mute/solo and volume.
+  Drums get a 16- or 32-step grid (Shift-click or right-click for a soft
+  hit); melodic sounds show their notes and open the piano roll.
+- **Piano roll:** two octaves (shift with oct −/+), out-of-key rows
+  shaded, click or drag to draw notes, drag a note's edge to stretch it,
+  click to delete. **Chord: triad / 7th** stamps a chord from the key on
+  the clicked root; **in key** snaps clicks to the scale.
+- **Patterns and song:** four patterns (A–D, copy/clear) and a 16-slot
+  song; play the loop or the whole song.
+- **Mixer:** per channel volume, pan, tuning, tone (low-pass), reverb
+  and delay sends; master volume, filter, tape drive, reverb and delay.
+- **Project:** tempo, swing, key, scale, 1 or 2 bars; four starters
+  (late-night boom bap, rainy lofi, cold trap, night drill) or empty;
+  eight save slots in the browser (the project also autosaves); undo
+  (Ctrl/⌘+Z); **bounce to WAV** (a pattern or the whole song).
+
+Everything plays through one mixer and is scheduled ahead on the audio
+clock; the WAV export renders the same graph offline. Saved projects show
+up as tapes on the bedroom shelf and play there. Code:
+`src/components/game/studio/`.
+
+#### Adding your own samples
+
+Put short WAV or MP3 one-shots in `public/samples/` and list them in
+`src/data/samples.ts` (`{ id, name, file }`). They appear under **Your
+samples** and load only when used.
 
 Audio never piles up: entering the game pauses the site's music and
-remembers where it was; it picks up again when you go back. The sampler
-ducks the street's room tone, and tapes stop when you leave the room.
+remembers where it was; it picks up again when you go back. The studio
+ducks the room tone and stops when you leave it; tapes stop when you
+leave the bedroom.
 
 Controls: WASD or arrows to walk, E / Space / Enter to use and talk, Esc to
 leave. On touch screens, a pad and an A button. Reduced motion (or still
@@ -109,8 +155,9 @@ visuals) turns off the rain, the flicker and the haze.
 
 Code: `src/components/game/`: `Game.tsx` (loop, input, dialogue, the lid),
 `world.ts` (the four maps and their painting), `render.ts` (sprites, lights,
-rain), `Studio.tsx` + `sequencer.ts` + `kit.ts` (the sampler), `sfx.ts`
-(room tone and cues), `save.ts`.
+rain), `studio/` (the DAW: `voices.ts` sounds, `engine.ts` mixer and
+sequencer, `project.ts` model and saves, `presets.ts` starters, and the
+panels), `sfx.ts` (room tone and cues), `save.ts`.
 
 ## Project structure
 

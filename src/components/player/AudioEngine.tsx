@@ -83,7 +83,7 @@ export default function AudioEngine() {
       onError={() => usePlayerStore.getState().markFailed()}
       onTimeUpdate={(e) => sync({ currentTime: e.currentTarget.currentTime })}
       onLoadedMetadata={(e) => sync({ duration: e.currentTarget.duration, status: "ready" })}
-      onEnded={() => usePlayerStore.getState().next()}
+      onEnded={() => usePlayerStore.getState().ended()}
     />
   );
 }

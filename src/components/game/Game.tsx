@@ -4,19 +4,21 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePlayerStore } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { FINDABLE, playSound, soundById, SOUNDS } from "./kit";
 import { draw, VIEW_H, VIEW_W } from "./render";
-import { loadSave, writeSave, type SaveData } from "./save";
-import { Sequencer, STARTER, type Pattern } from "./sequencer";
+import { loadSave, migrateOldTapes, writeSave, type SaveData } from "./save";
 import { duck, setPlace, setRing, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
-import Studio from "./Studio";
+import { Engine } from "./studio/engine";
+import { PRESETS } from "./studio/presets";
+import { loadStore } from "./studio/project";
+import Studio from "./studio/Studio";
+import { FINDABLE, playVoice, voiceById, VOICES } from "./studio/voices";
 import { blocked, inside, SCENES, START, TILE, type Dir, type Door } from "./world";
 
 // The game: a bedroom, the street outside, the corner store and a basement
 // studio. You start at the laptop the website lives on; closing it puts you
 // in the room, and using it again brings the site back. The loop is small:
-// walk around, find a sound, take it to the sampler, make a beat, save it
-// to tape, and find it on your shelf later.
+// walk around, find a sound, take it to the studio, make a beat, save it,
+// and find it on your shelf later.
 
 type Phase = "closing" | "play" | "leaving";
 interface Choice {
@@ -41,12 +43,19 @@ const KEYMAP: Record<string, Dir> = {
   KeyD: "right",
 };
 const PLACE_NAMES: Record<Place, string> = { bedroom: "Your room", street: "Outside", store: "Corner store", studio: "Studio" };
-const HINT_AT: Record<string, string> = { rain: "window", phone: "phone", bottle: "counter" };
+const HINT_AT: Record<string, string> = { rain: "window", phone: "phone", bottle: "counter", lighter: "bench" };
+/** How many saved projects there are (they show as tapes on the shelf). */
+const savedProjects = () => loadStore().slots.filter(Boolean).length;
 
 export default function Game({ onExit }: { onExit: () => void }) {
   const [phase, setPhase] = useState<Phase>("closing");
   const [save, setSaveState] = useState<SaveData>(loadSave);
-  const [studioSeq, setStudioSeq] = useState<Sequencer | null>(null);
+  const [studioEngine, setStudioEngine] = useState<Engine | null>(null);
+  // beats saved in the studio, shown as tapes on the shelf (old tapes move in first)
+  const [shelf, setShelf] = useState(() => {
+    migrateOldTapes();
+    return savedProjects();
+  });
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [studio, setStudio] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -68,8 +77,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const lid = useRef<HTMLDivElement>(null);
   const keys = useRef<Dir[]>([]);
-  const seq = useRef<Sequencer | null>(null);
-  const tape = useRef<{ seq: Sequencer; slot: number } | null>(null);
+  const engine = useRef<Engine | null>(null);
+  const tape = useRef<{ engine: Engine; slot: number } | null>(null);
+  const shelfRef = useRef(shelf);
+  const closeStudioRef = useRef<() => void>(() => {});
   // the save as of right now (state lags a render behind)
   const saveRef = useRef(save);
   const st = useRef({
@@ -119,15 +130,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (saveRef.current.found.includes(id)) return false;
     updateSave((s) => ({ ...s, found: [...s.found, id], unseen: [...s.unseen, id] }));
     sfx.found(id);
-    const def = soundById(id)!;
-    const lane = ["kick", "snare", "hat", "keys"][def.lane];
-    showToast(`New sound: ${def.name}. It's in the studio's ${lane} lane.`, 5200);
+    const def = voiceById(id)!;
+    showToast(`New sound: ${def.name}. It's in the studio, under Found.`, 5200);
     return true;
   };
 
   const stopTape = () => {
     if (!tape.current) return;
-    tape.current.seq.dispose();
+    tape.current.engine.dispose();
     tape.current = null;
     duck(false);
   };
@@ -139,7 +149,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     setPhase("leaving");
     setDialog(null);
     setStudio(false);
-    seq.current?.dispose();
+    engine.current?.dispose();
     stopTape();
     stopGameAudio();
     usePlayerStore.getState().release("game");
@@ -189,12 +199,38 @@ export default function Game({ onExit }: { onExit: () => void }) {
     }
     return () => {
       // whatever way we go, nothing keeps playing and the music is handed back
-      seq.current?.dispose();
-      tape.current?.seq.dispose();
+      engine.current?.dispose();
+      tape.current?.engine.dispose();
       stopGameAudio();
       usePlayerStore.getState().release("game");
     };
   }, []);
+
+  // ------------------------------------------------------------ the studio
+
+  const openStudio = () => {
+    stopTape();
+    if (!engine.current) {
+      const store = loadStore();
+      engine.current = new Engine(store.current ?? PRESETS[0].make());
+    }
+    setStudioEngine(engine.current);
+    setDialog(null);
+    setHelp(false);
+    duck(true);
+    setStudio(true);
+  };
+
+  /** The shortcut: straight down to the basement and into the studio. */
+  const goToStudio = () => {
+    const s = st.current;
+    if (s.place === "bedroom") stopTape();
+    Object.assign(s, { place: "studio", x: 8 * TILE, y: 3.7 * TILE, dir: "up", sitting: false, trans: null });
+    setPlace("studio");
+    setPlaceName("studio");
+    if (!saveRef.current.seenHelp) updateSave((v) => ({ ...v, seenHelp: true }));
+    openStudio();
+  };
 
   // ------------------------------------------------------------ interactions
 
@@ -214,7 +250,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
           else say([s.windowOpen ? "You open the window. The rain gets louder." : "You close the window."]);
           break;
         case "shelf": {
-          const slots = saveRef.current.tapes.map((t, i) => (t ? i : -1)).filter((i) => i >= 0);
+          const store = loadStore();
+          const slots = store.slots.map((t, i) => (t ? i : -1)).filter((i) => i >= 0);
           if (!slots.length) {
             say(["A shelf for tapes. It's empty.", "Beats you save in the studio end up here."]);
             break;
@@ -226,12 +263,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
             showToast("Tape stopped.", 1800);
             break;
           }
-          const t = saveRef.current.tapes[next]!;
-          const player = new Sequencer(t.pattern);
-          player.start();
-          tape.current = { seq: player, slot: next };
+          const project = store.slots[next]!;
+          const player = new Engine(project);
+          void player.start();
+          tape.current = { engine: player, slot: next };
           duck(true);
-          showToast(`Playing tape ${"ABCD"[next]}. Use the shelf again for the next one.`, 3200);
+          showToast(`Playing “${project.name}”. Use the shelf again for the next tape.`, 3200);
           break;
         }
         case "bed":
@@ -254,7 +291,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
                 s.dir = "down";
                 s.hazeUntil = s.t + 25;
                 sfx.flick();
-                say(["You light up. The street goes quiet and soft for a while."]);
+                if (find("lighter")) say(["You light up. The flick of the lighter, close to the ear. You keep it."]);
+                else say(["You light up. The street goes quiet and soft for a while."]);
               },
             },
             { label: "Keep walking", run: () => setDialog(null) },
@@ -288,11 +326,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
           break;
         }
         case "sampler":
-          stopTape();
-          seq.current ??= new Sequencer(STARTER);
-          setStudioSeq(seq.current);
-          duck(true);
-          setStudio(true);
+          openStudio();
           break;
         case "couch":
           say(["The cushion is still warm."]);
@@ -311,7 +345,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       case "window":
         return s.windowOpen ? "close the window" : "open the window";
       case "shelf":
-        return saveRef.current.tapes.some(Boolean) ? (tape.current ? "next tape" : "play a tape") : "look at the shelf";
+        return shelfRef.current ? (tape.current ? "next tape" : "play a tape") : "look at the shelf";
       case "bed":
         return "lie down";
       case "crate":
@@ -373,7 +407,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       const u = ui.current;
-      if (u.studio || u.phase !== "play") return;
+      if (u.studio) {
+        // the studio handles its own keys; this catches Escape when focus has wandered off it
+        if (e.key === "Escape") closeStudioRef.current();
+        return;
+      }
+      if (u.phase !== "play") return;
       if (e.key === "Escape") {
         e.preventDefault();
         if (u.dialog) setDialog(null);
@@ -442,12 +481,13 @@ export default function Game({ onExit }: { onExit: () => void }) {
         setPlace(place, s.windowOpen);
         setPlaceName(place);
       },
-      /** Render each kit sound offline and report its peak and length. */
+      /** Render each synthesized sound offline and report its peak and length. */
       kitLevels: async () => {
         const out: Record<string, { peak: number; ms: number }> = {};
-        for (const def of SOUNDS) {
-          const ctx = new OfflineAudioContext(1, 44100 * 2, 44100);
-          playSound(ctx, ctx.destination, def.id, 0.01, 1);
+        for (const def of VOICES) {
+          if (def.load) continue;
+          const ctx = new OfflineAudioContext(1, 44100 * 3, 44100);
+          playVoice(ctx, ctx.destination, def.id, 0.01, { midi: def.cat === "808 & bass" ? 36 : 60, dur: 0.6, vel: 1 });
           const d = (await ctx.startRendering()).getChannelData(0);
           let peak = 0;
           let last = 0;
@@ -459,6 +499,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
           out[def.id] = { peak: Math.round(peak * 100) / 100, ms: Math.round((last / 44100) * 1000) };
         }
         return out;
+      },
+      studio: () => {
+        const e = engine.current;
+        return e ? { playing: e.playing, position: e.position(), project: e.project } : null;
       },
     };
     return () => {
@@ -578,10 +622,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
         figure: s.figure,
         haze: reduced ? 0 : s.haze,
         catLooking: s.catLooking,
-        tapes: saveRef.current.tapes.map(Boolean),
+        tapes: Array.from({ length: 4 }, (_, i) => i < shelfRef.current),
         hints: [
           ...FINDABLE.filter((id) => !saveRef.current.found.includes(id)).map((id) => HINT_AT[id]),
-          ...(saveRef.current.tapes.some(Boolean) ? [] : ["sampler"]),
+          ...(shelfRef.current ? [] : ["sampler"]),
         ],
         reduced,
       });
@@ -619,11 +663,18 @@ export default function Game({ onExit }: { onExit: () => void }) {
 
   const foundCount = save.found.length;
   const closeStudio = () => {
-    seq.current?.stop();
+    if (!ui.current.studio) return;
+    engine.current?.stop();
     duck(false);
     setStudio(false);
+    const saved = savedProjects();
+    shelfRef.current = saved;
+    setShelf(saved);
     root.current?.focus();
   };
+  useLayoutEffect(() => {
+    closeStudioRef.current = closeStudio;
+  });
 
   return (
     <div
@@ -644,8 +695,17 @@ export default function Game({ onExit }: { onExit: () => void }) {
         <span className="text-[#8a8170]" aria-label={`${foundCount} of ${FINDABLE.length} sounds found`}>
           sounds {foundCount}/{FINDABLE.length}
         </span>
+        {!studio && (
+          <button
+            className="ml-auto rounded-[3px] border border-[#3a3733] bg-[#171615] px-3 py-1.5 font-sans text-[13px] hover:border-[#6d6558]"
+            onClick={goToStudio}
+            data-testid="game-to-studio"
+          >
+            Go to the studio
+          </button>
+        )}
         <button
-          className="ml-auto flex items-center gap-2 rounded-[3px] border border-[#3a3733] bg-[#171615] px-3 py-1.5 font-sans text-[13px] hover:border-[#6d6558]"
+          className={`${studio ? "ml-auto" : ""} flex items-center gap-2 rounded-[3px] border border-[#3a3733] bg-[#171615] px-3 py-1.5 font-sans text-[13px] hover:border-[#6d6558]`}
           onClick={leave}
           data-testid="game-exit"
         >
@@ -735,16 +795,21 @@ export default function Game({ onExit }: { onExit: () => void }) {
                 </>
               )}
             </ul>
-            <button
-              className="mt-3 rounded-[2px] border border-[#4a4540] bg-[#1d1b19] px-3 py-1 text-[20px] hover:border-amber"
-              onClick={() => {
-                setHelp(false);
-                updateSave((s) => ({ ...s, seenHelp: true }));
-                root.current?.focus();
-              }}
-            >
-              Got it
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                className="rounded-[2px] border border-[#4a4540] bg-[#1d1b19] px-3 py-1 text-[20px] hover:border-amber"
+                onClick={() => {
+                  setHelp(false);
+                  updateSave((s) => ({ ...s, seenHelp: true }));
+                  root.current?.focus();
+                }}
+              >
+                Got it
+              </button>
+              <button className="rounded-[2px] border border-[#4a4540] bg-[#1d1b19] px-3 py-1 text-[20px] hover:border-amber" onClick={goToStudio}>
+                Straight to the studio
+              </button>
+            </div>
           </div>
         )}
 
@@ -793,22 +858,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
           </div>
         )}
 
-        {studio && studioSeq && (
-          <Studio
-            seq={studioSeq}
-            found={save.found}
-            unseen={save.unseen}
-            tapes={save.tapes}
-            onSeen={() => updateSave((s) => ({ ...s, unseen: [] }))}
-            onSave={(slot, pattern: Pattern) =>
-              updateSave((s) => {
-                const tapes = [...s.tapes];
-                tapes[slot] = { pattern, savedAt: Date.now() };
-                return { ...s, tapes };
-              })
-            }
-            onClose={closeStudio}
-          />
+        {studio && studioEngine && (
+          <Studio engine={studioEngine} found={save.found} fresh={save.unseen} onSeen={() => updateSave((s) => ({ ...s, unseen: [] }))} onClose={closeStudio} />
         )}
       </div>
       </div>

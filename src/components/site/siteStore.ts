@@ -14,9 +14,12 @@ export const WINDOW_TITLES: Record<WindowId, string> = {
 interface WinState {
   open: boolean;
   minimized: boolean;
+  maximized: boolean;
   x: number;
   y: number;
 }
+
+export type VisMode = "reveal" | "scan";
 
 interface SiteState {
   windows: Record<WindowId, WinState>;
@@ -25,6 +28,9 @@ interface SiteState {
   gameOpen: boolean;
   introOpen: boolean;
   calm: boolean;
+  /** The moving visualizer's look (when not calm). */
+  vis: VisMode;
+  shortcutsOpen: boolean;
 
   openWindow: (id: WindowId) => void;
   closeWindow: (id: WindowId) => void;
@@ -34,14 +40,22 @@ interface SiteState {
   setGameOpen: (open: boolean) => void;
   setIntroOpen: (open: boolean) => void;
   setCalm: (calm: boolean) => void;
+  /** Visuals: reveal → scan → still → reveal. */
+  cycleVisuals: () => void;
+  toggleMaximize: (id: WindowId) => void;
+  /** Remember where the windows sit, for the next visit. */
+  rememberPositions: () => void;
+  setShortcutsOpen: (open: boolean) => void;
 }
 
 const CALM_KEY = "saeculo-calm";
+const VIS_KEY = "saeculo-vis";
+const POS_KEY = "saeculo-windows";
 
 const initialWindows: Record<WindowId, WinState> = {
-  beats: { open: false, minimized: false, x: -1, y: -1 },
-  socials: { open: false, minimized: false, x: -1, y: -1 },
-  contact: { open: false, minimized: false, x: -1, y: -1 },
+  beats: { open: false, minimized: false, maximized: false, x: -1, y: -1 },
+  socials: { open: false, minimized: false, maximized: false, x: -1, y: -1 },
+  contact: { open: false, minimized: false, maximized: false, x: -1, y: -1 },
 };
 
 export const useSiteStore = create<SiteState>((set, get) => ({
@@ -50,6 +64,8 @@ export const useSiteStore = create<SiteState>((set, get) => ({
   gameOpen: false,
   introOpen: false,
   calm: false,
+  vis: "reveal",
+  shortcutsOpen: false,
 
   openWindow: (id) =>
     set((s) => ({
@@ -87,7 +103,52 @@ export const useSiteStore = create<SiteState>((set, get) => ({
     document.documentElement.dataset.calm = String(calm);
     set({ calm });
   },
+  cycleVisuals: () => {
+    const { calm, vis, setCalm } = get();
+    if (calm) {
+      setCalm(false);
+      set({ vis: "reveal" });
+    } else if (vis === "reveal") set({ vis: "scan" });
+    else setCalm(true);
+    try {
+      localStorage.setItem(VIS_KEY, get().vis);
+    } catch {
+      // not remembered
+    }
+  },
+  toggleMaximize: (id) => set((s) => ({ windows: { ...s.windows, [id]: { ...s.windows[id], maximized: !s.windows[id].maximized, minimized: false } } })),
+  rememberPositions: () => {
+    try {
+      const w = get().windows;
+      const pos = Object.fromEntries(WINDOW_IDS.map((id) => [id, { x: w[id].x, y: w[id].y }]));
+      localStorage.setItem(POS_KEY, JSON.stringify(pos));
+    } catch {
+      // not remembered
+    }
+  },
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
 }));
+
+/** Saved look and window positions, applied after the first render. */
+export function restoreSitePrefs() {
+  const patch: Partial<SiteState> = {};
+  try {
+    const vis = localStorage.getItem(VIS_KEY);
+    if (vis === "scan" || vis === "reveal") patch.vis = vis;
+    const pos = JSON.parse(localStorage.getItem(POS_KEY) ?? "null");
+    if (pos && typeof pos === "object") {
+      const windows = { ...useSiteStore.getState().windows };
+      for (const id of WINDOW_IDS) {
+        const p = pos[id];
+        if (p && typeof p.x === "number" && typeof p.y === "number" && p.x >= 0 && p.y >= 0) windows[id] = { ...windows[id], x: p.x, y: p.y };
+      }
+      patch.windows = windows;
+    }
+  } catch {
+    // defaults
+  }
+  useSiteStore.setState(patch);
+}
 
 /** The window on top that isn't minimized, if any. */
 export function activeWindow(s: Pick<SiteState, "order" | "windows">): WindowId | null {

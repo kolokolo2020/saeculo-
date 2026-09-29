@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePlayerStore, setMuffle } from "@/components/player/playerStore";
 import { beatInfo } from "@/components/player/spectrum";
 import { startAmbience, stopAmbience } from "@/lib/ambience";
+import { getAudioContext } from "@/lib/audioContext";
 import { PROFILE } from "@/data/profile";
 import { BeatsIcon } from "@/components/site/Icons";
 import { ArtistArt, ArtistHead, BackArt, CatHead, CatTail, DeskArt, EMBER, H, LavaBlobs, SCREEN, W } from "./art";
@@ -90,6 +91,38 @@ function useSmoke(canvas: React.RefObject<HTMLCanvasElement | null>, active: boo
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
   }, [canvas, active, puff]);
+}
+
+/** A cassette going into the deck: a clunk, a moment of hiss. */
+function tapeStart() {
+  try {
+    const ctx = getAudioContext();
+    const t = ctx.currentTime + 0.01;
+    const len = Math.floor(ctx.sampleRate * 0.9);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+    const hiss = ctx.createBufferSource();
+    hiss.buffer = buf;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 3000;
+    const hg = ctx.createGain();
+    hg.gain.value = 0.05;
+    hiss.connect(hp).connect(hg).connect(ctx.destination);
+    hiss.start(t);
+    const clunk = ctx.createOscillator();
+    clunk.frequency.setValueAtTime(110, t);
+    clunk.frequency.exponentialRampToValueAtTime(45, t + 0.08);
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(0.25, t);
+    cg.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    clunk.connect(cg).connect(ctx.destination);
+    clunk.start(t);
+    clunk.stop(t + 0.15);
+  } catch {
+    // no sound, no matter
+  }
 }
 
 export default function RoomIntro({ onDone }: { onDone: () => void }) {
@@ -216,14 +249,21 @@ export default function RoomIntro({ onDone }: { onDone: () => void }) {
     requestAnimationFrame(step);
   }, [phase, fit, finish]);
 
+  const [tracking, setTracking] = useState(false);
   const enter = () => {
     if (phase !== "title") return;
-    // the click that lets sound start: his music, muffled, and the rain
+    // the click that lets sound start: a tape going in, then his music,
+    // muffled, and the rain
+    tapeStart();
     const player = usePlayerStore.getState();
     player.play();
     setMuffle(1, 0);
     startAmbience(0.35, 2);
     setPhase("room");
+    if (!reduced.current) {
+      setTracking(true);
+      setTimeout(() => setTracking(false), 1000);
+    }
   };
 
   // it moves on by itself after a short look around
@@ -244,7 +284,8 @@ export default function RoomIntro({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") skip();
-      else if (e.key === "Enter" || e.key === " ") {
+      else if (e.key.length === 1 || e.key === "Enter") {
+        // any key: letters, numbers, space, Enter (not Tab, arrows or modifiers)
         e.preventDefault();
         if (phase === "title") enter();
         else push();
@@ -337,6 +378,7 @@ export default function RoomIntro({ onDone }: { onDone: () => void }) {
       {phase !== "title" && (
         <>
           <div className={`room-bars ${phase === "push" ? "room-bars-open" : ""}`} aria-hidden />
+          {tracking && <div className="room-tracking pointer-events-none absolute inset-x-0" aria-hidden />}
           <p className="pointer-events-none absolute bottom-5 left-6 font-mono text-[13px] tracking-widest text-white/70 [text-shadow:0_0_6px_rgba(255,255,255,0.5)]" aria-hidden>
             {date} {time}
           </p>
@@ -368,7 +410,7 @@ export default function RoomIntro({ onDone }: { onDone: () => void }) {
         }}
         className="absolute top-4 right-5 z-10 px-2 py-1 font-mono text-[12px] tracking-widest text-white/60 uppercase hover:text-white"
       >
-        Skip ›
+        Skip · Esc
       </button>
     </div>
   );

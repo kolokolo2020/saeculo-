@@ -106,6 +106,16 @@ function Clock({ onReplayIntro }: { onReplayIntro: () => void }) {
           >
             <span className="inline-block w-4">{calm ? "✓" : ""}</span>Still visuals
           </button>
+          <button
+            role="menuitem"
+            className="px-3 py-2 text-left hover:bg-brick hover:text-white focus-visible:bg-brick focus-visible:text-white focus-visible:outline-none"
+            onClick={() => {
+              setOpen(false);
+              useSiteStore.getState().setShortcutsOpen(true);
+            }}
+          >
+            Keyboard shortcuts
+          </button>
         </div>
       )}
     </div>
