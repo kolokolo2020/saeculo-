@@ -96,7 +96,7 @@ export const SCENES: Record<Place, Scene> = {
     tiles: [
       "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
       "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-      "bbbbDbbbbbbbbbbbbbbbDbbbbbbbbbbbbbDbbbbb",
+      "bbbbDbbbbbDbbbbbbbbbDbbbbbbbbbbbbbDbbbbb",
       "ssssssssssssssssssssssssssssssssssssssss",
       "ssssssssssssssssssssssssssssssssssssssss",
       "cccccccccccccccccccccccccccccccccccccccc",
@@ -115,12 +115,15 @@ export const SCENES: Record<Place, Scene> = {
       { id: "phone", body: { x: 26 * TILE, y: 3 * TILE, w: TILE, h: 10 }, zone: T(25.5, 3.6, 2, 1) },
       { id: "lamp2", body: { x: 30 * TILE + 6, y: 3 * TILE + 8, w: 4, h: 4 } },
       { id: "lamp3", body: { x: 37 * TILE + 6, y: 9 * TILE + 8, w: 4, h: 4 } },
-      { id: "car", body: { x: 2 * TILE, y: 8 * TILE - 4, w: 4 * TILE, h: 20 }, zone: T(2, 7, 4, 1) },
+      { id: "car", body: { x: 22 * TILE, y: 9 * TILE - 2, w: 4 * TILE, h: 18 }, zone: T(22, 8.2, 4, 1) },
+      { id: "boombox", body: { x: 17 * TILE + 3, y: 4 * TILE + 6, w: 12, h: 6 }, zone: T(16.6, 4, 1.8, 1.4) },
     ],
     doors: [
       { zone: T(4, 2), to: "bedroom", label: "↑ home", spawn: { x: 18.2 * TILE, y: 6.5 * TILE, dir: "left" } },
       { zone: T(20, 2), to: "store", label: "↑ corner store", spawn: { x: 7 * TILE, y: 7.4 * TILE, dir: "up" } },
       { zone: T(34, 2), to: "studio", label: "↑ studio", spawn: { x: 8 * TILE, y: 8.4 * TILE, dir: "up" } },
+      { zone: T(10, 2), to: "rooftop", label: "↑ fire escape to the roof", spawn: { x: 1.6 * TILE, y: 5.8 * TILE, dir: "right" } },
+      { zone: { x: 0, y: 3 * TILE, w: 6, h: 7 * TILE }, to: "park", label: "← the park", spawn: { x: 28.2 * TILE, y: 6 * TILE, dir: "left" } },
     ],
     lights: [
       { x: 12.5 * TILE, y: 1.2 * TILE, r: 74, color: "rgba(255,196,120,0.55)", kind: "lamp" },
@@ -183,15 +186,82 @@ export const SCENES: Record<Place, Scene> = {
     surface: () => "carpet",
     things: [
       { id: "sampler", body: T(5, 2, 6, 1), zone: T(5.5, 3, 5, 1) },
-      { id: "couch", body: T(11, 6, 4, 2), zone: T(11, 5, 4, 1) },
+      { id: "couch", body: T(11, 6, 4, 2) },
       { id: "redlamp", body: { x: 2 * TILE + 2, y: 2 * TILE + 6, w: 12, h: 8 } },
     ],
     doors: [{ zone: T(7, 9, 2, 1), to: "street", label: "↓ outside", spawn: { x: 34.5 * TILE, y: 3.7 * TILE, dir: "down" } }],
     lights: [
       { x: 2.5 * TILE, y: 2 * TILE, r: 100, color: "rgba(255,70,50,0.45)" },
       { x: 8 * TILE, y: 2.4 * TILE, r: 84, color: "rgba(255,190,100,0.5)", kind: "screen" },
+      { x: 13 * TILE, y: 5.6 * TILE, r: 62, color: "rgba(170,110,255,0.35)" },
     ],
     darkness: 0.52,
+  },
+
+  park: {
+    id: "park",
+    name: "Park",
+    tiles: [
+      "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+      "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+      "ggggggggggggggggaaaaaaaaaaaagg",
+      "ggggggggggggggggaaaaaaaaaaaagg",
+      "ggggggggggggggggaaaaaaaaaaaagg",
+      "ppppppppppppppppaaaaaaaaaaaapp",
+      "ppppppppppppppppaaaaaaaaaaaapp",
+      "ggggggggggggggggaaaaaaaaaaaagg",
+      "ggggggggggggggggaaaaaaaaaaaagg",
+      "gggggggggggggggggggggggggggggg",
+      "ffffffffffffffffffffffffffffff",
+    ],
+    solid: "Tf",
+    surface: (ch) => (ch === "a" || ch === "p" ? "stone" : "carpet"),
+    things: [
+      { id: "park-bench", body: { x: 5 * TILE, y: 2 * TILE + 4, w: 2 * TILE, h: 12 } },
+      { id: "swings", body: { x: 9 * TILE, y: 2 * TILE, w: 3 * TILE, h: 10 }, zone: T(9, 2.7, 3, 1) },
+      { id: "hoop", body: { x: 26 * TILE + 5, y: 2 * TILE, w: 6, h: 10 }, zone: T(24.5, 2.6, 3, 1.6) },
+      { id: "fountain", body: { x: 12 * TILE + 4, y: 8 * TILE + 2, w: 24, h: 12 }, zone: T(12, 7.2, 2, 1) },
+    ],
+    doors: [{ zone: { x: 29 * TILE + 10, y: 2 * TILE, w: 6, h: 8 * TILE }, to: "street", label: "→ back to the street", spawn: { x: 1.2 * TILE, y: 4.4 * TILE, dir: "right" } }],
+    lights: [
+      { x: 3 * TILE, y: 1.3 * TILE, r: 70, color: "rgba(255,196,120,0.5)", kind: "lamp" },
+      { x: 21 * TILE, y: 2.2 * TILE, r: 96, color: "rgba(220,235,255,0.35)" },
+      { x: 14 * TILE, y: 9 * TILE, r: 40, color: "rgba(160,200,255,0.25)" },
+    ],
+    darkness: 0.72,
+  },
+
+  rooftop: {
+    id: "rooftop",
+    name: "Rooftop",
+    tiles: [
+      "SSSSSSSSSSSSSSSSSSSS",
+      "SSSSSSSSSSSSSSSSSSSS",
+      "SSSSSSSSSSSSSSSSSSSS",
+      "PPPPPPPPPPPPPPPPPPPP",
+      "rrrrrrrrrrrrrrrrrrrP",
+      "rrrrrrrrrrrrrrrrrrrP",
+      "rrrrrrrrrrrrrrrrrrrP",
+      "rrrrrrrrrrrrrrrrrrrP",
+      "rrrrrrrrrrrrrrrrrrrP",
+      "rrrrrrrrrrrrrrrrrrrP",
+      "PPPPPPPPPPPPPPPPPPPP",
+    ],
+    solid: "SP",
+    surface: () => "stone",
+    things: [
+      { id: "chimney", body: T(4, 4, 2, 1), zone: T(4, 5, 2, 1) },
+      { id: "chimes", body: { x: 8 * TILE + 6, y: 4 * TILE + 8, w: 4, h: 6 }, zone: T(7.5, 4.4, 2, 1.4) },
+      { id: "tank", body: T(14, 4, 3, 2), zone: T(14, 6, 3, 1) },
+      { id: "coop", body: T(16, 8, 3, 1.5), zone: T(15.5, 7, 3.5, 1) },
+    ],
+    doors: [{ zone: { x: 0, y: 4 * TILE, w: 6, h: 6 * TILE }, to: "street", label: "↓ down the fire escape", spawn: { x: 10.5 * TILE, y: 3.7 * TILE, dir: "down" } }],
+    lights: [
+      { x: 10 * TILE, y: 1 * TILE, r: 120, color: "rgba(180,200,255,0.3)" },
+      { x: 6 * TILE, y: 3.4 * TILE, r: 50, color: "rgba(255,200,140,0.35)" },
+      { x: 14 * TILE, y: 3.4 * TILE, r: 50, color: "rgba(255,200,140,0.35)" },
+    ],
+    darkness: 0.58,
   },
 };
 
@@ -429,9 +499,15 @@ function paintStreet(g: G, s: Scene) {
   r(g, 26 * TILE + 5, 2 * TILE + 15, 3, 7, "#111");
   r(g, 26 * TILE + 3, 2 * TILE + 2, 10, 2, "#6f8596");
 
-  // parked car
-  const cx = 2 * TILE;
-  const cy = 7 * TILE + 4;
+  // fire escape up the apartment block
+  r(g, 10 * TILE + 2, 0, 2, 3 * TILE, "#55565c");
+  r(g, 10 * TILE + 12, 0, 2, 3 * TILE, "#55565c");
+  for (let y = 3; y < 3 * TILE; y += 5) r(g, 10 * TILE + 2, y, 12, 1, "#6c6d73");
+  r(g, 9 * TILE, 8, 3 * TILE, 2, "#46474d");
+
+  // parked car, on the far side
+  const cx = 22 * TILE;
+  const cy = 8 * TILE + 12;
   r(g, cx + 8, cy, 40, 10, "#2d3a44");
   r(g, cx + 12, cy + 2, 14, 7, "#1a2229");
   r(g, cx + 29, cy + 2, 14, 7, "#1a2229");
@@ -439,6 +515,141 @@ function paintStreet(g: G, s: Scene) {
   r(g, cx + 6, cy + 19, 10, 5, "#0b0b0d");
   r(g, cx + 46, cy + 19, 10, 5, "#0b0b0d");
   r(g, cx, cy + 12, 3, 3, "#b33");
+}
+
+function paintPark(g: G, s: Scene) {
+  s.tiles.forEach((row, ty) =>
+    [...row].forEach((ch, tx) => {
+      const x = tx * TILE;
+      const y = ty * TILE;
+      const n = hash(tx + 50, ty);
+      if (ch === "T") {
+        r(g, x, y, TILE, TILE, "#0c1510");
+        r(g, x + (n > 0.5 ? 2 : 6), y + (ty === 0 ? 3 : 1), 10, 9, n > 0.4 ? "#142519" : "#10201a");
+        if (ty === 1 && tx % 3 === 1) r(g, x + 7, y + 8, 3, 8, "#241810");
+      } else if (ch === "g") {
+        r(g, x, y, TILE, TILE, "#1b2718");
+        if (n > 0.55) r(g, x + Math.floor(n * 11), y + Math.floor(n * 13), 1, 2, "#2a3a22");
+        if (n > 0.8) r(g, x + 3, y + 5, 1, 2, "#314528");
+      } else if (ch === "p") {
+        r(g, x, y, TILE, TILE, "#3a3528");
+        if (n > 0.6) r(g, x + Math.floor(n * 12), y + Math.floor(n * 10), 2, 1, "#4a4434");
+      } else if (ch === "a") {
+        r(g, x, y, TILE, TILE, "#23282f");
+        if (n > 0.7) r(g, x + 4, y + 9, 2, 1, "#2a3038");
+      } else if (ch === "f") {
+        r(g, x, y, TILE, TILE, "#0e0f12");
+        r(g, x, y + 2, TILE, 2, "#2c2e33");
+        for (let k = 1; k < TILE; k += 4) r(g, x + k, y, 1, TILE, "#24262b");
+      }
+    }),
+  );
+  // court lines
+  const line = "rgba(201,194,179,0.45)";
+  r(g, 16 * TILE + 4, 2 * TILE + 4, 12 * TILE - 8, 1, line);
+  r(g, 16 * TILE + 4, 9 * TILE - 5, 12 * TILE - 8, 1, line);
+  r(g, 16 * TILE + 4, 2 * TILE + 4, 1, 7 * TILE - 8, line);
+  r(g, 23 * TILE, 3 * TILE, 1, 3 * TILE, line);
+  r(g, 23 * TILE, 3 * TILE, 5 * TILE - 4, 1, line);
+  r(g, 23 * TILE, 6 * TILE, 5 * TILE - 4, 1, line);
+  for (let a = 0; a < 20; a++) {
+    const ang = (a / 20) * Math.PI * 2;
+    r(g, Math.round(20 * TILE + Math.cos(ang) * 18), Math.round(5.5 * TILE + Math.sin(ang) * 18), 1, 1, line);
+  }
+  // hoop: pole, backboard, rim
+  r(g, 26 * TILE + 6, 1 * TILE, 4, 2 * TILE, "#5c5f66");
+  r(g, 25 * TILE + 8, 0.5 * TILE, 22, 14, "#d9d4c8");
+  r(g, 25 * TILE + 13, 0.5 * TILE + 5, 12, 7, "#8e2b1f");
+  r(g, 25 * TILE + 14, 0.5 * TILE + 6, 10, 5, "#d9d4c8");
+  r(g, 25 * TILE + 12, 1.5 * TILE, 14, 2, "#e0662a");
+  for (let k = 0; k < 4; k++) r(g, 25 * TILE + 13 + k * 3, 1.5 * TILE + 2, 1, 5, "#c9c2b3");
+  // bench
+  r(g, 5 * TILE, 2 * TILE + 4, 2 * TILE, 3, "#5a4330");
+  r(g, 5 * TILE, 2 * TILE + 10, 2 * TILE, 4, "#6a5038");
+  r(g, 5 * TILE + 2, 2 * TILE + 14, 2, 4, "#222");
+  r(g, 7 * TILE - 4, 2 * TILE + 14, 2, 4, "#222");
+  // swings
+  r(g, 9 * TILE, 1 * TILE + 4, 2, 2 * TILE - 2, "#4a4d55");
+  r(g, 12 * TILE - 2, 1 * TILE + 4, 2, 2 * TILE - 2, "#4a4d55");
+  r(g, 9 * TILE, 1 * TILE + 4, 3 * TILE, 2, "#5c5f66");
+  for (const sx of [9.6, 10.9]) {
+    r(g, sx * TILE, 1 * TILE + 6, 1, 18, "#8a8d94");
+    r(g, sx * TILE + 8, 1 * TILE + 6, 1, 18, "#8a8d94");
+    r(g, sx * TILE - 1, 1 * TILE + 24, 11, 3, "#6e1f18");
+  }
+  // fountain
+  r(g, 12 * TILE + 2, 8 * TILE, 28, 14, "#5a5a60");
+  r(g, 12 * TILE + 5, 8 * TILE + 3, 22, 8, "#26324a");
+  r(g, 12 * TILE + 8, 8 * TILE + 5, 6, 1, "#4d6590");
+  // trash can
+  r(g, 15 * TILE, 2 * TILE + 2, 10, 13, "#2f3a33");
+  r(g, 15 * TILE - 1, 2 * TILE + 1, 12, 2, "#3f4a43");
+}
+
+function paintRooftop(g: G, s: Scene) {
+  const { w } = sceneSize(s);
+  // sky and the city across
+  const sky = g.createLinearGradient(0, 0, 0, 3 * TILE);
+  sky.addColorStop(0, "#070b1c");
+  sky.addColorStop(1, "#1c2442");
+  g.fillStyle = sky;
+  g.fillRect(0, 0, w, 3 * TILE);
+  for (let i = 0; i < 40; i++) r(g, Math.floor(hash(i, 3) * w), Math.floor(hash(i, 7) * 26), 1, 1, hash(i, 9) > 0.6 ? "#c9d2ef" : "#5b6690");
+  r(g, 15 * TILE, 6, 9, 9, "#dfe5f5");
+  r(g, 15 * TILE + 2, 8, 2, 2, "#c3cbe2");
+  let x = 0;
+  let i = 0;
+  while (x < w) {
+    const bw = 10 + Math.floor(hash(i, 1) * 22);
+    const bh = 10 + Math.floor(hash(i, 2) * 26);
+    r(g, x, 3 * TILE - bh, bw, bh, i % 2 ? "#0a0d18" : "#0d111e");
+    for (let wy = 3 * TILE - bh + 3; wy < 3 * TILE - 2; wy += 5)
+      for (let wx = x + 2; wx < x + bw - 2; wx += 4) if (hash(wx, wy) > 0.8) r(g, wx, wy, 1, 2, hash(wx + 1, wy) > 0.5 ? "#e0b060" : "#8fa6d0");
+    if (hash(i, 5) > 0.75) {
+      r(g, x + Math.floor(bw / 2), 3 * TILE - bh - 8, 1, 8, "#0a0d18");
+      r(g, x + Math.floor(bw / 2), 3 * TILE - bh - 9, 1, 1, "#ff4a36");
+    }
+    x += bw + 1;
+    i++;
+  }
+  s.tiles.forEach((row, ty) =>
+    [...row].forEach((ch, tx) => {
+      const px = tx * TILE;
+      const py = ty * TILE;
+      if (ch === "r") {
+        r(g, px, py, TILE, TILE, "#1f1f23");
+        const n = hash(tx + 90, ty);
+        for (let k = 0; k < 4; k++) r(g, px + Math.floor(hash(tx + k, ty) * 15), py + Math.floor(hash(tx, ty + k) * 15), 1, 1, n > 0.5 ? "#2b2b30" : "#18181b");
+        if (ty % 3 === 0) r(g, px, py + 15, TILE, 1, "#18181b");
+      } else if (ch === "P") {
+        r(g, px, py, TILE, TILE, "#3a3a41");
+        r(g, px, py, TILE, 3, "#55555d");
+        r(g, px + (tx % 2) * 8, py + 7, 1, 9, "#2c2c32");
+      }
+    }),
+  );
+  // the ladder up from the fire escape
+  r(g, 2, 4 * TILE + 8, 2, 2 * TILE + 8, "#6c6d73");
+  r(g, 12, 4 * TILE + 8, 2, 2 * TILE + 8, "#6c6d73");
+  // chimney
+  r(g, 4 * TILE, 3 * TILE, 2 * TILE, 2 * TILE, "#4a2420");
+  for (let yy = 0; yy < 4; yy++) r(g, 4 * TILE, 3 * TILE + yy * 8, 2 * TILE, 1, "#321816");
+  r(g, 4 * TILE - 2, 3 * TILE - 3, 2 * TILE + 4, 4, "#5b5b62");
+  // antenna, chimes hanging off it
+  r(g, 8 * TILE + 7, 1 * TILE, 2, 3.8 * TILE, "#6c6d73");
+  r(g, 8 * TILE + 1, 1.4 * TILE, 14, 1, "#6c6d73");
+  // water tank on its legs
+  r(g, 14 * TILE + 3, 4 * TILE, 2, 2 * TILE, "#2a2a2e");
+  r(g, 17 * TILE - 5, 4 * TILE, 2, 2 * TILE, "#2a2a2e");
+  r(g, 14 * TILE, 1.6 * TILE, 3 * TILE, 2.6 * TILE, "#4a3526");
+  for (let k = 0; k < 5; k++) r(g, 14 * TILE, 1.6 * TILE + 6 + k * 8, 3 * TILE, 1, "#2c1f16");
+  r(g, 14 * TILE - 2, 1.6 * TILE - 4, 3 * TILE + 4, 5, "#3a2a1e");
+  // pigeon coop
+  r(g, 16 * TILE, 7.6 * TILE, 3 * TILE, 1.9 * TILE, "#4f3a28");
+  for (let k = 0; k < 6; k++) r(g, 16 * TILE + 3 + k * 7, 7.6 * TILE + 5, 1, 1.9 * TILE - 8, "#8a8d94");
+  r(g, 16 * TILE, 7.6 * TILE + 5, 3 * TILE, 1, "#8a8d94");
+  // string lights along the ledge
+  for (let k = 0; k < 14; k++) r(g, 2 * TILE + k * 14, 3 * TILE + 6 + (k % 2), 2, 2, k % 3 ? "#f2c47a" : "#f08a5a");
 }
 
 function lampPole(g: G, x: number, baseY: number) {
@@ -540,12 +751,13 @@ export function paintPlace(s: Scene): HTMLCanvasElement {
   c.height = h;
   const g = c.getContext("2d")!;
   g.imageSmoothingEnabled = false;
-  ({ bedroom: paintBedroom, street: paintStreet, store: paintStore, studio: paintStudio })[s.id](g, s);
+  ({ bedroom: paintBedroom, street: paintStreet, store: paintStore, studio: paintStudio, park: paintPark, rooftop: paintRooftop })[s.id](g, s);
   return c;
 }
 
 /** Parts that stand in front of whoever walks behind them. */
 export function paintForeground(g: G, s: Scene) {
+  if (s.id === "park") lampPole(g, 2.5 * TILE, 3 * TILE);
   if (s.id === "street") {
     lampPole(g, 12 * TILE, 3 * TILE);
     lampPole(g, 30 * TILE, 3 * TILE);

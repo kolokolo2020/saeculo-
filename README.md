@@ -96,14 +96,30 @@ or Esc, at any time) lifts the lid back onto the site.
 
 - **Bedroom**: the laptop, a window, a shelf for tapes, a bed, records.
 - **Street**: rain, a flickering lamp, a bench, a payphone that rings, a
-  cat, and something at the far end that isn't always there.
+  cat, and something at the far end that isn't always there. Three
+  friends hang round a boombox outside the corner store, drinking and
+  smoking, nodding to what's playing (give them your tape and they play
+  your beat, louder and clearer as you walk up). A dog walker does laps
+  with their dog. Cars pass with their headlights on and stop and honk if
+  you stand in the road; cyclists ring their bells.
 - **Corner store**: the clerk.
-- **Studio** (the basement door with the red light): the sampler.
+- **Studio** (the basement door with the red light): the sampler, quiet
+  music on the monitors, and three on the couch (a styrofoam cup of
+  something purple, a joint going round, headphones on), all bopping.
+  Ask the one with headphones and they'll play your beat.
+- **The park** (walk off the left end of the street): kids shooting
+  hoops (take a shot), pigeons that scatter, an old man on a bench,
+  swings, a fountain.
+- **The roof** (up the fire escape): the skyline, wind chimes on the
+  antenna, a water tank, a pigeon coop, someone sitting on the ledge.
 
 The loop: find a sound → take it to the studio → make a beat → save it
-→ it's a tape on your shelf. Four sounds are hidden around the block (the
-window, the payphone, the store, the bench); each turns up in the
-studio under **Found**.
+→ it's a tape on your shelf, and something to play for people. Six
+sounds are hidden around the neighbourhood (the window, the payphone,
+the store, the bench, the court, the roof); each turns up in the studio
+under **Found**. People and animals are drawn from a few pixel templates
+(`game/people.ts`), live in `game/life.ts` and are drawn in
+`game/actors.ts`.
 
 ### The studio
 

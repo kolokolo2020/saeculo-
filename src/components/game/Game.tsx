@@ -12,7 +12,10 @@ import { PRESETS } from "./studio/presets";
 import { loadStore } from "./studio/project";
 import Studio from "./studio/Studio";
 import { FINDABLE, playVoice, voiceById, VOICES } from "./studio/voices";
-import { blocked, inside, SCENES, START, TILE, type Dir, type Door } from "./world";
+import { clearSmoke } from "./actors";
+import { lifeBlocks, lifeTarget, makeLife, updateLife, type Actor } from "./life";
+import { clone, type Project } from "./studio/project";
+import { blocked, inside, SCENES, START, tileAt, TILE, type Dir, type Door } from "./world";
 
 // The game: a bedroom, the street outside, the corner store and a basement
 // studio. You start at the laptop the website lives on; closing it puts you
@@ -42,8 +45,31 @@ const KEYMAP: Record<string, Dir> = {
   ArrowRight: "right",
   KeyD: "right",
 };
-const PLACE_NAMES: Record<Place, string> = { bedroom: "Your room", street: "Outside", store: "Corner store", studio: "Studio" };
-const HINT_AT: Record<string, string> = { rain: "window", phone: "phone", bottle: "counter", lighter: "bench" };
+const PLACE_NAMES: Record<Place, string> = { bedroom: "Your room", street: "Outside", store: "Corner store", studio: "Studio", park: "The park", rooftop: "The roof" };
+const HINT_AT: Record<string, string> = { rain: "window", phone: "phone", bottle: "counter", lighter: "bench", basketball: "hoop", chimes: "chimes" };
+const BOOMBOX = { x: 17.6 * TILE, y: 4.4 * TILE };
+
+/** Lines people say, cycled one set per conversation. */
+const LINES: Record<string, string[][]> = {
+  "crew-smoke": [
+    ["\u201cYou live up top? Light's on all night.\u201d"],
+    ["\u201cThis block's quieter than it looks.\u201d", "\u201cThat's the problem.\u201d"],
+    ["\u201cDon't answer that payphone. Or do. Your business.\u201d"],
+  ],
+  "crew-drink": [["\u201cStore never closes. Neither do we.\u201d"], ["\u201cMilo found that speaker in a skip. Still slaps.\u201d"]],
+  "crew-box": [["\u201cThis speaker's older than me.\u201d"], ["\u201cYou make beats? Bring us something.\u201d"]],
+  walker: [["\u201cHe likes you. He doesn't like anyone.\u201d"], ["\u201cSame walk every night. He insists.\u201d"]],
+  "couch-cup": [["\u201cSip slow.\u201d"], ["\u201cYou cooking tonight or just looking at the pads?\u201d"]],
+  "couch-blunt": [["\u201cSit down, you're making the room nervous.\u201d"]],
+  "couch-phones": [["She slides one side of her headphones off."]],
+  oldman: [
+    ["\u201cSame pigeons every night. I think they know me.\u201d"],
+    ["\u201cThat payphone on the corner rings for years now.\u201d", "\u201cI stopped wondering who.\u201d"],
+  ],
+  "hooper-1": [["\u201cNext.\u201d"]],
+  "hooper-2": [["\u201cHe's been missing all night. Don't tell him.\u201d"]],
+  ledge: [["She doesn't turn around."], ["\u201cYou can see the whole block from here.\u201d", "\u201cYour window's the one that never goes dark.\u201d"]],
+};
 /** How many saved projects there are (they show as tapes on the shelf). */
 const savedProjects = () => loadStore().slots.filter(Boolean).length;
 
@@ -81,6 +107,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const tape = useRef<{ engine: Engine; slot: number } | null>(null);
   const shelfRef = useRef(shelf);
   const closeStudioRef = useRef<() => void>(() => {});
+  // the neighbourhood's people and traffic, and the music playing where you are
+  const life = useRef<Actor[]>([]);
+  const talks = useRef<Record<string, number>>({});
+  const music = useRef<{ key: string; engine: Engine } | null>(null);
+  const musicPick = useRef<Record<string, Project>>({});
   // the save as of right now (state lags a render behind)
   const saveRef = useRef(save);
   const st = useRef({
@@ -150,6 +181,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
     setDialog(null);
     setStudio(false);
     engine.current?.dispose();
+    music.current?.engine.dispose();
+    music.current = null;
     stopTape();
     stopGameAudio();
     usePlayerStore.getState().release("game");
@@ -173,6 +206,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
 
   useEffect(() => {
     usePlayerStore.getState().hold("game");
+    life.current = makeLife();
     startGameAudio();
     setPlace("bedroom");
     const el = lid.current;
@@ -201,6 +235,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
       // whatever way we go, nothing keeps playing and the music is handed back
       engine.current?.dispose();
       tape.current?.engine.dispose();
+      music.current?.engine.dispose();
+      clearSmoke();
       stopGameAudio();
       usePlayerStore.getState().release("game");
     };
@@ -230,6 +266,119 @@ export default function Game({ onExit }: { onExit: () => void }) {
     setPlaceName("studio");
     if (!saveRef.current.seenHelp) updateSave((v) => ({ ...v, seenHelp: true }));
     openStudio();
+  };
+
+  // ------------------------------------------------------------ people
+
+  const latestTape = (): Project | null => {
+    const slots = loadStore().slots.filter((p): p is Project => !!p);
+    return slots.length ? slots[slots.length - 1] : null;
+  };
+
+  const smokeWith = () => {
+    const s = st.current;
+    s.hazeUntil = s.t + 25;
+    sfx.flick();
+    say(["You take one pull and pass it back.", "The room goes soft around the edges."]);
+  };
+
+  /** Play something on the boombox (street) or the studio monitors. */
+  const playFor = (where: "street" | "studio", project: Project) => {
+    musicPick.current[where] = clone(project);
+    if (music.current?.key === where) {
+      music.current.engine.dispose();
+      music.current = null;
+    }
+  };
+
+  const talkTo = (a: Actor) => {
+    const n = talks.current[a.id] ?? 0;
+    talks.current[a.id] = n + 1;
+    const lines = LINES[a.id];
+    const next = lines ? lines[n % lines.length] : ["…"];
+    const tape = latestTape();
+    switch (a.id) {
+      case "dog":
+        say(["The dog leans on your leg for a second, then remembers the walk."]);
+        return;
+      case "crew-smoke":
+        say(next, [
+          { label: "Hit the joint", run: smokeWith },
+          { label: "I'm good", run: () => say(["\u201cSuit yourself.\u201d"]) },
+        ]);
+        return;
+      case "crew-drink":
+        say(next, [
+          { label: "Take a sip", run: () => say(["Warm, sweet, too strong. You hand it back.", "\u201cSee? Medicine.\u201d"]) },
+          { label: "No thanks", run: () => setDialog(null) },
+        ]);
+        return;
+      case "crew-box":
+        boombox();
+        return;
+      case "couch-cup":
+        say(next, [
+          { label: "Pour me one?", run: () => say(["\u201cNah. Not while you're working.\u201d", "He takes a long sip, eyes half shut."]) },
+          { label: "Just looking", run: () => setDialog(null) },
+        ]);
+        return;
+      case "couch-blunt":
+        say(next, [
+          { label: "Hit it", run: smokeWith },
+          { label: "Pass", run: () => say(["\u201cMore for the couch.\u201d"]) },
+        ]);
+        return;
+      case "couch-phones":
+        if (tape)
+          say([...next, "\u201cPlay me something you made.\u201d"], [
+            {
+              label: `Play \u201c${tape.name}\u201d`,
+              run: () => {
+                playFor("studio", tape);
+                say(["It comes out of the monitors, loud.", "The whole couch starts nodding."]);
+              },
+            },
+            { label: "Not yet", run: () => say(["\u201cThen go make something.\u201d"]) },
+          ]);
+        else say([...next, "\u201cMake something first. The sampler's right there.\u201d"]);
+        return;
+      case "hooper-1":
+      case "hooper-2":
+        say(next, [
+          { label: "Take a shot", run: shoot },
+          { label: "Watch", run: () => setDialog(null) },
+        ]);
+        return;
+      default:
+        say(next);
+    }
+  };
+
+  const boombox = () => {
+    const tape = latestTape();
+    const choices = [
+      ...(tape
+        ? [
+            {
+              label: `Play them \u201c${tape.name}\u201d`,
+              run: () => {
+                playFor("street", tape);
+                say(["Milo slots your tape in and turns it up.", "\u201cWait. You made this?\u201d", "Nobody says anything else. Heads start going."]);
+              },
+            },
+          ]
+        : []),
+      { label: "Turn it down", run: () => say(["\u201cNah.\u201d"]) },
+      { label: "Leave it", run: () => setDialog(null) },
+    ];
+    say(tape ? ["\u201cYou got something on you?\u201d"] : ["\u201cThis speaker's older than me.\u201d", "\u201cBring us a tape sometime. Something you made.\u201d"], choices);
+  };
+
+  const shoot = () => {
+    const made = Math.random() < 0.45;
+    sfx.voice("basketball");
+    if (find("basketball")) say([made ? "Swish. Nobody saw." : "Off the rim. Loud.", "The bounce echoes off the court. You keep it."]);
+    else say([made ? "Swish." : "Off the rim.", made ? "\u201cLucky.\u201d" : "\u201cNext.\u201d"]);
   };
 
   // ------------------------------------------------------------ interactions
@@ -331,6 +480,39 @@ export default function Game({ onExit }: { onExit: () => void }) {
         case "couch":
           say(["The cushion is still warm."]);
           break;
+        case "boombox":
+          boombox();
+          break;
+        case "swings":
+          sfx.creak();
+          say(["You sit on the swing for a bit. It creaks every time."]);
+          break;
+        case "hoop":
+          shoot();
+          break;
+        case "fountain":
+          sfx.splash();
+          say(["Coins on the bottom, mostly old ones. You flip one in."]);
+          break;
+        case "chimney":
+          say(["Warm air comes up from somewhere below."]);
+          break;
+        case "chimes":
+          if (find("chimes")) say(["The chimes knock together in the wind.", "You keep the sound."]);
+          else say(["The chimes keep time with nothing."]);
+          break;
+        case "tank":
+          say(["An old water tank. Something drips inside, very slowly."]);
+          break;
+        case "coop":
+          sfx.flap();
+          say(["The pigeons shuffle and go quiet while you look at them."]);
+          break;
+        default:
+          if (id.startsWith("npc:")) {
+            const a = life.current.find((x) => x.id === id.slice(4));
+            if (a) talkTo(a);
+          }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -368,7 +550,24 @@ export default function Game({ onExit }: { onExit: () => void }) {
         return "use the sampler";
       case "couch":
         return "sit on the couch";
+      case "boombox":
+        return "the boombox";
+      case "swings":
+        return "sit on the swing";
+      case "hoop":
+        return "shoot some hoops";
+      case "fountain":
+        return "look in the fountain";
+      case "chimney":
+        return "the chimney";
+      case "chimes":
+        return "the wind chimes";
+      case "tank":
+        return "the water tank";
+      case "coop":
+        return "the pigeon coop";
       default:
+        if (id.startsWith("npc:")) return life.current.find((a) => a.id === id.slice(4))?.talk ?? null;
         return null;
     }
   };
@@ -468,6 +667,43 @@ export default function Game({ onExit }: { onExit: () => void }) {
     return () => window.removeEventListener("resize", fit);
   }, []);
 
+  // ------------------------------------------------------------ music in the room
+  // The boombox outside the store and the studio's monitors: loops from the
+  // starters (or your tape, if you gave them one), louder and clearer as you
+  // walk up. Returns whether it's on the beat right now, for the nodding.
+  const musicClock = useRef(0);
+  const placeMusic = (place: Place, inStudio: boolean, dt: number): boolean => {
+    const want = place === "street" ? "street" : place === "studio" && !inStudio ? "studio" : null;
+    if (music.current && music.current.key !== want) {
+      music.current.engine.dispose();
+      music.current = null;
+    }
+    if (want && !music.current && ui.current.phase === "play") {
+      const base = musicPick.current[want] ?? (want === "street" ? PRESETS[2].make() : PRESETS[0].make());
+      const project = clone(base);
+      project.mode = project.song.some((x) => x >= 0) ? "song" : "pattern";
+      const e = new Engine(project);
+      music.current = { key: want, engine: e };
+      void e.start();
+      musicClock.current = 1;
+    }
+    const m = music.current;
+    if (!m) return false;
+    musicClock.current += dt;
+    if (musicClock.current > 0.15) {
+      musicClock.current = 0;
+      const s = st.current;
+      const base = m.engine.project;
+      const d = want === "street" ? Math.hypot(s.x - BOOMBOX.x, s.y - BOOMBOX.y) : 60;
+      const near = Math.max(0, 1 - d / 230);
+      const vol = want === "street" ? 0.75 * near * near : 0.4;
+      const cutoff = want === "street" ? 0.3 + 0.7 * near : 0.62;
+      m.engine.setProject({ ...base, master: { ...base.master, vol, cutoff } });
+    }
+    const p = m.engine.position();
+    return p.step >= 0 && p.step % 4 < 2;
+  };
+
   // dev-only handle for the browser tests (scripts/verify.mjs)
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
@@ -500,6 +736,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
         }
         return out;
       },
+      life: () => ({
+        music: music.current?.key ?? null,
+        musicProject: music.current?.engine.project.name ?? null,
+        actors: life.current.map((a) => ({ id: a.id, kind: a.kind, place: a.place, x: a.x, y: a.y, stopped: a.stopped ?? 0, fly: a.fly ?? null })),
+      }),
       studio: () => {
         const e = engine.current;
         return e ? { playing: e.playing, position: e.position(), project: e.project } : null;
@@ -543,14 +784,15 @@ export default function Game({ onExit }: { onExit: () => void }) {
         if (vx || vy) {
           s.sitting = false;
           const nx = s.x + vx * SPEED * dt;
-          if (!blocked(scene, { x: nx - 4, y: s.y - 3, w: 8, h: 4 })) s.x = nx;
+          const free = (box: { x: number; y: number; w: number; h: number }) => !blocked(scene, box) && !lifeBlocks(life.current, s.place, box);
+          if (free({ x: nx - 4, y: s.y - 3, w: 8, h: 4 })) s.x = nx;
           const ny = s.y + vy * SPEED * dt;
-          if (!blocked(scene, { x: s.x - 4, y: ny - 3, w: 8, h: 4 })) s.y = ny;
+          if (free({ x: s.x - 4, y: ny - 3, w: 8, h: 4 })) s.y = ny;
           s.walk += dt;
           s.stepAcc += dt;
           if (s.stepAcc > 0.3) {
             s.stepAcc = 0;
-            sfx.step(scene.surface(""));
+            sfx.step(scene.surface(tileAt(scene, s.x, s.y - 1)));
           }
         }
       } else s.walk = 0;
@@ -587,13 +829,18 @@ export default function Game({ onExit }: { onExit: () => void }) {
       const fy = s.y - 3 + (s.dir === "up" ? -9 : s.dir === "down" ? 7 : 0);
       const cur = SCENES[s.place];
       const hit = cur.things.find((t) => t.zone && (inside(s.x, s.y - 2, t.zone) || inside(fx, fy, t.zone)));
-      s.target = hit && promptFor(hit.id) ? hit.id : null;
+      const who = hit ? null : lifeTarget(life.current, s.place, s.x, s.y, fx, fy);
+      s.target = hit && promptFor(hit.id) ? hit.id : who ? `npc:${who.id}` : null;
       const near = cur.doors.find((d) => Math.abs(s.x - (d.zone.x + d.zone.w / 2)) < d.zone.w / 2 + 14 && Math.abs(s.y - (d.zone.y + d.zone.h / 2)) < d.zone.h / 2 + 18);
       const p = frozen ? null : s.target ? promptFor(s.target) : near ? `@${near.label}` : null;
       if (p !== lastPrompt) {
         lastPrompt = p;
         setPrompt(p);
       }
+
+      // everyone else, and the music where you are
+      if (u.phase === "play") updateLife(life.current, dt, s.place, s.x, s.y, { honk: sfx.honk, bell: sfx.bell, flap: sfx.flap });
+      const beat = placeMusic(s.place, u.studio, dt);
 
       // the neighbourhood's own small events
       if (s.catLooking && s.t > s.catUntil) s.catLooking = false;
@@ -628,6 +875,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
           ...(shelfRef.current ? [] : ["sampler"]),
         ],
         reduced,
+        actors: life.current,
+        beat,
+        boombox: music.current?.key === "street",
+        dt,
       });
       if (s.trans) {
         const k = s.trans.t < 0.22 ? s.trans.t / 0.22 : 1 - (s.trans.t - 0.22) / 0.22;

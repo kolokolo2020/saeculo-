@@ -441,6 +441,26 @@ const lighter: Play = (ctx, out, t, { vel }) => {
   noiseSrc(ctx, t + 0.05, t + 0.35, filter(ctx, "bandpass", 900, 0.8, perc(ctx, out, t + 0.05, 0.07 * vel, 0.03, 0.25)));
 };
 
+const basketball: Play = (ctx, out, t, { vel, midi }) => {
+  const k = tune(midi);
+  const o = osc(ctx, "sine", 140 * k, t, t + 0.25, perc(ctx, out, t, 0.7 * vel, 0.002, 0.16));
+  o.frequency.exponentialRampToValueAtTime(70 * k, t + 0.08);
+  noiseSrc(ctx, t, t + 0.05, filter(ctx, "bandpass", 1400 * k, 1.2, perc(ctx, out, t, 0.35 * vel, 0.001, 0.03)));
+  // the court answers back
+  noiseSrc(ctx, t + 0.06, t + 0.2, filter(ctx, "bandpass", 900 * k, 2, perc(ctx, out, t + 0.06, 0.05 * vel, 0.005, 0.1)));
+};
+
+const chimes: Play = (ctx, out, t, { vel, midi, dur }) => {
+  // a few tubes knocking into each other, tuned around the note
+  [0, 7, 12, 16].forEach((iv, i) => {
+    const at = t + i * (0.05 + Math.random() * 0.05);
+    const f = hz(midi + 12 + iv);
+    const d = Math.min(3, 1.4 + dur);
+    osc(ctx, "sine", f, at, at + d + 0.1, perc(ctx, out, at, (0.12 - i * 0.02) * vel, 0.002, d));
+    osc(ctx, "sine", f * 2.76, at, at + 0.6, perc(ctx, out, at, 0.03 * vel, 0.001, 0.5));
+  });
+};
+
 // ------------------------------------------------------------ files: chops and your samples
 
 const buffers = new Map<string, AudioBuffer>();
@@ -588,6 +608,8 @@ export const VOICES: Voice[] = [
   d("bottle", "bottle", "Found", bottle, "the store"),
   m("phone", "phone line", "Found", phone, "the payphone"),
   d("lighter", "lighter", "Found", lighter, "the bench"),
+  d("basketball", "basketball", "Found", basketball, "the park"),
+  m("chimes", "wind chimes", "Found", chimes, "the rooftop"),
 
   ...chopVoices,
   ...sampleVoices,
