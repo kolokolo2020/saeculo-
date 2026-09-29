@@ -8,9 +8,11 @@ import BeatsWindow from "@/components/beats/BeatsWindow";
 import { trackIndexFromHash } from "@/lib/trackLink";
 import ContactWindow from "./ContactWindow";
 import { BeatsIcon, ContactIcon, GameIcon, SocialsIcon } from "./Icons";
-import { readCalm, useSiteStore, type WindowId } from "./siteStore";
+import ShortcutsCard from "./ShortcutsCard";
+import { readCalm, restoreSitePrefs, useSiteStore, type WindowId } from "./siteStore";
 import SocialsWindow from "./SocialsWindow";
 import Taskbar from "./Taskbar";
+import { useShortcuts } from "./useShortcuts";
 import Window from "./Window";
 
 // The intro and the game are only downloaded when they're needed: returning
@@ -48,6 +50,7 @@ const ICONS: { id: WindowId | "game"; label: string; Icon: typeof BeatsIcon }[] 
 ];
 
 export default function Site() {
+  useShortcuts();
   const windows = useSiteStore((s) => s.windows);
   const gameOpen = useSiteStore((s) => s.gameOpen);
   const introOpen = useSiteStore((s) => s.introOpen);
@@ -63,6 +66,7 @@ export default function Site() {
     useSiteStore.setState({
       calm: readCalm() || window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     });
+    restoreSitePrefs();
     const fromLink = trackIndexFromHash(window.location.hash);
     if (fromLink >= 0) usePlayerStore.getState().selectTrack(fromLink, false);
     const site = useSiteStore.getState();
@@ -136,6 +140,7 @@ export default function Site() {
         </Window>
 
         <Taskbar onReplayIntro={() => useSiteStore.getState().setIntroOpen(true)} />
+        <ShortcutsCard />
       </div>
 
       <div className="grain" aria-hidden />

@@ -15,6 +15,8 @@ interface PlayerState {
   duration: number;
   volume: number;
   muted: boolean;
+  repeatOne: boolean;
+  shuffle: boolean;
   status: LoadStatus;
   /** Track ids whose file failed to load this visit. */
   failed: string[];
@@ -40,6 +42,10 @@ interface PlayerState {
   seek: (seconds: number) => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
+  toggleRepeat: () => void;
+  toggleShuffle: () => void;
+  /** The track ended: repeat it, or move on. */
+  ended: () => void;
   /** Pause for someone else's sound; remembers whether to resume. */
   hold: (owner: string) => void;
   /** Give the music back: resumes only if it was playing when held. */
@@ -52,19 +58,26 @@ const isIOS = () =>
   /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (navigator.userAgent.includes("Macintosh") && navigator.maxTouchPoints > 1);
 
-function savePrefs(volume: number, muted: boolean) {
+interface Prefs {
+  volume: number;
+  muted: boolean;
+  repeatOne: boolean;
+  shuffle: boolean;
+}
+
+function savePrefs(p: Prefs) {
   try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ volume, muted }));
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p));
   } catch {
     // storage unavailable: the setting lasts for this visit
   }
 }
 
-function loadPrefs(): { volume: number; muted: boolean } | null {
+function loadPrefs(): Prefs | null {
   try {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "null");
     if (saved && typeof saved.volume === "number" && saved.volume >= 0 && saved.volume <= 1) {
-      return { volume: saved.volume, muted: saved.muted === true };
+      return { volume: saved.volume, muted: saved.muted === true, repeatOne: saved.repeatOne === true, shuffle: saved.shuffle === true };
     }
   } catch {
     // corrupted or blocked storage: keep the defaults
@@ -147,6 +160,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     duration: 0,
     volume: 0.8,
     muted: false,
+    repeatOne: false,
+    shuffle: false,
     status: "idle",
     failed: [],
     heldBy: null,
@@ -163,7 +178,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       if (!el.getAttribute("src") && TRACKS[get().trackIndex]) el.src = TRACKS[get().trackIndex].src;
       el.volume = volume;
       el.muted = muted;
-      set({ audio: el, volume, muted });
+      set({ audio: el, volume, muted, repeatOne: prefs?.repeatOne ?? false, shuffle: prefs?.shuffle ?? false });
     },
     detach: (el) => {
       if (get().audio === el) set({ audio: null });
@@ -205,7 +220,19 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
     next: () => {
       if (!TRACKS.length) return;
-      get().selectTrack((get().trackIndex + 1) % TRACKS.length);
+      const { shuffle, trackIndex } = get();
+      if (shuffle && TRACKS.length > 1) {
+        // anything but the one that's playing
+        const pick = Math.floor(Math.random() * (TRACKS.length - 1));
+        get().selectTrack(pick >= trackIndex ? pick + 1 : pick);
+      } else get().selectTrack((trackIndex + 1) % TRACKS.length);
+    },
+    ended: () => {
+      const { repeatOne, audio } = get();
+      if (repeatOne && audio) {
+        audio.currentTime = 0;
+        startPlayback(audio);
+      } else get().next();
     },
     prev: () => {
       const { audio, trackIndex } = get();
@@ -234,14 +261,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       }
       const muted = volume > 0 ? false : get().muted;
       set({ volume, muted });
-      savePrefs(volume, muted);
+      savePrefs({ ...pick(get()), volume, muted });
     },
     toggleMute: () => {
       const muted = !get().muted;
       const { audio } = get();
       if (audio) audio.muted = muted;
       set({ muted });
-      savePrefs(get().volume, muted);
+      savePrefs({ ...pick(get()), muted });
+    },
+    toggleRepeat: () => {
+      set({ repeatOne: !get().repeatOne });
+      savePrefs(pick(get()));
+    },
+    toggleShuffle: () => {
+      set({ shuffle: !get().shuffle });
+      savePrefs(pick(get()));
     },
     hold: (owner) => {
       const { audio, heldBy } = get();
@@ -258,6 +293,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
   };
 });
+
+function pick(s: PlayerState): Prefs {
+  return { volume: s.volume, muted: s.muted, repeatOne: s.repeatOne, shuffle: s.shuffle };
+}
 
 export function useCurrentTrack() {
   const index = usePlayerStore((s) => s.trackIndex);

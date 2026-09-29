@@ -28,7 +28,11 @@ function imageFor(src: string): HTMLImageElement {
   return img;
 }
 
-export default function CoverVisualizer({ track, palette, calm }: { track: Track | undefined; palette: Palette; calm: boolean }) {
+// "scan" is the other look: the cover cut into scanlines, each drifting
+// sideways and brightening with its band (the low end at the bottom).
+const SCAN_ROWS = 56;
+
+export default function CoverVisualizer({ track, palette, calm, mode = "reveal" }: { track: Track | undefined; palette: Palette; calm: boolean; mode?: "reveal" | "scan" }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const levels = useRef(new Float32Array(COLS));
   const bass = useRef(0);
@@ -115,6 +119,31 @@ export default function CoverVisualizer({ track, palette, calm }: { track: Track
       g.clearRect(0, 0, size, size);
       g.fillStyle = palette.deep;
       g.fillRect(0, 0, size, size);
+
+      if (mode === "scan" && img && img.complete && img.naturalWidth) {
+        const rowH = size / SCAN_ROWS;
+        const srcH = img.naturalHeight / SCAN_ROWS;
+        for (let r = 0; r < SCAN_ROWS; r++) {
+          const band = Math.min(COLS - 1, Math.floor(((SCAN_ROWS - 1 - r) / SCAN_ROWS) * COLS));
+          const e = lv[band] * pr;
+          const shift = (r % 2 ? 1 : -1) * e * size * 0.05;
+          g.globalAlpha = 0.55 + 0.45 * Math.min(1, e * 1.4 + (1 - pr));
+          g.drawImage(img, 0, r * srcH, img.naturalWidth, srcH, shift, r * rowH, size, Math.ceil(rowH) - (pr > 0.3 ? 1 : 0));
+        }
+        g.globalAlpha = 1;
+        if (b > 0.01) {
+          g.globalCompositeOperation = "screen";
+          g.fillStyle = palette.accent;
+          g.globalAlpha = Math.min(0.18, b * 0.25);
+          g.fillRect(0, 0, size, size);
+          g.globalCompositeOperation = "source-over";
+          g.globalAlpha = 1;
+        }
+        if (moving && !document.hidden) raf = requestAnimationFrame(frame);
+        else running = false;
+        return;
+      }
+
       // the dim print, breathing with the low end
       drawCover(1, 1 + pr * 0.02 + b * 0.025, `brightness(${(0.88 - pr * 0.58 + b * 0.12).toFixed(3)}) saturate(${(1 - pr * 0.35).toFixed(3)})`);
 
@@ -191,7 +220,7 @@ export default function CoverVisualizer({ track, palette, calm }: { track: Track
       img?.removeEventListener("load", still);
       img?.removeEventListener("load", kick);
     };
-  }, [track, palette, calm]);
+  }, [track, palette, calm, mode]);
 
   return (
     <canvas

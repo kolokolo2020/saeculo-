@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
-import { NextGlyph, PauseGlyph, PlayGlyph, PrevGlyph, VolumeGlyph } from "@/components/site/Icons";
+import { NextGlyph, PauseGlyph, PlayGlyph, PrevGlyph, RepeatGlyph, ShuffleGlyph, VolumeGlyph } from "@/components/site/Icons";
 import { TRACKS, isNew } from "@/data/tracks";
 import analysis from "@/data/trackAnalysis.json";
 import { formatTime } from "@/lib/audio";
 import { trackUrl } from "@/lib/trackLink";
 import CoverVisualizer from "./CoverVisualizer";
 import { usePalette } from "./palette";
+import WaveformSeek from "./WaveformSeek";
 
 const measured = analysis as Record<string, { duration?: number } | undefined>;
 
@@ -77,35 +78,16 @@ function Lcd() {
   );
 }
 
-function Seek() {
-  const currentTime = usePlayerStore((s) => s.currentTime);
-  const duration = usePlayerStore((s) => s.duration);
-  const seek = usePlayerStore((s) => s.seek);
-  const pct = duration ? (currentTime / duration) * 100 : 0;
-  return (
-    <input
-      type="range"
-      className="deck-range w-full"
-      aria-label="Seek"
-      aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
-      min={0}
-      max={duration || 1}
-      step={0.1}
-      value={Math.min(currentTime, duration || 1)}
-      disabled={!duration}
-      onChange={(e) => seek(Number(e.target.value))}
-      style={{ ["--fill" as string]: `${pct}%` }}
-    />
-  );
-}
-
 function Transport() {
   const playing = usePlayerStore((s) => s.playing);
   const volume = usePlayerStore((s) => s.volume);
   const muted = usePlayerStore((s) => s.muted);
-  const { toggle, prev, next, setVolume, toggleMute } = usePlayerStore.getState();
+  const repeatOne = usePlayerStore((s) => s.repeatOne);
+  const shuffle = usePlayerStore((s) => s.shuffle);
+  const { toggle, prev, next, setVolume, toggleMute, toggleRepeat, toggleShuffle } = usePlayerStore.getState();
   const calm = useSiteStore((s) => s.calm);
-  const setCalm = useSiteStore((s) => s.setCalm);
+  const vis = useSiteStore((s) => s.vis);
+  const cycleVisuals = useSiteStore((s) => s.cycleVisuals);
   const vol = muted ? 0 : volume;
   const empty = TRACKS.length === 0;
   return (
@@ -119,6 +101,24 @@ function Transport() {
         </button>
         <button className="deck-btn" aria-label="Next" onClick={next} disabled={empty}>
           <NextGlyph />
+        </button>
+        <button
+          className="grid h-8 w-8 place-items-center rounded-[3px] text-[#8a8170] hover:text-white aria-pressed:text-[var(--accent)]"
+          aria-label="Repeat this beat"
+          aria-pressed={repeatOne}
+          onClick={toggleRepeat}
+          title="Repeat this beat"
+        >
+          <RepeatGlyph size={15} />
+        </button>
+        <button
+          className="grid h-8 w-8 place-items-center rounded-[3px] text-[#8a8170] hover:text-white aria-pressed:text-[var(--accent)]"
+          aria-label="Shuffle"
+          aria-pressed={shuffle}
+          onClick={toggleShuffle}
+          title="Shuffle"
+        >
+          <ShuffleGlyph size={15} />
         </button>
       </div>
       <div className="flex min-w-[130px] flex-1 items-center gap-2">
@@ -139,11 +139,10 @@ function Transport() {
       </div>
       <button
         className="rounded-[3px] border border-[#3a3733] px-2 py-1 font-lcd text-[16px] leading-none tracking-wide text-[#cfc6b3] hover:border-[#6d6558] hover:text-white"
-        aria-pressed={!calm}
-        onClick={() => setCalm(!calm)}
-        title="Turn the moving visuals on or off"
+        onClick={cycleVisuals}
+        title="Change the visuals: reveal, scan or still"
       >
-        visuals: {calm ? "still" : "live"}
+        visuals: {calm ? "still" : vis}
       </button>
     </div>
   );
@@ -218,6 +217,7 @@ export default function BeatsWindow() {
   const track = useCurrentTrack();
   const palette = usePalette(track?.cover);
   const calm = useSiteStore((s) => s.calm);
+  const vis = useSiteStore((s) => s.vis);
   const [copied, setCopied] = useState(false);
 
   const copyLink = async () => {
@@ -238,11 +238,11 @@ export default function BeatsWindow() {
         style={{ ["--accent" as string]: palette.accent, ["--accent-2" as string]: palette.second }}
       >
         <div className="mx-auto aspect-square w-[min(62vw,240px)] shrink-0 overflow-hidden bg-black shadow-[0_0_0_1px_#000,0_6px_18px_rgba(0,0,0,0.6)] sm:mx-0 sm:w-[212px]">
-          <CoverVisualizer track={track} palette={palette} calm={calm} />
+          <CoverVisualizer track={track} palette={palette} calm={calm} mode={vis} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-between gap-3">
           <Lcd />
-          <Seek />
+          <WaveformSeek track={track} accent={palette.accent} />
           <Transport />
         </div>
       </div>

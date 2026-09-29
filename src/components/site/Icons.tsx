@@ -205,6 +205,26 @@ export const MinGlyph = (p: P) => (
     <rect x="3" y="11" width="8" height="2" />
   </G>
 );
+export const MaxGlyph = (p: P) => (
+  <G {...p}>
+    <path d="M3 3h10v10H3z M4.5 6h7v5.5h-7z" fillRule="evenodd" />
+  </G>
+);
+export const RestoreGlyph = (p: P) => (
+  <G {...p}>
+    <path d="M5 2.5h8.5V10H12V4H5z M2.5 5.5H11V13H2.5z M4 8h5.5v3.5H4z" fillRule="evenodd" />
+  </G>
+);
+export const RepeatGlyph = (p: P) => (
+  <G {...p}>
+    <path d="M3 6.5V5a1.5 1.5 0 0 1 1.5-1.5H11V1.5L14 4.5 11 7.5V5.5H5V6.5z M13 9.5V11a1.5 1.5 0 0 1-1.5 1.5H5v2L2 11.5 5 8.5v2h6V9.5z" />
+  </G>
+);
+export const ShuffleGlyph = (p: P) => (
+  <G {...p}>
+    <path d="M1.5 4h3l6 8h2v-2l2.5 3-2.5 3v-2h-2.8l-6-8H1.5z M1.5 12h3l1.6-2.1 1.2 1.6L5.3 14H1.5z M10.5 4h2V2l2.5 3-2.5 3V6h-1.8L9.3 7.8 8.1 6.2z" />
+  </G>
+);
 export const StopGlyph = (p: P) => (
   <G {...p}>
     <rect x="3.5" y="3.5" width="9" height="9" />

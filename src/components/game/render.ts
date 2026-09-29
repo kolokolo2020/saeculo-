@@ -1,3 +1,5 @@
+import { actorLights, drawActor, drawBoombox, drawChimes, drawSmoke } from "./actors";
+import type { Actor } from "./life";
 import { paintForeground, paintPlace, sceneSize, SCENES, TILE, type Dir, type Scene } from "./world";
 import type { Place } from "./sfx";
 
@@ -100,6 +102,13 @@ export interface View {
   tapes: boolean[];
   hints: string[]; // thing ids with a sound still to find
   reduced: boolean;
+  /** Everyone else in the neighbourhood. */
+  actors: Actor[];
+  /** On the beat of whatever music is playing here. */
+  beat: boolean;
+  /** Is the corner-store boombox playing? */
+  boombox: boolean;
+  dt: number;
 }
 
 const painted = new Map<Place, HTMLCanvasElement>();
@@ -185,7 +194,15 @@ export function draw(g: G, v: View) {
 
   // hints: a faint glint over places with a sound still to find
   if (!v.reduced || Math.floor(v.t) % 2 === 0) {
-    const glintAt: Record<string, [Place, number, number]> = { window: ["bedroom", 8.5, 1], phone: ["street", 26.5, 1.6], counter: ["store", 10.5, 2.6], sampler: ["studio", 8, 1] };
+    const glintAt: Record<string, [Place, number, number]> = {
+      window: ["bedroom", 8.5, 1],
+      phone: ["street", 26.5, 1.6],
+      counter: ["store", 10.5, 2.6],
+      sampler: ["studio", 8, 1],
+      bench: ["street", 9, 2.2],
+      hoop: ["park", 26, 0.3],
+      chimes: ["rooftop", 9.4, 1],
+    };
     for (const id of v.hints) {
       const at = glintAt[id];
       if (!at || at[0] !== v.place) continue;
@@ -199,19 +216,31 @@ export function draw(g: G, v: View) {
     }
   }
 
-  // --- you
-  if (me && sitting) {
-    const img = v.sitting ? sitting : me[v.dir][v.walk ? 1 + (Math.floor(v.walk * 8) % 2) : 0];
-    g.fillStyle = "rgba(0,0,0,0.35)";
-    g.fillRect(Math.round(v.x) - 4, Math.round(v.y) - 1, 8, 2);
-    g.drawImage(img, Math.round(v.x) - 6, Math.round(v.y) - img.height + (v.sitting ? -4 : 0));
+  if (v.place === "street") drawBoombox(g, v.beat, v.boombox);
+  if (v.place === "rooftop") drawChimes(g, v.t, v.reduced);
+
+  // --- everyone, back to front, you included
+  const here = v.actors.filter((a) => a.place === v.place);
+  const order: (Actor | null)[] = [...here, null].sort((a, b) => (a ? a.y : v.y) - (b ? b.y : v.y));
+  for (const a of order) {
+    if (a) {
+      drawActor(g, a, v.t, v.beat, v.reduced);
+      continue;
+    }
+    if (me && sitting) {
+      const img = v.sitting ? sitting : me[v.dir][v.walk ? 1 + (Math.floor(v.walk * 8) % 2) : 0];
+      g.fillStyle = "rgba(0,0,0,0.35)";
+      g.fillRect(Math.round(v.x) - 4, Math.round(v.y) - 1, 8, 2);
+      g.drawImage(img, Math.round(v.x) - 6, Math.round(v.y) - img.height + (v.sitting ? -4 : 0));
+    }
   }
+  drawSmoke(g, v.dt);
 
   paintForeground(g, s);
   g.restore();
 
   // --- rain outside
-  if (v.place === "street" && !v.reduced) {
+  if ((v.place === "street" || v.place === "park" || v.place === "rooftop") && !v.reduced) {
     g.strokeStyle = "rgba(160,180,220,0.28)";
     g.lineWidth = 1;
     g.beginPath();
@@ -236,7 +265,8 @@ export function draw(g: G, v: View) {
   d.fillStyle = `rgba(6,7,16,${s.darkness})`;
   d.fillRect(0, 0, VIEW_W, VIEW_H);
   d.globalCompositeOperation = "destination-out";
-  for (const L of s.lights) {
+  const lights = [...s.lights, ...actorLights(v.actors, v.place)];
+  for (const L of lights) {
     const lv = lampLevel(L.kind, v.t, v.reduced);
     const x = L.x - cx;
     const y = L.y - cy;
@@ -248,7 +278,7 @@ export function draw(g: G, v: View) {
   }
   g.drawImage(dark, 0, 0);
   g.globalCompositeOperation = "lighter";
-  for (const L of s.lights) {
+  for (const L of lights) {
     const lv = lampLevel(L.kind, v.t, v.reduced);
     const x = L.x - cx;
     const y = L.y - cy;

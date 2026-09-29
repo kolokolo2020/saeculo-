@@ -1,10 +1,10 @@
 import { getAudioContext } from "@/lib/audioContext";
-import { playSound } from "./kit";
+import { playVoice } from "./studio/voices";
 
 // The neighbourhood's sound: a room tone per place (rain, a fridge hum, a
 // quiet studio), footsteps, and small cues. One bus, torn down on exit.
 
-export type Place = "bedroom" | "street" | "store" | "studio";
+export type Place = "bedroom" | "street" | "store" | "studio" | "park" | "rooftop";
 
 let bus: GainNode | null = null;
 let rainGain: GainNode | null = null;
@@ -129,8 +129,8 @@ export function stopGameAudio() {
 export function setPlace(place: Place, windowOpen = false) {
   const c = ctx();
   const at = c.currentTime;
-  const rain = { bedroom: windowOpen ? 0.3 : 0.1, street: 0.34, store: 0.03, studio: 0 }[place];
-  const hum = { bedroom: 0.004, street: 0, store: 0.02, studio: 0.006 }[place];
+  const rain = { bedroom: windowOpen ? 0.3 : 0.1, street: 0.34, store: 0.03, studio: 0, park: 0.26, rooftop: 0.4 }[place];
+  const hum = { bedroom: 0.004, street: 0, store: 0.02, studio: 0.006, park: 0, rooftop: 0 }[place];
   rainGain?.gain.setTargetAtTime(rain, at, 0.3);
   humGain?.gain.setTargetAtTime(hum, at, 0.3);
 }
@@ -197,18 +197,78 @@ export const sfx = {
     blip(90, 0.25, "sine", 0.18);
     blip(140, 0.12, "triangle", 0.05);
   },
+  /** A car horn, two notes, a bit tired. */
+  honk() {
+    if (!bus) return;
+    const c = ctx();
+    const t = c.currentTime;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 0.02);
+    g.gain.setValueAtTime(0.05, t + 0.32);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 1800;
+    lp.connect(g).connect(bus);
+    for (const f of [392, 494]) {
+      const o = c.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.value = f;
+      o.connect(lp);
+      o.start(t);
+      o.stop(t + 0.42);
+    }
+  },
+  bell() {
+    blip(2100, 0.35, "sine", 0.04);
+    setTimeout(() => blip(2100, 0.3, "sine", 0.03), 140);
+  },
+  flap() {
+    if (!bus) return;
+    const c = ctx();
+    for (let i = 0; i < 5; i++) {
+      const t = c.currentTime + i * 0.06;
+      const src = c.createBufferSource();
+      const len = Math.floor(c.sampleRate * 0.04);
+      const buf = c.createBuffer(1, len, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let k = 0; k < len; k++) d[k] = (Math.random() * 2 - 1) * (1 - k / len);
+      src.buffer = buf;
+      const f = c.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = 900;
+      const g = c.createGain();
+      g.gain.value = 0.05;
+      src.connect(f).connect(g).connect(bus);
+      src.start(t);
+    }
+  },
+  creak() {
+    blip(310, 0.35, "sawtooth", 0.02);
+    setTimeout(() => blip(260, 0.3, "sawtooth", 0.015), 380);
+  },
+  splash() {
+    blip(1800, 0.05, "sine", 0.04);
+    setTimeout(() => blip(700, 0.25, "triangle", 0.03), 60);
+  },
+  /** One of the studio's sounds, on the game's bus. */
+  voice(id: string) {
+    if (!bus) return;
+    const c = ctx();
+    playVoice(c, bus, id, c.currentTime + 0.02, { vel: 0.8 });
+  },
   flick() {
     // a lighter
     if (!bus) return;
     const c = ctx();
-    playSound(c, bus, "hat", c.currentTime, 0, 0.9);
-    playSound(c, bus, "hat", c.currentTime + 0.05, 0, 0.5);
+    playVoice(c, bus, "lighter", c.currentTime, { vel: 0.9 });
   },
   /** A new sound: play it, then a small rising figure. */
   found(id: string) {
     if (!bus) return;
     const c = ctx();
-    playSound(c, bus, id, c.currentTime + 0.02, 0);
+    playVoice(c, bus, id, c.currentTime + 0.02, { midi: 60, dur: 0.5 });
     [0, 1, 2].forEach((i) => {
       const t = c.currentTime + 0.5 + i * 0.12;
       const o = c.createOscillator();

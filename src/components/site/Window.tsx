@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { CloseGlyph, MinGlyph } from "./Icons";
+import { CloseGlyph, MaxGlyph, MinGlyph, RestoreGlyph } from "./Icons";
 import { activeWindow, useSiteStore, WINDOW_TITLES, type WindowId } from "./siteStore";
 
 export const TASKBAR_H = 44;
@@ -30,7 +30,7 @@ export default function Window({
   const state = useSiteStore((s) => s.windows[id]);
   const z = useSiteStore((s) => s.order.indexOf(id));
   const active = useSiteStore((s) => activeWindow(s) === id);
-  const { focus, closeWindow, minimize, moveWindow } = useSiteStore.getState();
+  const { focus, closeWindow, minimize, moveWindow, toggleMaximize, rememberPositions } = useSiteStore.getState();
   const mobile = useIsMobile();
   const ref = useRef<HTMLElement>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
@@ -59,8 +59,9 @@ export default function Window({
 
   if (!state.open) return null;
 
+  const maximized = state.maximized && !mobile;
   const onPointerDown = (e: React.PointerEvent) => {
-    if (mobile || e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
+    if (mobile || maximized || e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
     drag.current = { dx: e.clientX - state.x, dy: e.clientY - state.y };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -73,12 +74,15 @@ export default function Window({
     moveWindow(id, x, y);
   };
   const endDrag = () => {
+    if (drag.current) rememberPositions();
     drag.current = null;
   };
 
   const style: React.CSSProperties = mobile
     ? { inset: `0 0 ${TASKBAR_H}px 0`, zIndex: 10 + z }
-    : {
+    : maximized
+      ? { inset: `6px 6px ${TASKBAR_H + 6}px 6px`, zIndex: 10 + z }
+      : {
         left: state.x,
         top: state.y,
         width: `min(${width}px, calc(100vw - 16px))`,
@@ -106,13 +110,18 @@ export default function Window({
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        onDoubleClick={() => !mobile && moveWindow(id, -1, -1)}
+        onDoubleClick={(e) => !mobile && !(e.target as HTMLElement).closest("button") && toggleMaximize(id)}
       >
         <span className="grid h-4 w-4 place-items-center">{icon}</span>
         <h2 id={`win-${id}-title`}>{WINDOW_TITLES[id]}</h2>
         <button className="cap-btn" aria-label={`Minimize ${WINDOW_TITLES[id]}`} onClick={() => minimize(id)}>
           <MinGlyph size={12} />
         </button>
+        {!mobile && (
+          <button className="cap-btn" aria-label={`${maximized ? "Restore" : "Maximize"} ${WINDOW_TITLES[id]}`} onClick={() => toggleMaximize(id)}>
+            {maximized ? <RestoreGlyph size={12} /> : <MaxGlyph size={12} />}
+          </button>
+        )}
         <button className="cap-btn ml-0.5" aria-label={`Close ${WINDOW_TITLES[id]}`} onClick={() => closeWindow(id)}>
           <CloseGlyph size={11} />
         </button>
