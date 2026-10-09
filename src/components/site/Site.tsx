@@ -129,7 +129,7 @@ export default function Site() {
           ))}
         </nav>
 
-        <Window id="beats" width={720} height={560} icon={<BeatsIcon size={16} />}>
+        <Window id="beats" width={760} height={600} icon={<BeatsIcon size={16} />} glass>
           <BeatsWindow />
         </Window>
         <Window id="socials" width={400} height={344} icon={<SocialsIcon size={16} />}>

@@ -81,7 +81,7 @@ export default function Browser({
               </button>
               {!locked && (
                 <>
-                  <button className="rounded-[2px] px-1.5 text-[12px] text-[#b9b09e] hover:bg-[#2d2a27] hover:text-white disabled:opacity-30" disabled={!canSwap} onClick={() => onSwap(v)} aria-label={`Put ${v.name} on the selected channel`} title="Put on the selected channel">
+                  <button className="rounded-[2px] px-1.5 text-[12px] text-[#b9b09e] hover:bg-[#2d2a27] hover:text-white disabled:opacity-30" disabled={!canSwap} onClick={() => onSwap(v)} aria-label={`swap: Put ${v.name} on the selected channel`} title="Put on the selected channel">
                     swap
                   </button>
                   <button className="rounded-[2px] px-1.5 text-[15px] leading-none text-[#b9b09e] hover:bg-[#2d2a27] hover:text-white disabled:opacity-30" disabled={!canAdd} onClick={() => onAdd(v)} aria-label={`Add ${v.name} as a new channel`} title="Add as a new channel">

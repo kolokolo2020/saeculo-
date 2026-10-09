@@ -19,12 +19,15 @@ export default function Window({
   width,
   height,
   icon,
+  glass = false,
   children,
 }: {
   id: WindowId;
   width: number;
   height: number;
   icon: React.ReactNode;
+  /** Dark glass chrome (the media player) instead of the beige. */
+  glass?: boolean;
   children: React.ReactNode;
 }) {
   const state = useSiteStore((s) => s.windows[id]);
@@ -98,7 +101,7 @@ export default function Window({
       aria-labelledby={`win-${id}-title`}
       data-testid={`window-${id}`}
       data-active={active}
-      className="win outline-none"
+      className={`win outline-none ${glass ? "win-glass" : ""}`}
       hidden={state.minimized}
       style={style}
       onPointerDownCapture={() => focus(id)}

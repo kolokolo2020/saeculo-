@@ -29,7 +29,7 @@ function MiniPlayer() {
         <span className="flex min-w-0 flex-col leading-tight">
           <span className="max-w-[20vw] truncate text-[12.5px] font-bold sm:max-w-[160px]">{track.title}</span>
           <span className="relative mt-0.5 hidden h-[3px] w-[110px] bg-face-lo sm:block" aria-hidden>
-            <span className="absolute inset-y-0 left-0 bg-brick" style={{ width: `${pct}%` }} />
+            <span className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,#2fb9ee,#8a6bff)]" style={{ width: `${pct}%` }} />
           </span>
           {status === "error" && <span className="text-[11px] text-alert">unavailable</span>}
         </span>

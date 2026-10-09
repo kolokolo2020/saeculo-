@@ -19,7 +19,7 @@ interface WinState {
   y: number;
 }
 
-export type VisMode = "reveal" | "scan";
+export type VisMode = "led" | "wave";
 
 interface SiteState {
   windows: Record<WindowId, WinState>;
@@ -68,7 +68,7 @@ export const useSiteStore = create<SiteState>((set, get) => ({
   gameOpen: false,
   introOpen: false,
   calm: false,
-  vis: "reveal",
+  vis: "led",
   shortcutsOpen: false,
   sample: null,
 
@@ -112,8 +112,8 @@ export const useSiteStore = create<SiteState>((set, get) => ({
     const { calm, vis, setCalm } = get();
     if (calm) {
       setCalm(false);
-      set({ vis: "reveal" });
-    } else if (vis === "reveal") set({ vis: "scan" });
+      set({ vis: "led" });
+    } else if (vis === "led") set({ vis: "wave" });
     else setCalm(true);
     try {
       localStorage.setItem(VIS_KEY, get().vis);
@@ -140,7 +140,7 @@ export function restoreSitePrefs() {
   const patch: Partial<SiteState> = {};
   try {
     const vis = localStorage.getItem(VIS_KEY);
-    if (vis === "scan" || vis === "reveal") patch.vis = vis;
+    if (vis === "led" || vis === "wave") patch.vis = vis;
     const pos = JSON.parse(localStorage.getItem(POS_KEY) ?? "null");
     if (pos && typeof pos === "object") {
       const windows = { ...useSiteStore.getState().windows };

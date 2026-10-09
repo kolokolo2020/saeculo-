@@ -387,31 +387,6 @@
   outline-offset: 2px;
 }
 
-.track-row {
-  display: grid;
-  grid-template-columns: 34px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 5px 8px;
-  text-align: left;
-  border: 1px dotted transparent;
-}
-.track-row:hover {
-  background: #e6dfd0;
-}
-.track-row[aria-current="true"] {
-  color: #fff;
-  background: var(--color-brick);
-}
-.track-row:focus-visible {
-  outline: none;
-  border-color: var(--color-ink);
-}
-.track-row[aria-current="true"]:focus-visible {
-  border-color: #fff;
-}
-
 .eq-bars {
   display: inline-flex;
   align-items: flex-end;
@@ -428,6 +403,277 @@
 @keyframes eq {
   from { height: 25%; }
   to { height: 100%; }
+}
+
+/* ------------------------------------------------------------------ */
+/* the Beats window: a 2007 media player in night-blue glass            */
+/* ------------------------------------------------------------------ */
+
+.win.win-glass {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 7px 7px 4px 4px;
+  background: #070b16;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 18px 50px rgba(0, 0, 0, 0.65),
+    0 0 50px rgba(79, 227, 255, 0.08);
+}
+.win.win-glass .win-title {
+  height: 30px;
+  padding: 0 6px 0 10px;
+  font-family: var(--font-vista);
+  font-weight: 400;
+  font-size: 13px;
+  text-shadow: 0 0 8px rgba(120, 220, 255, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04) 50%, transparent 51%),
+    linear-gradient(90deg, #0f2b45, #172349 60%, #251c4a);
+  filter: saturate(0.35) brightness(0.85);
+}
+.win.win-glass[data-active="true"] .win-title {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05) 50%, transparent 51%),
+    linear-gradient(90deg, #0f3554, #1b2b5e 60%, #30225e);
+  filter: none;
+}
+.win.win-glass .win-title + div {
+  margin-top: 0;
+}
+.win-glass .cap-btn {
+  width: 26px;
+  height: 19px;
+  color: #eaf8ff;
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.02) 51%, rgba(255, 255, 255, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.win-glass .cap-btn:hover {
+  background: linear-gradient(180deg, rgba(150, 240, 255, 0.55), rgba(79, 227, 255, 0.25) 50%, rgba(40, 140, 200, 0.3) 51%, rgba(79, 227, 255, 0.4));
+}
+.win-glass .cap-btn:focus-visible {
+  outline: 1px solid var(--accent, #4fe3ff);
+}
+
+.mp {
+  color: #e6f3ff;
+  background: #070b16;
+}
+.mp :focus-visible {
+  outline: 2px solid #4fe3ff;
+  outline-offset: 1px;
+}
+.mp-stage {
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(79, 227, 255, 0.16), transparent 60%),
+    radial-gradient(ellipse at 95% 100%, rgba(169, 139, 255, 0.16), transparent 60%),
+    linear-gradient(180deg, #0c162c, #070b16);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.mp-cover {
+  width: 92px;
+  height: 92px;
+  align-self: center;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28), 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 30px rgba(79, 227, 255, 0.12);
+}
+@media (min-width: 640px) {
+  .mp-cover {
+    width: 184px;
+    height: 184px;
+  }
+}
+.mp-screen {
+  position: relative;
+  min-height: 64px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #02040a, #060a16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 2px 10px #000;
+}
+.mp-screen::after {
+  /* glass over the screen */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 45%);
+}
+.mp-deck {
+  background: linear-gradient(180deg, #0e1628, #080c18);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.mp-play {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin: 0 -7px;
+  color: #fff;
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 30%, #c8f7ff 0%, #2fb9ee 36%, #0b5a9a 70%, #062a55 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.7),
+    0 0 0 3px rgba(255, 255, 255, 0.07),
+    0 0 20px rgba(79, 227, 255, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.85);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+}
+.mp-play::before {
+  content: "";
+  position: absolute;
+  inset: 3px 9px 50% 9px;
+  border-radius: 999px 999px 40% 40%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.05));
+  pointer-events: none;
+}
+.mp-play svg {
+  position: relative;
+  filter: drop-shadow(0 0 3px rgba(0, 40, 80, 0.8));
+}
+.mp-play:hover {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.7),
+    0 0 0 3px rgba(255, 255, 255, 0.1),
+    0 0 30px rgba(79, 227, 255, 0.7),
+    inset 0 1px 1px rgba(255, 255, 255, 0.85);
+}
+.mp-play:active {
+  transform: scale(0.96);
+}
+.mp-skip {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 32px;
+  color: #dff6ff;
+  background: linear-gradient(180deg, #3d4a66, #182035 52%, #0e1424 53%, #172036);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.75);
+}
+.mp-skip:hover {
+  background: linear-gradient(180deg, #4b5e84, #1e2a48 52%, #121b33 53%, #1e2c4a);
+  color: #fff;
+}
+.mp-skip-l {
+  border-radius: 16px 0 0 16px;
+  padding-right: 6px;
+}
+.mp-skip-r {
+  border-radius: 0 16px 16px 0;
+  padding-left: 6px;
+}
+.mp-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  color: rgba(230, 243, 255, 0.6);
+  border-radius: 4px;
+}
+.mp-icon:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+.mp-icon[aria-pressed="true"] {
+  color: #4fe3ff;
+  filter: drop-shadow(0 0 4px rgba(79, 227, 255, 0.8));
+}
+.mp-chip {
+  align-items: center;
+  padding: 2px 9px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: rgba(230, 243, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.mp-chip:hover {
+  color: #fff;
+  border-color: rgba(79, 227, 255, 0.6);
+}
+.mp-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  background: transparent;
+}
+.mp-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #4fe3ff, #a98bff var(--fill, 0%), #222c44 var(--fill, 0%));
+}
+.mp-range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #4fe3ff, #a98bff var(--fill, 0%), #222c44 var(--fill, 0%));
+}
+.mp-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 35%, #fff, #9fe9ff 45%, #2a8fc4);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 8px rgba(79, 227, 255, 0.6);
+}
+.mp-range::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 35%, #fff, #9fe9ff 45%, #2a8fc4);
+}
+.mp-list {
+  background: linear-gradient(180deg, #080d1a, #060912);
+}
+.mp-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto 44px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 14px 7px 10px;
+  text-align: left;
+  border-left: 2px solid transparent;
+}
+@media (min-width: 640px) {
+  .mp-row {
+    grid-template-columns: 22px minmax(0, 1fr) 96px 40px 48px;
+  }
+}
+.mp-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.mp-row[aria-current="true"] {
+  background: linear-gradient(90deg, rgba(79, 227, 255, 0.2), rgba(169, 139, 255, 0.1) 70%, transparent);
+  border-left-color: #4fe3ff;
+}
+.mp-row:focus-visible {
+  outline: 1px solid #4fe3ff;
+  outline-offset: -1px;
+}
+.mp-head {
+  padding-top: 6px;
+  padding-bottom: 5px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(230, 243, 255, 0.38);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.mp-head:hover {
+  background: none;
+}
+.mp-foot {
+  background: #0a1020;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* ------------------------------------------------------------------ */

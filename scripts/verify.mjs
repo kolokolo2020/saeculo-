@@ -97,7 +97,7 @@ try {
     check("returning visit: no intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
     await page.getByRole("button", { name: "Clock and settings" }).click();
     await page.getByRole("menuitem", { name: "Replay intro" }).click();
-    await page.waitForTimeout(300);
+    await page.getByRole("dialog", { name: "Intro" }).waitFor({ timeout: 5000 }).catch(() => {});
     check("replay intro from the clock menu", await page.getByRole("dialog", { name: "Intro" }).isVisible());
     await page.waitForTimeout(2000);
     await page.getByRole("button", { name: /enter/i }).click();
@@ -116,7 +116,8 @@ try {
   {
     const { ctx, page } = await open();
     check("Beats opens by default", await page.getByTestId("window-beats").isVisible());
-    check("folder lists the tracks", (await page.locator("[data-testid^=track-]").count()) === 3);
+    check("tracklist lists the beats", (await page.locator("[data-testid^=track-]").count()) === 3);
+    check("one album cover for every beat", (await page.locator("[data-testid=window-beats] img").count()) === 1 && (await page.locator("[data-testid=window-beats] img").getAttribute("src")).includes("saeculo"));
     await page.getByTestId("deck-play").click();
     await page.waitForTimeout(1200);
     const a1 = await audio(page);
@@ -144,18 +145,18 @@ try {
     check("previous restarts the track", a3.t < 2 && a3.src.includes("dull-knife"));
     await page.waitForTimeout(600);
     const drawn = await page.evaluate(() => {
-      const c = document.querySelector("[data-testid=window-beats] canvas");
+      const c = document.querySelector("[data-testid=visualizer]");
       const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
       let lit = 0;
       for (let i = 0; i < d.length; i += 400) lit += d[i] + d[i + 1] + d[i + 2] > 60 ? 1 : 0;
       return lit;
     });
-    check("visualizer draws the cover", drawn > 50, String(drawn));
+    check("the visualizer spells it out, live", drawn > 50, String(drawn));
     await page.getByRole("button", { name: /visuals:/ }).click();
-    check("visuals: scan mode", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("scan"));
+    check("visuals: wave mode", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("wave"));
     await page.waitForTimeout(400);
-    check("scan mode draws", await page.evaluate(() => {
-      const c = document.querySelector("[data-testid=window-beats] canvas");
+    check("wave mode draws", await page.evaluate(() => {
+      const c = document.querySelector("[data-testid=visualizer]");
       const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
       let lit = 0;
       for (let i = 0; i < d.length; i += 400) lit += d[i] + d[i + 1] + d[i + 2] > 60 ? 1 : 0;
@@ -164,7 +165,7 @@ try {
     await page.getByRole("button", { name: /visuals:/ }).click();
     check("visuals: still mode", (await page.evaluate(() => document.documentElement.dataset.calm)) === "true");
     await page.getByRole("button", { name: /visuals:/ }).click();
-    check("visuals: back to reveal", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("reveal"));
+    check("visuals: back to led", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("led"));
     await page.getByRole("button", { name: "Repeat this beat" }).click();
     await page.getByRole("button", { name: "Shuffle" }).click();
     const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-player")));
