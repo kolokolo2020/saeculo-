@@ -605,6 +605,8 @@ try {
     await page.getByRole("button", { name: "Fight", exact: true }).click();
     await page.waitForTimeout(300);
     check("fight: it starts, with health bars", (await page.evaluate(() => window.__game.fight()))?.foes.length >= 2);
+    await page.waitForTimeout(200);
+    check("fight: no talking mid-fight (E swings)", !/talk/.test((await page.getByTestId("game-prompt").textContent().catch(() => "")) ?? ""));
     await page.evaluate(() => window.__game.weaken());
     for (let i = 0; i < 40 && (await page.evaluate(() => window.__game.fight()?.outcome)) === ""; i++) {
       const f = await page.evaluate(() => window.__game.fight());
@@ -684,6 +686,34 @@ try {
     check("phone: game still has no sideways scroll", await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     const exitBox = await page.getByTestId("game-exit").boundingBox();
     check("phone: the game's top bar fits on one line", exitBox.height < 44 && exitBox.y < 48);
+    // mini-games: the title and the way out fit on one line
+    await page.evaluate(() => window.__game.mini({ kind: "rhythm", mode: "cypher" }));
+    await page.waitForTimeout(300);
+    const leaveBox = await page.getByRole("button", { name: /^Leave/ }).boundingBox();
+    check("phone: a mini-game's header fits on one line", leaveBox.height < 40);
+    await page.getByTestId("rhythm-start").tap();
+    await page.waitForTimeout(400);
+    check("phone: the rhythm game has pads to tap", (await page.getByRole("button", { name: /pad$/ }).count()) === 4);
+    await page.evaluate(() => window.__game.mini(null));
+    // a fight on a phone: health where you can see it, toasts under the picture, A/B/eat
+    await page.evaluate(() => window.__game.teleport("alley", 12, 6, "right"));
+    await page.evaluate(() => window.__game.trouble());
+    for (let i = 0; i < 25 && !(await page.getByRole("button", { name: "Fight", exact: true }).count()); i++) {
+      await page.waitForTimeout(400);
+      if (await page.getByTestId("game-dialog").count()) await page.getByTestId("game-dialog").tap();
+    }
+    await page.getByRole("button", { name: "Fight", exact: true }).tap();
+    await page.waitForTimeout(400);
+    check("phone: B and eat show up in a fight", (await page.getByRole("button", { name: "B: dodge" }).isVisible()) && (await page.getByRole("button", { name: "Eat", exact: true }).isVisible()));
+    const heart = await page.evaluate(() => {
+      const c = document.querySelector("[data-testid=game] canvas");
+      const x = window.__game.state().hudX;
+      return [...c.getContext("2d").getImageData(x + 6, 7, 1, 1).data];
+    });
+    check("phone: your health bar is on screen in a fight", heart[0] > 200 && heart[1] < 120, String(heart));
+    const toastBox = await page.getByTestId("game-toast").boundingBox();
+    const picBox = await page.locator("[data-testid=game] canvas").boundingBox();
+    check("phone: toasts go under the picture, not over it", toastBox && toastBox.y >= picBox.y + picBox.height);
     await ctx.close();
   }
 

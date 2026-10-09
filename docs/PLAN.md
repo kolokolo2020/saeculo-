@@ -14,11 +14,13 @@ commit + push after each step, extend scripts/verify.mjs).
    Tank boss), cash/respect, selling beats, rhythm games (cypher, DJ set),
    dice, crates, hoops, tagging, shops, 16 goals, menu + settings.
 
+4. Playtest pass (`scripts/playtest.mjs`): on phones your health bar is
+   back on screen in a fight, toasts sit under the picture instead of over
+   it, mini-game and menu headers fit on one line, Hoops shoots the moment
+   a finger lands, touch screens see A/B/eat instead of key names; no
+   "talk" prompt mid-fight.
+
 ## Next (in order)
-1. Playtest pass on desktop and phone (390×844): screenshot every new place,
-   the menu, each mini-game and a whole fight; fix layout, overlap,
-   readability and anything that feels off. Check the phone controls in a
-   fight (A swing, B dodge, eat) and the mini-games' touch input.
 2. Balance: fight difficulty per setting, cash/respect rewards, prices,
    how often trouble comes, the weapon unlock pace. Keep it fun, not grindy.
 3. More life on the map: a police car rolling by with lights, thunder and

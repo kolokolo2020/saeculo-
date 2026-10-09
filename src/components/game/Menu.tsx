@@ -149,7 +149,7 @@ function Wardrobe({ profile, owned, onChange }: { profile: Profile; owned: strin
   );
 }
 
-function Fight({ save, onEquip, onUse }: { save: SaveData; onEquip: (id: string) => void; onUse: (id: string) => void }) {
+function Fight({ save, onEquip, onUse, touch }: { save: SaveData; onEquip: (id: string) => void; onUse: (id: string) => void; touch: boolean }) {
   const s = save.stats;
   return (
     <div className="flex flex-col gap-3">
@@ -191,7 +191,9 @@ function Fight({ save, onEquip, onUse }: { save: SaveData; onEquip: (id: string)
           {!CONSUMABLES.some((c) => (save.items[c.id] ?? 0) > 0) && <li className="text-[#8a8170]">Nothing. The corner store sells noodles.</li>}
         </ul>
       </div>
-      <p className="text-[16px] text-[#8a8170]">In a fight: E or Space to swing, Shift to dodge (nothing hits you mid-dash), Q to eat something. Watch for the “!”: that’s a swing coming.</p>
+      <p className="text-[16px] text-[#8a8170]">
+        {touch ? "In a fight: A to swing, B to dodge (nothing hits you mid-dash), eat to eat something." : "In a fight: E or Space to swing, Shift to dodge (nothing hits you mid-dash), Q to eat something."} Watch for the “!”: that’s a swing coming.
+      </p>
     </div>
   );
 }
@@ -340,13 +342,13 @@ export default function Menu({
           </span>
         )}
         <button className={`${btn} ml-auto font-sans text-[13px]`} onClick={onClose} data-testid="menu-close">
-          {creator ? "Start" : "Close (Esc)"}
+          {creator ? "Start" : <>Close<span className="hidden sm:inline"> (Esc)</span></>}
         </button>
       </div>
       {!creator && (
-        <div role="tablist" aria-label="Menu" className="flex shrink-0 flex-wrap gap-1 border-b border-[#2a2724] px-3 pt-2">
+        <div role="tablist" aria-label="Menu" className="flex shrink-0 flex-wrap gap-0.5 border-b border-[#2a2724] px-3 pt-2">
           {TABS.map((t) => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} className="rounded-t-[3px] border border-b-0 border-transparent px-3 py-1 text-[#b9b09e] aria-selected:border-[#3a3733] aria-selected:bg-[#171615] aria-selected:text-amber" onClick={() => onTab(t.id)}>
+            <button key={t.id} role="tab" aria-selected={tab === t.id} className="rounded-t-[3px] border border-b-0 border-transparent px-2 py-1 text-[#b9b09e] sm:px-3 aria-selected:border-[#3a3733] aria-selected:bg-[#171615] aria-selected:text-amber" onClick={() => onTab(t.id)}>
               {t.name}
             </button>
           ))}
@@ -363,7 +365,7 @@ export default function Menu({
           <div className="min-w-0 flex-1">
             {(creator || tab === "you") && <You profile={profile} onChange={onProfile} />}
             {!creator && tab === "wardrobe" && <Wardrobe profile={profile} owned={save.owned} onChange={onProfile} />}
-            {!creator && tab === "fight" && <Fight save={save} onEquip={onEquip} onUse={onUse} />}
+            {!creator && tab === "fight" && <Fight save={save} onEquip={onEquip} onUse={onUse} touch={touch} />}
             {!creator && tab === "goals" && <Goals save={save} tapes={tapes} />}
             {!creator && tab === "settings" && <SettingsTab settings={save.settings} onChange={onSettings} onReset={onReset} touch={touch} />}
           </div>

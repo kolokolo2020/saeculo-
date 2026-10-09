@@ -71,8 +71,22 @@ export default function Hoops({ cash, reduced, onShot, onSettle, onClose }: { ca
         </p>
         <p className="text-[18px]">{[0, 1, 2].map((i) => (shots[i] === undefined ? "○" : shots[i] ? "●" : "×")).join(" ")}</p>
         {!done ? (
-          <button className={miniBtn} onClick={shoot} data-autofocus data-testid="hoops-shoot">
-            Shoot (Space)
+          <button
+            className={miniBtn}
+            // on a touch screen the shot goes the moment your finger lands, not when it lifts
+            onPointerDown={(e) => {
+              if (e.pointerType === "mouse") return;
+              e.preventDefault();
+              shoot();
+            }}
+            onClick={(e) => {
+              const kind = (e.nativeEvent as PointerEvent).pointerType;
+              if (kind !== "touch" && kind !== "pen") shoot();
+            }}
+            data-autofocus
+            data-testid="hoops-shoot"
+          >
+            Shoot<span className="hidden pointer-fine:inline"> (Space)</span>
           </button>
         ) : (
           <div className="flex flex-wrap gap-2">

@@ -213,5 +213,9 @@ npx next dev -p 3210
 node scripts/verify.mjs
 ```
 
+`node scripts/playtest.mjs <dir> [desk|phone]` takes screenshots of every
+place, each menu tab, each mini-game and a whole fight, on a desktop and a
+phone, for checking by eye.
+
 The earlier version of the site (the Vista desktop, Beat Deck, Night
 Radio, the vault) is in the git history before this redesign.

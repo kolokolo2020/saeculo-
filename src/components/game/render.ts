@@ -94,6 +94,8 @@ export interface View {
   down: boolean;
   hp: number;
   maxHp: number;
+  /** Where the visible picture starts (a phone held upright shows only part of it). */
+  hudX?: number;
   /** Your name on the alley wall. */
   tag: { name: string; color: string } | null;
   /** Camera shake, in pixels. */
@@ -344,6 +346,8 @@ export function draw(g: G, v: View) {
   // your health, top left, whenever it matters
   if (v.me || v.hp < v.maxHp) {
     const f = Math.max(0, v.hp / v.maxHp);
+    g.save();
+    g.translate(v.hudX ?? 0, 0);
     g.fillStyle = "rgba(0,0,0,0.6)";
     g.fillRect(4, 4, 66, 9);
     g.fillStyle = "#ff5a7a";
@@ -358,5 +362,6 @@ export function draw(g: G, v: View) {
     g.fillRect(14, 6, Math.max(1, Math.round(54 * f)), 5);
     g.fillStyle = "rgba(255,255,255,0.3)";
     g.fillRect(14, 6, Math.round(54 * f), 1);
+    g.restore();
   }
 }

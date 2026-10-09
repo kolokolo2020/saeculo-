@@ -197,6 +197,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
     fx: { beats: 0, diceRoll: 0 } as Record<string, number>,
     lastBeat: false,
     visit: {} as Record<string, number>,
+    // where the visible picture starts, for the health bar
+    hudX: 0,
   });
   // the payphone playing your beat back down the line
   const call = useRef<{ engine: Engine; until: number } | null>(null);
@@ -1386,6 +1388,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
       weaken: () => st.current.fight?.foes.forEach((a) => a.fighter && (a.fighter.hp = 1)),
       give: (patch: Partial<SaveData>) => updateSave((v) => ({ ...v, ...patch })),
       save: () => saveRef.current,
+      /** Open a mini-game or a menu tab straight away. */
+      mini: (m: Mini | null) => setMini(m),
+      menu: (tab: MenuTab | null) => setMenu(tab ? { tab, creator: false } : null),
     };
     return () => {
       delete w.__game;
@@ -1532,7 +1537,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
       const who = hit ? null : lifeTarget(life.current, s.place, s.x, s.y, fx, fy);
       s.target = hit && promptFor(hit.id) ? hit.id : who ? `npc:${who.id}` : null;
       const near = cur.doors.find((d) => Math.abs(s.x - (d.zone.x + d.zone.w / 2)) < d.zone.w / 2 + 14 && Math.abs(s.y - (d.zone.y + d.zone.h / 2)) < d.zone.h / 2 + 18);
-      const p = frozen ? null : s.target ? promptFor(s.target) : near ? `@${near.label}` : null;
+      const inFight = !!fight && !fight.outcome;
+      const p = frozen || (inFight && !near) ? null : s.target && !inFight ? promptFor(s.target) : near ? `@${near.label}` : null;
       if (p !== lastPrompt) {
         lastPrompt = p;
         setPrompt(p);
@@ -1564,7 +1570,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
       if (call.current && (s.place !== "street" || s.t > call.current.until)) stopCall();
       setRing(s.place === "street" && ringing ? Math.max(0, 1 - Math.abs(s.x - 26.5 * TILE) / (16 * TILE)) : 0);
 
+      // how much of the picture is off the left of the screen (phones held upright)
+      const vw = view.current;
+      const box = c.parentElement;
+      const full = VIEW_W * vw.scale;
+      const bw = box?.clientWidth ?? full;
+      const off = full > bw ? Math.min(0, Math.max(bw - full, bw / 2 - (s.x - camera(SCENES[s.place], s.x, s.y).cx) * vw.scale)) : (bw - full) / 2;
       draw(g, {
+        hudX: (s.hudX = vw.below ? Math.max(0, Math.round(-off / vw.scale)) : 0),
         place: s.place,
         x: s.x,
         y: s.y,
@@ -1600,12 +1613,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         fx: s.fx,
       });
       // zoomed in (phones held upright): keep you in the middle of the picture
-      const vw = view.current;
-      const box = c.parentElement;
       if (box) {
-        const full = VIEW_W * vw.scale;
-        const bw = box.clientWidth;
-        const off = full > bw ? Math.min(0, Math.max(bw - full, bw / 2 - (s.x - camera(SCENES[s.place], s.x, s.y).cx) * vw.scale)) : (bw - full) / 2;
         const tf = vw.below ? `translateX(${Math.round(off)}px)` : "";
         if (c.style.transform !== tf) c.style.transform = tf;
       }
@@ -1723,7 +1731,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         </span>
         <span className="text-amber" data-testid="game-cash" aria-label={`$${Math.floor(save.cash)}, respect ${Math.floor(save.rep)}`}>
           ${Math.floor(save.cash)}
-          <span className="ml-2 hidden text-[#b9b09e] md:inline">★{Math.floor(save.rep)}</span>
+          <span className="ml-2 text-[#b9b09e]">★{Math.floor(save.rep)}</span>
         </span>
         <span className="hidden text-[#8a8170] lg:inline" aria-label={`${foundCount} of ${FINDABLE.length} sounds found`}>
           sounds {foundCount}/{FINDABLE.length}
@@ -1862,7 +1870,13 @@ export default function Game({ onExit }: { onExit: () => void }) {
         )}
 
         {toast && (
-          <p className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-[3px] bg-[#6e1f18] px-3 py-2 text-center font-lcd text-[19px] leading-tight shadow-lg" role="status" data-testid="game-toast">
+          <p
+            className={`pointer-events-none absolute left-1/2 z-20 w-max max-w-[calc(100%-24px)] -translate-x-1/2 rounded-[3px] bg-[#6e1f18] px-3 py-2 text-center font-lcd text-[19px] leading-tight shadow-lg ${below ? "" : "top-3"}`}
+            // phones held upright: in the free space under the picture, clear of the pad
+            style={below ? { bottom: touch ? 206 : 16 } : undefined}
+            role="status"
+            data-testid="game-toast"
+          >
             {toast}
           </p>
         )}

@@ -114,7 +114,7 @@ export default function Tag({ name, onDone, onSpray, onClose }: { name: string; 
           onContextMenu={(e) => e.preventDefault()}
           data-testid="tag-spray"
         >
-          {done ? "Done" : "Hold to spray (E)"}
+          {done ? "Done" : <>Hold to spray<span className="hidden pointer-fine:inline"> (E)</span></>}
         </button>
       </div>
     </Frame>
