@@ -38,6 +38,7 @@ export interface Stats {
   battleWins: number;
   battleLosses: number;
   jobs: number;
+  rides: number;
 }
 
 /** A job from Dre: a tape to take somewhere, then back to him for the money. */
@@ -86,7 +87,7 @@ export interface SaveData {
 const KEY = "saeculo-game";
 
 export const DEFAULT_SETTINGS: Settings = { sfx: 0.8, music: 0.8, shake: true, hints: true, difficulty: "normal" };
-const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0, battleWins: 0, battleLosses: 0, jobs: 0 };
+const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0, battleWins: 0, battleLosses: 0, jobs: 0, rides: 0 };
 
 export function freshSave(): SaveData {
   return {

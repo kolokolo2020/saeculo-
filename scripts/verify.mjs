@@ -684,6 +684,26 @@ try {
     check("avenue: the CD guy wants a slow beat", (await saved()).seen.includes("cd-ask") && /track four/i.test(cdText), cdText);
     await closeDialog();
 
+    // the subway as fast travel: one stop each way
+    await talkTo("street", 31.5, 9.1, "down");
+    const stairsText = (await page.getByTestId("game-dialog").count()) ? await dialogText() : "";
+    check("street: subway stairs on the far pavement", /Down the stairs/.test(stairsText), stairsText + " " + JSON.stringify((({ place, x, y, target, pending }) => ({ place, x, y, target, pending: !!pending }))(await game(page))));
+    await pick(/Get on: the avenue/);
+    check("subway: on the train", (await game(page)).ride?.to === "avenue");
+    await page.waitForTimeout(3000);
+    check("subway: off at the avenue, by the stairs", (await game(page)).place === "avenue" && !(await game(page)).ride);
+    await closeDialog();
+    await page.evaluate(() => window.__game.teleport("subway", 15, 5.5, "down"));
+    for (let i = 0; i < 80 && !((await game(page)).t % 34 > 5 && (await game(page)).t % 34 < 9); i++) await page.waitForTimeout(250);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(200);
+    await pick(/Get on: your block/);
+    await page.waitForTimeout(3000);
+    const home = await game(page);
+    check("subway: board when the doors are open, off at your block", home.place === "street" && home.y > 140, `${home.place} ${home.y}`);
+    check("subway: rides are counted", (await saved()).stats.rides === 2);
+    await closeDialog();
+
     // more life: a police car, people passing on the avenue, the alley cat, the storm
     check("alley: a cat", (await lifeNow()).actors.some((a) => a.kind === "cat" && a.place === "alley"));
     await page.evaluate(() => window.__game.teleport("avenue", 20, 5, "down"));
@@ -703,7 +723,7 @@ try {
     check("game: music picks up where it was", !(await audio(page)).paused);
     await page.getByTestId("icon-game").click();
     await page.waitForTimeout(1600);
-    check("game: remembers found sounds", (await page.getByTestId("game").textContent()).includes("sounds 7/12"));
+    check("game: remembers found sounds", (await page.getByTestId("game").textContent()).includes("sounds 8/12"));
     await page.getByTestId("game-to-studio").click();
     await page.waitForTimeout(500);
     check("game: straight to the studio", (await page.getByTestId("studio").isVisible()) && (await page.getByTestId("game").getAttribute("data-place")) === "studio");

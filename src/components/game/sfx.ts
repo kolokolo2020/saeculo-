@@ -301,6 +301,11 @@ export const sfx = {
     src.start(t);
     if (near > 0.6) noise(c, t, 0.25, 1800, 0.12, 400);
   },
+  /** The doors-closing chime on the train: two notes, down. */
+  chime() {
+    blip(784, 0.5, "sine", 0.06);
+    setTimeout(() => blip(622, 0.7, "sine", 0.06), 260);
+  },
   /** A police car's two notes, short, as it rolls past. */
   siren() {
     if (!bus) return;

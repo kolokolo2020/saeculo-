@@ -48,9 +48,15 @@ commit + push after each step, extend scripts/verify.mjs).
    get in), paid on return; the job shows in the menu. Two new goals
    (18). A fight you've won is cleared when you walk out of the place.
 
+8. The subway as fast travel: at the avenue station, the platform edge
+   offers "Get on: your block" while the doors are open; on your street,
+   new stairs on the far pavement (green globe, SUBWAY sign) take you one
+   stop to the avenue. Between stops, a couple of seconds in the carriage
+   (tunnel lights going past, still with reduced motion; a door chime;
+   the rumble; "next stop" on the board, centred so a phone sees it).
+   Rides are counted (stats.rides).
+
 ## Next (in order)
-5. Subway as fast travel: board the train when the doors are open and get
-   off at "your block" (the street) or the avenue.
 6. Sound polish: footsteps per surface in the new places, crowd murmur in
    the club and the cypher, the train announcement.
 7. README + verify.mjs kept up to date with each of the above.

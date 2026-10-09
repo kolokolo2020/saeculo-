@@ -44,6 +44,8 @@ export interface Api {
   life: () => Actor[];
   /** The game clock (seconds). */
   t: () => number;
+  /** Get on the train: one stop, to your block or the avenue. */
+  ride: (to: "street" | "avenue") => void;
   /** Per-visit memory: things that can happen once a visit. */
   visit: Record<string, number>;
 }
@@ -159,7 +161,7 @@ export function promptFor(id: string, api: Api): string | null | undefined {
     case "map":
       return "the map";
     case "edge":
-      return trainAt(api.t()).here ? "the train" : "the edge of the platform";
+      return trainAt(api.t()).open ? "get on the train" : trainAt(api.t()).here ? "the train" : "the edge of the platform";
     case "speaker":
       return "the cypher";
   }
@@ -265,9 +267,15 @@ export function operate(id: string, api: Api): boolean {
       return true;
     case "edge": {
       const tr = trainAt(api.t());
+      const board = [
+        { label: "Get on: your block", run: () => api.ride("street") },
+        { label: "Stay", run: api.close },
+      ];
       if (tr.here || tr.arriving) {
-        if (api.find("train")) api.say(["The brakes scream along the whole platform. You hold your phone out and get it.", "You keep the sound."]);
-        else api.say([tr.open ? "The doors open. Nobody gets off. Nobody gets on." : "The train fills the whole platform with noise."]);
+        const got = api.find("train");
+        if (tr.open) api.say(got ? ["The brakes scream along the whole platform. You hold your phone out and get it. You keep the sound.", "The doors are open."] : ["The doors open. Nobody gets off.", "One stop to your block, if you want it."], board);
+        else if (got) api.say(["The brakes scream along the whole platform. You hold your phone out and get it.", "You keep the sound. (Wait for the doors to ride it.)"]);
+        else api.say(["The train fills the whole platform with noise. Wait for the doors."]);
       } else api.say(["Mind the gap. The rails hum, a train somewhere in the tunnel."]);
       return true;
     }

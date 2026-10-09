@@ -75,6 +75,8 @@ export const SCENES: Record<Place, Scene> = {
       { id: "lamp3", body: { x: 37 * TILE + 6, y: 9 * TILE + 8, w: 4, h: 4 } },
       { id: "car", body: { x: 22 * TILE, y: 9 * TILE - 2, w: 4 * TILE, h: 18 }, zone: T(22, 8.2, 4, 1) },
       { id: "boombox", body: { x: 17 * TILE + 3, y: 4 * TILE + 6, w: 12, h: 6 }, zone: T(16.6, 4, 1.8, 1.4) },
+      // the subway stairs on the far pavement: one stop to the avenue
+      { id: "stairs", zone: T(30.2, 9.3, 2.6, 0.7) },
     ],
     doors: [
       { zone: T(4, 2), to: "bedroom", label: "↑ home", spawn: { x: 18.2 * TILE, y: 6.5 * TILE, dir: "left" } },
@@ -92,6 +94,7 @@ export const SCENES: Record<Place, Scene> = {
       { x: 34.5 * TILE, y: 1.6 * TILE, r: 36, color: "rgba(255,60,40,0.6)" },
       { x: 3 * TILE, y: 0.8 * TILE, r: 26, color: "rgba(255,200,120,0.4)" },
       { x: 8 * TILE, y: 0.8 * TILE, r: 22, color: "rgba(255,200,120,0.3)" },
+      { x: 31.5 * TILE, y: 9.6 * TILE, r: 40, color: "rgba(120,230,160,0.45)" },
     ],
     darkness: 0.74,
   },
@@ -438,6 +441,23 @@ function paintStreet(g: G, s: Scene) {
   r(g, cx + 6, cy + 19, 10, 5, "#0b0b0d");
   r(g, cx + 46, cy + 19, 10, 5, "#0b0b0d");
   r(g, cx, cy + 12, 3, 3, "#b33");
+
+  // subway stairs, going down through the railings on the far pavement
+  const sx = 30 * TILE + 4;
+  const sy = 9 * TILE + 8;
+  r(g, sx, sy, 3 * TILE - 8, 2 * TILE - 8, "#0b0c10");
+  for (let k = 0; k < 5; k++) r(g, sx + 2, sy + 3 + k * 4, 3 * TILE - 12, 2, k % 2 ? "#26282e" : "#33363d");
+  r(g, sx - 2, sy - 2, 2, 2 * TILE - 6, "#6a7a70");
+  r(g, sx + 3 * TILE - 8, sy - 2, 2, 2 * TILE - 6, "#6a7a70");
+  r(g, sx - 2, sy - 2, 3 * TILE - 4, 1, "#7f9187");
+  // the green globe and a little sign
+  r(g, sx + 3 * TILE - 7, sy - 9, 3, 7, "#3a3c42");
+  r(g, sx + 3 * TILE - 9, sy - 13, 6, 5, "#7fe0a0");
+  r(g, sx + 6, sy - 7, 22, 5, "#1d4a30");
+  g.fillStyle = "#e8f0e8";
+  g.font = "5px monospace";
+  g.textBaseline = "top";
+  g.fillText("SUBWAY", sx + 7, sy - 7);
 }
 
 function paintPark(g: G, s: Scene) {

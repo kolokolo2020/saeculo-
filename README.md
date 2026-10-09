@@ -93,7 +93,9 @@ neighbourhood:
 - **The alley**: a fire in a barrel, street dice with Jay, a wall for
   your name. **The record shop**: dig the crates, a listening station,
   an owner who buys tapes. **The club**: the floor, the bar, the decks.
-  **The subway**: trains in and out. **The underpass**: the cypher, Dre
+  **The subway**: trains in and out; get on when the doors are open and
+  ride one stop to your block (the stairs on the far pavement of your
+  street, which also take you back to the avenue). **The underpass**: the cypher, Dre
   (buys beats), and Tank.
 
 Life on the block: cars, bikes and now and then a police car rolling by

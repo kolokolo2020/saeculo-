@@ -14,7 +14,7 @@ import Hoops from "./minigames/Hoops";
 import Rhythm from "./minigames/Rhythm";
 import Shop from "./minigames/Shop";
 import Tag from "./minigames/Tag";
-import { overhead, trainAt } from "./places/underground";
+import { drawRide, overhead, trainAt } from "./places/underground";
 import { camera, draw, VIEW_H, VIEW_W } from "./render";
 import { loadSave, MAX_HP, migrateOldTapes, resetSave, writeSave, type SaveData, type Settings } from "./save";
 import { battle, clubOk, operate, promptFor as promptMore, talk as talkMore, type Api, type Mini } from "./scripts";
@@ -213,6 +213,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
     thunderAt: 0,
     thunderNear: 0,
     bolts: 0,
+    // on the train between stops
+    ride: null as null | { to: "street" | "avenue"; t: number },
   });
   // the payphone playing your beat back down the line
   const call = useRef<{ engine: Engine; until: number } | null>(null);
@@ -658,6 +660,16 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (f && !f.outcome && startDodge(f.me, keys.current)) sfx.dodge();
   };
 
+  /** On the train: the carriage for a moment, then off at the next stop (the loop does the arriving). */
+  const rideTo = (to: "street" | "avenue") => {
+    const s = st.current;
+    setDialog(null);
+    keys.current = [];
+    s.ride = { to, t: 0 };
+    s.sitting = false;
+    sfx.chime();
+  };
+
   const latestTape = (): Project | null => {
     const slots = loadStore().slots.filter((p): p is Project => !!p);
     return slots.length ? slots[slots.length - 1] : null;
@@ -694,6 +706,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       return [`chop:${track.id}:${i}`, `chop:${track.id}:${i + 1}`, `chop:${track.id}:${i + 2}`];
     },
     sfx,
+    ride: (to) => rideTo(to),
     life: () => life.current,
     t: () => st.current.t,
     get visit() {
@@ -1149,6 +1162,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
         case "sampler":
           openStudio();
           break;
+        case "stairs":
+          say(["Down the stairs. Warm air, then the rumble.", "A train's in, doors open. One stop to the avenue."], [
+            { label: "Get on: the avenue", run: () => rideTo("avenue") },
+            { label: "Not now", run: () => setDialog(null) },
+          ]);
+          break;
         case "couch":
           say(["The cushion is still warm."]);
           break;
@@ -1220,6 +1239,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
         return "talk to the clerk";
       case "sampler":
         return "use the sampler";
+      case "stairs":
+        return "the subway (one stop to the avenue)";
       case "couch":
         return "sit on the couch";
       case "boombox":
@@ -1482,6 +1503,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       give: (patch: Partial<SaveData>) => updateSave((v) => ({ ...v, ...patch })),
       save: () => saveRef.current,
       cop: sendCop,
+      ride: (to: "street" | "avenue") => rideTo(to),
       /** Bring the storm over now. */
       storm: () => {
         st.current.nextBolt = 0;
@@ -1515,7 +1537,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       s.t += dt;
       const u = ui.current;
       const scene = SCENES[s.place];
-      const frozen = u.phase !== "play" || !!u.dialog || u.studio || u.help || !!s.trans || !!u.menu || !!u.mini || !!u.ko;
+      const frozen = u.phase !== "play" || !!u.dialog || u.studio || u.help || !!s.trans || !!u.menu || !!u.mini || !!u.ko || !!s.ride;
       const fight = s.fight;
       const dashing = !!fight && fight.me.dodge > 0;
 
@@ -1676,7 +1698,22 @@ export default function Game({ onExit }: { onExit: () => void }) {
       // trains: one in the station, one going over the bridge
       const tr = s.place === "subway" ? trainAt(s.t) : null;
       const over = s.place === "underpass" ? overhead(s.t) : 0;
-      setRumble(tr ? (tr.here ? (tr.open ? 0.2 : 0.6) : tr.arriving ? 0.3 : 0) : over);
+      setRumble(s.ride ? 0.5 : tr ? (tr.here ? (tr.open ? 0.2 : 0.6) : tr.arriving ? 0.3 : 0) : over);
+      // the ride: a couple of seconds in the carriage, then up the stairs at the other end
+      if (s.ride) {
+        s.ride.t += dt;
+        if (s.ride.t >= (reduced ? 1.6 : 2.6)) {
+          const to = s.ride.to;
+          const spot = to === "street" ? { x: 31.5 * TILE, y: 9.1 * TILE, dir: "up" as Dir } : { x: 45 * TILE, y: 5.2 * TILE, dir: "down" as Dir };
+          arriveRef.current(to, s.place);
+          Object.assign(s, { place: to, ...spot, ride: null, trans: null });
+          setPlace(to, s.windowOpen);
+          setPlaceName(to);
+          sfx.door();
+          updateSave((v) => ({ ...v, stats: { ...v.stats, rides: v.stats.rides + 1 } }));
+          showToast(to === "street" ? "Your block. Up the stairs, across from the store." : "The avenue. Up the stairs by the underpass.", 3000);
+        }
+      }
       if (over > 0.6 && saveRef.current.settings.shake) s.shake = Math.max(s.shake, 0.8);
 
       // the neighbourhood's own small events
@@ -1699,8 +1736,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
       const box = c.parentElement;
       const full = VIEW_W * vw.scale;
       const bw = box?.clientWidth ?? full;
-      const off = full > bw ? Math.min(0, Math.max(bw - full, bw / 2 - (s.x - camera(SCENES[s.place], s.x, s.y).cx) * vw.scale)) : (bw - full) / 2;
-      draw(g, {
+      const off = full > bw && !s.ride ? Math.min(0, Math.max(bw - full, bw / 2 - (s.x - camera(SCENES[s.place], s.x, s.y).cx) * vw.scale)) : (bw - full) / 2;
+      if (s.ride) drawRide(g, VIEW_W, VIEW_H, s.ride.t, reduced, s.ride.to);
+      else draw(g, {
         hudX: (s.hudX = vw.below ? Math.max(0, Math.round(-off / vw.scale)) : 0),
         place: s.place,
         x: s.x,

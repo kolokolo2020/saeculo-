@@ -235,6 +235,47 @@ export const SUBWAY: Scene = {
   liveLights: lightsSubway,
 };
 
+/** Inside the carriage between stops: seats, poles, the tunnel lights going past (still with reduced motion). */
+export function drawRide(g: G, w: number, h: number, t: number, reduced: boolean, to: string) {
+  r(g, 0, 0, w, h, "#20242a");
+  // windows, and the tunnel through them
+  const wy = 30;
+  for (let k = 0; k < 4; k++) {
+    const wx = 18 + k * 78;
+    r(g, wx, wy, 56, 34, "#07080b");
+    if (!reduced) {
+      const off = (t * 520 + k * 40) % 140;
+      r(g, wx + 56 - off, wy + 12, 6, 2, "#f0e0a0");
+      r(g, wx + 56 - ((off + 70) % 140), wy + 22, 4, 1, "#9fb0c8");
+    } else r(g, wx + 20, wy + 14, 4, 2, "#5a5640");
+    r(g, wx, wy, 56, 2, "#3a3f46");
+    r(g, wx, wy + 32, 56, 2, "#3a3f46");
+  }
+  // the map strip over the windows: two stops, near the middle so a phone sees both
+  r(g, 0, 8, w, 16, "#e8e4da");
+  r(g, w / 2 - 66, 20, 132, 2, "#2f9a4a");
+  for (const [x, label, here] of [[w / 2 - 66, "your block", to === "street"], [w / 2 + 34, "avenue", to === "avenue"]] as const) {
+    r(g, x, 18, 6, 6, here ? "#d0302a" : "#111216");
+    g.fillStyle = here ? "#d0302a" : "#111216";
+    g.font = "6px monospace";
+    g.textBaseline = "top";
+    g.fillText(label, x, 10);
+  }
+  // seats and poles
+  r(g, 0, 80, w, 26, "#2f6b4a");
+  r(g, 0, 80, w, 3, "#3f8a60");
+  for (let k = 0; k < 5; k++) r(g, 40 + k * 64, 22, 3, 110, "#b8bec6");
+  r(g, 0, 106, w, h - 106, "#3a3d44");
+  for (let k = 0; k < 12; k++) r(g, k * 28 + ((Math.floor(t * 8) % 2) && !reduced ? 1 : 0), 120, 14, 1, "#30333a");
+  // the announcement, as it reads on the board
+  r(g, w / 2 - 70, h - 34, 140, 18, "#07080b");
+  g.fillStyle = "#ff9a3a";
+  g.font = "8px monospace";
+  g.textAlign = "center";
+  g.fillText(`next stop: ${to === "street" ? "your block" : "the avenue"}`, w / 2, h - 29);
+  g.textAlign = "left";
+}
+
 // ------------------------------------------------------------ the underpass
 
 /** A train going over: 0 when quiet, up to 1 right overhead. */
