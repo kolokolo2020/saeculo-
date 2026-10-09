@@ -65,5 +65,21 @@ commit + push after each step, extend scripts/verify.mjs).
    voice) as each train comes in, captioned once per visit, and a short
    one when you board.
 
-## Next (in order)
-7. README + verify.mjs kept up to date with each of the above.
+10. README and verify.mjs kept up to date with each step (verify.mjs:
+    181 checks; `scripts/playtest.mjs` for screenshots). README: stale
+    studio controls/code paragraph and the old `room/` folder removed,
+    `sharp` added to the dev install line.
+
+## Next
+The list is done. Waiting on the owner to playtest PR #17 and say "merge"
+(or what to change). Ideas if more is wanted, none started:
+- a second rival battle beat (Vee picks a different preset each time);
+- Dre's jobs with a risk (trouble more likely while you carry the tape);
+- the cat following you a few steps after you've petted it a few times.
+
+Notes for the next session:
+- Fight tuning was done with a headless simulation (combat.ts through
+  jiti, a bot that swings when in reach and dodges a share of wind-ups);
+  worth re-running if foe stats change.
+- The machine can run out of memory with the dev server, a build and the
+  verify browser all at once; run them one after another.

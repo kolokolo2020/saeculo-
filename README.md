@@ -148,11 +148,12 @@ the first time each visit).
 
 Controls: WASD or arrows, E / Space to use and talk, M for the menu, Esc
 back to the site. On touch screens, a pad, A (and B and eat in a fight).
-Reduced motion (or still visuals) turns off the rain, flicker and shake.
+Reduced motion (or still visuals) turns off the rain, flicker, haze, shake
+and the lightning flash.
 
 Code: `src/components/game/`: `Game.tsx` (loop, input, dialogue, fights),
-`world.ts` and `places/` (the maps), `life.ts` (people), `people.ts`
-(sprites), `character.ts` (looks, clothes), `combat.ts`, `weapons.ts`,
+`world.ts` and `places/` (the maps, the subway ride), `life.ts` (people,
+traffic, the cat), `actors.ts` (drawing them), `people.ts` (sprites), `character.ts` (looks, clothes), `combat.ts`, `weapons.ts`,
 `goals.ts`, `scripts.ts` (what the newer places' people say and do),
 `Menu.tsx`, `minigames/`, `render.ts`, `sfx.ts`, `save.ts`, `studio/`.
 
@@ -204,15 +205,9 @@ remembers where it was; it picks up again when you go back. The studio
 ducks the room tone and stops when you leave it; tapes stop when you
 leave the bedroom.
 
-Controls: WASD or arrows to walk, E / Space / Enter to use and talk, Esc to
-leave. On touch screens, a pad and an A button. Reduced motion (or still
-visuals) turns off the rain, the flicker and the haze.
-
-Code: `src/components/game/`: `Game.tsx` (loop, input, dialogue, the lid),
-`world.ts` (the four maps and their painting), `render.ts` (sprites, lights,
-rain), `studio/` (the DAW: `voices.ts` sounds, `engine.ts` mixer and
-sequencer, `project.ts` model and saves, `presets.ts` starters, and the
-panels), `sfx.ts` (room tone and cues), `save.ts`.
+Code: `src/components/game/studio/` (the DAW: `voices.ts` sounds,
+`engine.ts` mixer and sequencer, `project.ts` model and saves, `presets.ts`
+starters, and the panels).
 
 ## Project structure
 
@@ -222,7 +217,7 @@ panels), `sfx.ts` (room tone and cues), `save.ts`.
   Contact, and the site store.
 - `src/components/beats/`: the Beats window, the visualizer, the palette.
 - `src/components/player/`: the global player store and `<audio>` element.
-- `src/components/room/`: the intro, drawn in SVG.
+- `src/components/intro/`: the intro.
 - `src/components/game/`: the game.
 - `src/data/`: tracks and profile. Change content here.
 
@@ -239,7 +234,7 @@ Before committing: `npx tsc --noEmit`, `npm run lint`, `npm run build`,
 then the browser checks against a dev server on port 3210:
 
 ```bash
-npm i --no-save playwright-core axe-core
+npm i --no-save playwright-core axe-core sharp
 npx next dev -p 3210
 node scripts/verify.mjs
 ```
