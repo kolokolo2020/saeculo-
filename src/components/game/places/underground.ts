@@ -83,7 +83,7 @@ export const ALLEY: Scene = {
   name: "The alley",
   tiles: ["WWWWWWWWWWWWWWWWWWWWWWWW", "WWWWWWWWWWWWWWWWWWWWWWWW", "#gggggggggggggggggggggg#", "#gggggggggggggggggggggg#", "#gggggggggggggggggggggg#", "#gggggggggggggggggggggg#", "#gggggggggggggggggggggg#", "#gggggggggggggggggggggg#", "#gggggggggggggggggggggg#", "###########DD###########"],
   solid: "W#",
-  surface: () => "stone",
+  surface: () => "grit",
   outdoors: true,
   things: [
     { id: "dumpster", body: { x: TILE, y: 2 * TILE - 6, w: 3 * TILE, h: 20 }, zone: T(1, 3, 3, 0.9) },
@@ -214,7 +214,7 @@ export const SUBWAY: Scene = {
   name: "The subway",
   tiles: ["WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW", "WSSSWWWWWWWWWWWWWWWWWWWWWWWWWWWW", "pppppppppppppppppppppppppppppppp", "pppppppppppppppppppppppppppppppp", "pppppppppppppppppppppppppppppppp", "pppppppppppppppppppppppppppppppp", "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy", "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr", "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"],
   solid: "Wr",
-  surface: (ch) => (ch === "S" ? "stone" : "tile"),
+  surface: (ch) => (ch === "S" ? "stone" : ch === "y" ? "metal" : "tile"),
   things: [
     { id: "ticket", body: { x: 5 * TILE + 1, y: 2 * TILE - 2, w: 14, h: 8 }, zone: T(5, 2.4, 1, 1) },
     { id: "bench-s", body: T(8, 2, 3, 0.7) },
@@ -384,7 +384,7 @@ export const UNDERPASS: Scene = {
     "ffffffffffffffffffffffffffffffffff",
   ],
   solid: "Wf",
-  surface: () => "stone",
+  surface: () => "concrete",
   outdoors: true,
   things: [
     { id: "pillar", body: { x: 6 * TILE, y: 3 * TILE, w: 2 * TILE, h: TILE + 4 } },

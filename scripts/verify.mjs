@@ -704,6 +704,20 @@ try {
     check("subway: rides are counted", (await saved()).stats.rides === 2);
     await closeDialog();
 
+    // sound: footsteps per surface, the crowd, the station announcement
+    const underfoot = async (place, x, y) => {
+      await page.evaluate(([p, x, y]) => window.__game.teleport(p, x, y, "down"), [place, x, y]);
+      return page.evaluate(() => window.__game.surface());
+    };
+    const feet = [await underfoot("alley", 12, 6), await underfoot("underpass", 10, 6.5), await underfoot("avenue", 20, 7.5), await underfoot("subway", 15, 6.4), await underfoot("club", 12, 8)];
+    check("footsteps: grit, concrete, wet road, the platform strip, the club floor", feet.join() === "grit,concrete,wet,metal,floor", feet.join());
+    await page.waitForTimeout(200);
+    check("club: people talking under the music", (await game(page)).fx.crowd > 0.1);
+    await page.evaluate(() => window.__game.teleport("subway", 15, 4.5, "down"));
+    const ann0 = (await game(page)).fx.announcements ?? 0;
+    for (let i = 0; i < 90 && ((await game(page)).fx.announcements ?? 0) === ann0; i++) await page.waitForTimeout(400);
+    check("subway: an announcement as the train comes in, captioned", ((await game(page)).fx.announcements ?? 0) > ann0 && /now arriving/.test((await page.getByTestId("game-toast").textContent().catch(() => "")) ?? ""));
+
     // more life: a police car, people passing on the avenue, the alley cat, the storm
     check("alley: a cat", (await lifeNow()).actors.some((a) => a.kind === "cat" && a.place === "alley"));
     await page.evaluate(() => window.__game.teleport("avenue", 20, 5, "down"));

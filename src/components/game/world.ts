@@ -64,7 +64,7 @@ export const SCENES: Record<Place, Scene> = {
       "ffffffffffffffffffffffffffffffffffffffff",
     ],
     solid: "Bbf",
-    surface: () => "stone",
+    surface: (ch) => (ch === "a" || ch === "l" ? "wet" : "stone"),
     outdoors: true,
     things: [
       { id: "bench", body: { x: 8 * TILE, y: 3 * TILE, w: 2 * TILE, h: 10 }, zone: T(8, 3.6, 2, 1) },

@@ -264,7 +264,7 @@ export const CLUB: Scene = {
     "###########DD###########",
   ],
   solid: "#w",
-  surface: () => "tile",
+  surface: () => "floor",
   things: [
     { id: "booth", body: T(9, 3, 6, 1), zone: T(9, 4, 6, 1) },
     { id: "speaker-l", body: { x: 1.2 * TILE, y: 3 * TILE, w: 26, h: 6 } },

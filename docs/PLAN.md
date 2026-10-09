@@ -56,7 +56,14 @@ commit + push after each step, extend scripts/verify.mjs).
    the rumble; "next stop" on the board, centred so a phone sees it).
    Rides are counted (stats.rides).
 
+9. Sound polish: five new step sounds (wet road on the street and the
+   avenue, grit in the alley, the platform's metal strip, the club floor,
+   concrete with an echo under the bridge); a crowd murmur bed (six
+   noise "voices" through wandering vowel bands at syllable speed) for the
+   club, the cypher (by distance) and the club queue, muted during rhythm
+   games; a station announcement (three-note chime, a garbled tannoy
+   voice) as each train comes in, captioned once per visit, and a short
+   one when you board.
+
 ## Next (in order)
-6. Sound polish: footsteps per surface in the new places, crowd murmur in
-   the club and the cypher, the train announcement.
 7. README + verify.mjs kept up to date with each of the above.

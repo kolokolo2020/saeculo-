@@ -1,4 +1,4 @@
-import type { Place } from "../sfx";
+import type { Place, Surface } from "../sfx";
 
 // What every place is made of: 16-px tiles, things you bump into or use,
 // doors, lights, and a few painting helpers. Kept apart from world.ts so
@@ -58,7 +58,7 @@ export interface Scene {
   name: string;
   tiles: string[];
   solid: string;
-  surface: (ch: string) => "wood" | "stone" | "tile" | "carpet";
+  surface: (ch: string) => Surface;
   things: Thing[];
   doors: Door[];
   lights: Light[];

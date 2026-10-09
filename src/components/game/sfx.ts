@@ -6,6 +6,8 @@ import { ensureLoaded, playVoice, trackTiming } from "./studio/voices";
 
 export const PLACES = ["bedroom", "street", "store", "studio", "park", "rooftop", "avenue", "alley", "records", "thrift", "club", "subway", "underpass"] as const;
 export type Place = (typeof PLACES)[number];
+/** What your feet are on: each has its own step. */
+export type Surface = "wood" | "stone" | "tile" | "carpet" | "wet" | "grit" | "metal" | "floor" | "concrete";
 
 let bus: GainNode | null = null;
 let rainGain: GainNode | null = null;
@@ -18,6 +20,8 @@ let rainBuf: AudioBuffer | null = null;
 let level: GainNode | null = null;
 let sfxVolume = 0.8;
 let rumbleGain: GainNode | null = null;
+let crowdGain: GainNode | null = null;
+let noiseBuf: AudioBuffer | null = null;
 
 function ctx() {
   return getAudioContext();
@@ -121,6 +125,57 @@ export function startGameAudio() {
   rsrc.connect(rlp).connect(rumbleGain).connect(bus);
   rsrc.start();
   ringOscs.push(rsrc as unknown as OscillatorNode);
+
+  // a crowd talking: a few "voices", each noise through a vowel-ish band,
+  // opening and closing at syllable speed, never quite in step
+  noiseBuf ??= whiteNoise(c, 2);
+  crowdGain = c.createGain();
+  crowdGain.gain.value = 0;
+  const crowdTone = c.createBiquadFilter();
+  crowdTone.type = "lowpass";
+  crowdTone.frequency.value = 2200;
+  crowdGain.connect(crowdTone).connect(bus);
+  for (let k = 0; k < 6; k++) {
+    const src = c.createBufferSource();
+    src.buffer = noiseBuf;
+    src.loop = true;
+    src.loopStart = Math.random();
+    const vowel = c.createBiquadFilter();
+    vowel.type = "bandpass";
+    vowel.frequency.value = 350 + Math.random() * 700;
+    vowel.Q.value = 3;
+    const env = c.createGain();
+    env.gain.value = 0.12;
+    const syl = c.createOscillator();
+    syl.frequency.value = 2.5 + Math.random() * 3;
+    const depth = c.createGain();
+    depth.gain.value = 0.12;
+    syl.connect(depth).connect(env.gain);
+    // and the pitch of each voice wanders a little
+    const drift = c.createOscillator();
+    drift.frequency.value = 0.3 + Math.random() * 0.5;
+    const driftDepth = c.createGain();
+    driftDepth.gain.value = 120;
+    drift.connect(driftDepth).connect(vowel.frequency);
+    src.connect(vowel).connect(env).connect(crowdGain);
+    src.start(c.currentTime, Math.random());
+    syl.start();
+    drift.start();
+    ringOscs.push(src as unknown as OscillatorNode, syl, drift);
+  }
+}
+
+function whiteNoise(c: BaseAudioContext, secs: number) {
+  const n = Math.floor(c.sampleRate * secs);
+  const buf = c.createBuffer(1, n, c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+/** People talking around you (0 = nobody): the club, the cypher, the queue. */
+export function setCrowd(v: number) {
+  if (crowdGain) crowdGain.gain.setTargetAtTime(v, ctx().currentTime, 0.4);
 }
 
 /** How loud the game's own sounds are (the settings). */
@@ -152,7 +207,7 @@ export function stopGameAudio() {
     b.disconnect();
     lv?.disconnect();
   }, 900);
-  bus = rainGain = humGain = ringGain = rumbleGain = level = null;
+  bus = rainGain = humGain = ringGain = rumbleGain = crowdGain = level = null;
   rainSrc = null;
   humOscs = [];
   ringOscs = [];
@@ -221,23 +276,55 @@ function noise(c: AudioContext, t: number, dur: number, freq: number, lvl: numbe
 }
 
 export const sfx = {
-  step(surface: "wood" | "stone" | "tile" | "carpet") {
+  step(surface: Surface) {
     if (!bus) return;
     const c = ctx();
     const t = c.currentTime;
-    const src = c.createBufferSource();
-    const len = Math.floor(c.sampleRate * 0.05);
-    const buf = c.createBuffer(1, len, c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len / 5));
-    src.buffer = buf;
-    const f = c.createBiquadFilter();
-    f.type = "bandpass";
-    f.frequency.value = { wood: 500, stone: 1400, tile: 2200, carpet: 300 }[surface] * (0.9 + Math.random() * 0.2);
-    const g = c.createGain();
-    g.gain.value = { wood: 0.12, stone: 0.07, tile: 0.08, carpet: 0.05 }[surface];
-    src.connect(f).connect(g).connect(bus);
-    src.start(t);
+    const one = (at: number, freq: number, lvl: number, ms = 50, q = 1) => {
+      const src = c.createBufferSource();
+      const len = Math.floor(c.sampleRate * (ms / 1000));
+      const buf = c.createBuffer(1, len, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len / 5));
+      src.buffer = buf;
+      const f = c.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = freq * (0.9 + Math.random() * 0.2);
+      f.Q.value = q;
+      const g = c.createGain();
+      g.gain.value = lvl;
+      src.connect(f).connect(g).connect(bus!);
+      src.start(at);
+    };
+    switch (surface) {
+      case "wet":
+        // the heel, then a little splash off the wet tarmac
+        one(t, 1100, 0.06);
+        one(t + 0.02, 3800, 0.035, 70, 0.7);
+        break;
+      case "grit":
+        // grit and broken glass: a few tiny crunches
+        one(t, 1300, 0.05);
+        for (let k = 0; k < 3; k++) one(t + 0.008 + Math.random() * 0.03, 3000 + Math.random() * 2500, 0.02, 12, 3);
+        break;
+      case "metal":
+        // the ridged strip at the platform edge: a clink
+        one(t, 1800, 0.05);
+        one(t + 0.004, 4200, 0.03, 40, 8);
+        break;
+      case "floor":
+        // a sticky club floor, mostly felt under the bass
+        one(t, 260, 0.06, 60, 0.8);
+        break;
+      case "concrete":
+        // under the bridge every step comes back
+        one(t, 900, 0.08);
+        one(t + 0.11, 900, 0.025, 60);
+        one(t + 0.22, 900, 0.01, 60);
+        break;
+      default:
+        one(t, { wood: 500, stone: 1400, tile: 2200, carpet: 300 }[surface], { wood: 0.12, stone: 0.07, tile: 0.08, carpet: 0.05 }[surface]);
+    }
   },
   talk() {
     blip(180 + Math.random() * 60, 0.05, "triangle", 0.05);
@@ -300,6 +387,43 @@ export const sfx = {
     src.connect(lp).connect(g).connect(bus);
     src.start(t);
     if (near > 0.6) noise(c, t, 0.25, 1800, 0.12, 400);
+  },
+  /** The station announcement: three notes up, then a voice through a bad speaker (words you can't quite make out). */
+  announce(syllables = 14) {
+    if (!bus) return;
+    const c = ctx();
+    const t = c.currentTime;
+    [523, 659, 784].forEach((f, i) => setTimeout(() => blip(f, 0.45, "sine", 0.05), i * 220));
+    noiseBuf ??= whiteNoise(c, 2);
+    const src = c.createBufferSource();
+    src.buffer = noiseBuf;
+    src.loop = true;
+    // the tannoy: narrow, a bit crunchy
+    const speaker = c.createBiquadFilter();
+    speaker.type = "bandpass";
+    speaker.frequency.value = 1400;
+    speaker.Q.value = 1.2;
+    const vowel = c.createBiquadFilter();
+    vowel.type = "bandpass";
+    vowel.Q.value = 6;
+    const env = c.createGain();
+    env.gain.value = 0;
+    const start = t + 0.85;
+    let at = start;
+    for (let k = 0; k < syllables; k++) {
+      const len = 0.09 + Math.random() * 0.12;
+      vowel.frequency.setValueAtTime(500 + Math.random() * 900, at);
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.linearRampToValueAtTime(0.5, at + 0.02);
+      env.gain.linearRampToValueAtTime(0.0001, at + len);
+      at += len + (k % 5 === 4 ? 0.22 : 0.03);
+    }
+    const out = c.createGain();
+    out.gain.value = 0.5;
+    src.connect(vowel).connect(speaker).connect(env).connect(out).connect(bus);
+    src.start(start);
+    src.stop(at + 0.1);
+    return at - t;
   },
   /** The doors-closing chime on the train: two notes, down. */
   chime() {

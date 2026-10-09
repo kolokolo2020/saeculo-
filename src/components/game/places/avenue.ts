@@ -152,7 +152,7 @@ export const AVENUE: Scene = {
   name: "The avenue",
   tiles: ROAD,
   solid: "Bbf",
-  surface: () => "stone",
+  surface: (ch) => (ch === "a" || ch === "l" ? "wet" : "stone"),
   outdoors: true,
   things: [
     { id: "lamp-a1", body: { x: 9 * TILE + 6, y: 3 * TILE + 8, w: 4, h: 4 } },

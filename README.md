@@ -139,6 +139,13 @@ most bought or earned), weapons and food, goals (18, each pays out),
 settings (sound and music levels, fight difficulty, shake, hints, start
 over). Cash, respect, health and everything else save in the browser.
 
+Sound: footsteps change with what's underfoot (wood, tiles, wet road,
+grit in the alley, the ridged strip on the platform, the club floor,
+concrete under the bridge with its echo); people talking in the club, round
+the cypher and in the queue outside the club; the station chime and a
+voice through a bad speaker as each train comes in (captioned on screen
+the first time each visit).
+
 Controls: WASD or arrows, E / Space to use and talk, M for the menu, Esc
 back to the site. On touch screens, a pad, A (and B and eat in a fight).
 Reduced motion (or still visuals) turns off the rain, flicker and shake.

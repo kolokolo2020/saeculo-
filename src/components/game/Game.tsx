@@ -18,7 +18,7 @@ import { drawRide, overhead, trainAt } from "./places/underground";
 import { camera, draw, VIEW_H, VIEW_W } from "./render";
 import { loadSave, MAX_HP, migrateOldTapes, resetSave, writeSave, type SaveData, type Settings } from "./save";
 import { battle, clubOk, operate, promptFor as promptMore, talk as talkMore, type Api, type Mini } from "./scripts";
-import { duck, setPlace, setRing, setRumble, setSfxVolume, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
+import { duck, setCrowd, setPlace, setRing, setRumble, setSfxVolume, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
 import { CONSUMABLES, consumableById, unlockedByWins, weaponById } from "./weapons";
 import { Engine } from "./studio/engine";
 import { PRESETS } from "./studio/presets";
@@ -668,6 +668,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     s.ride = { to, t: 0 };
     s.sitting = false;
     sfx.chime();
+    window.setTimeout(() => sfx.announce(8), 500);
   };
 
   const latestTape = (): Project | null => {
@@ -1480,6 +1481,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         return out;
       },
       life: () => ({
+        announced: st.current.fx.announced ?? 0,
         music: music.current?.key ?? null,
         call: !!call.current,
         musicProject: music.current?.engine.project.name ?? null,
@@ -1503,6 +1505,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
       give: (patch: Partial<SaveData>) => updateSave((v) => ({ ...v, ...patch })),
       save: () => saveRef.current,
       cop: sendCop,
+      /** What your feet are on right now. */
+      surface: () => {
+        const s = st.current;
+        const sc = SCENES[s.place];
+        return sc.surface(tileAt(sc, s.x, s.y - 1));
+      },
       ride: (to: "street" | "avenue") => rideTo(to),
       /** Bring the storm over now. */
       storm: () => {
@@ -1699,6 +1707,21 @@ export default function Game({ onExit }: { onExit: () => void }) {
       const tr = s.place === "subway" ? trainAt(s.t) : null;
       const over = s.place === "underpass" ? overhead(s.t) : 0;
       setRumble(s.ride ? 0.5 : tr ? (tr.here ? (tr.open ? 0.2 : 0.6) : tr.arriving ? 0.3 : 0) : over);
+      // the station announcement, as each train comes in (with what it says, on screen)
+      const coming = !!tr?.arriving && tr.here;
+      if (coming && !s.fx.announced && u.phase === "play" && !u.mini) {
+        sfx.announce();
+        // what it says, on screen, the first time each visit
+        if (!s.visit.announced) showToast("\u201cThe train now arriving is for: your block. Mind the gap.\u201d (a voice through a bad speaker)", 4200);
+        s.visit.announced = 1;
+        s.fx.announcements = (s.fx.announcements ?? 0) + 1;
+      }
+      s.fx.announced = coming ? 1 : 0;
+      // people talking: the club, round the cypher, the queue outside the club
+      const closeTo = (x: number, y: number, range: number) => Math.max(0, 1 - Math.hypot(s.x - x, s.y - y) / range);
+      const crowd = s.ride ? 0.05 : u.mini?.kind === "rhythm" ? 0 : s.place === "club" ? 0.22 : s.place === "underpass" ? 0.3 * closeTo(17.5 * TILE, 6.4 * TILE, 220) : s.place === "avenue" ? 0.14 * closeTo(38.5 * TILE, 3.7 * TILE, 110) : 0;
+      setCrowd(crowd * saveRef.current.settings.sfx);
+      s.fx.crowd = crowd;
       // the ride: a couple of seconds in the carriage, then up the stairs at the other end
       if (s.ride) {
         s.ride.t += dt;
