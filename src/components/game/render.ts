@@ -102,6 +102,8 @@ export interface View {
   shake: number;
   /** What the place's own animation keeps track of. */
   fx: Record<string, number>;
+  /** A lightning flash outside, 1 at the strike, fading to 0. */
+  lightning?: number;
 }
 
 const painted = new Map<Place, HTMLCanvasElement>();
@@ -300,7 +302,7 @@ export function draw(g: G, v: View) {
   d.fillStyle = `rgba(6,7,16,${s.darkness})`;
   d.fillRect(0, 0, VIEW_W, VIEW_H);
   d.globalCompositeOperation = "destination-out";
-  const lights = [...s.lights, ...actorLights(v.actors, v.place), ...(s.liveLights?.(fx) ?? [])];
+  const lights = [...s.lights, ...actorLights(v.actors, v.place, v.t, v.reduced), ...(s.liveLights?.(fx) ?? [])];
   for (const L of lights) {
     const lv = lampLevel(L.kind, v.t, v.reduced);
     const x = L.x - cx;
@@ -326,6 +328,14 @@ export function draw(g: G, v: View) {
   }
   g.globalAlpha = 1;
   g.globalCompositeOperation = "source-over";
+
+  // lightning: the whole sky goes white, flickers once, and drains away
+  if (v.lightning && v.lightning > 0) {
+    const k = v.lightning;
+    const flick = k > 0.75 ? 1 : k > 0.62 ? 0.25 : k > 0.5 ? 0.8 : k * 1.1;
+    g.fillStyle = `rgba(215,225,255,${(flick * 0.5).toFixed(3)})`;
+    g.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
 
   // a little haze after the bench
   if (v.haze > 0) {

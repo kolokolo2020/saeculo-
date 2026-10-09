@@ -26,7 +26,7 @@ import { loadStore } from "./studio/project";
 import Studio from "./studio/Studio";
 import { FINDABLE, playVoice, voiceById, VOICES } from "./studio/voices";
 import { clearSmoke } from "./actors";
-import { lifeBlocks, lifeTarget, makeLife, updateLife, type Actor } from "./life";
+import { lifeBlocks, lifeTarget, makeLife, sendCop, updateLife, type Actor } from "./life";
 import { clone, type Project } from "./studio/project";
 import { sampleProject } from "./studio/sample";
 import { TRACKS } from "@/data/tracks";
@@ -102,6 +102,11 @@ const LINES: Record<string, string[][]> = {
   ],
   "hooper-1": [["\u201cNext.\u201d"]],
   "hooper-2": [["\u201cHe's been missing all night. Don't tell him.\u201d"]],
+  "alley-cat": [
+    ["The cat lets you scratch behind one ear. Then it decides that's enough."],
+    ["It looks at you like you owe it money."],
+    ["It purrs, very quietly, like it doesn't want anyone to know."],
+  ],
   ledge: [["She doesn't turn around."], ["\u201cYou can see the whole block from here.\u201d", "\u201cYour window's the one that never goes dark.\u201d"]],
 };
 /** How many saved projects there are (they show as tapes on the shelf). */
@@ -202,6 +207,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
     // where the visible picture starts, for the health bar
     hudX: 0,
     lastTrouble: -1e9,
+    // the storm: a flash, then thunder a moment later
+    bolt: 0,
+    nextBolt: 40,
+    thunderAt: 0,
+    thunderNear: 0,
+    bolts: 0,
   });
   // the payphone playing your beat back down the line
   const call = useRef<{ engine: Engine; until: number } | null>(null);
@@ -560,6 +571,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const w = gained.length ? weaponById(gained[gained.length - 1]) : null;
     const lines = [
       f.boss ? "Tank goes down, and stays down a while. Nobody in the cypher says a word." : f.foes.length > 2 ? "The last of them hits the pavement." : "Both of them on the ground. Your hands are shaking.",
+      ...cheer(),
       `They leave $${cash} behind getting up. (+${rep} respect)`,
       ...(w ? [w.found] : []),
     ];
@@ -569,6 +581,27 @@ export default function Game({ onExit }: { onExit: () => void }) {
         { label: "Keep what I've got", run: () => setDialog(null) },
       ] : undefined);
     }, 500);
+  };
+
+  /** Everyone who saw it reacts; returns what one of them says. */
+  const cheer = (): string[] => {
+    const s = st.current;
+    const saw = life.current.filter((a) => a.place === s.place && a.kind === "person" && !a.fighter && !a.hidden && Math.hypot(a.x - s.x, a.y - s.y) < 170);
+    for (const a of saw) a.react = 2.4;
+    if (!saw.length) return [];
+    if (s.place === "underpass") return ["Then the whole cypher goes up at once. Somebody starts a verse about it."];
+    const who = saw.sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y))[0];
+    const said: Record<string, string> = {
+      "barrel-man": "The man by the fire doesn't look up. \u201cTold you. Don't stand still.\u201d",
+      "dice-1": "Jay whistles through his teeth. \u201cI'd have bet on you. I didn't, but I would have.\u201d",
+      "dice-2": "Jay whistles through his teeth. \u201cI'd have bet on you. I didn't, but I would have.\u201d",
+      "cd-guy": "The CD guy holds one up at you. \u201cSoundtrack to that? Five dollars.\u201d",
+      bouncer: "The bouncer nods at you, once. That's a lot, from him.",
+      busker: "The busker plays you a little fanfare on the keys.",
+      dre: "Dre doesn't clap. He just nods, like he knew.",
+    };
+    const generic = ["\u201cYES! Did you see that?\u201d Somebody saw that.", "A whistle from across the way. Nobody comes over, but everybody saw.", "Someone starts clapping, slow, then stops when you look."];
+    return [said[who.id] ?? generic[Math.floor(Math.random() * generic.length)]];
   };
 
   const knockout = () => {
@@ -659,6 +692,30 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const arriveRef = useRef(arriveAt);
   useLayoutEffect(() => {
     arriveRef.current = arriveAt;
+  });
+  const rhythmDone = (mode: "cypher" | "dj", score: number) => {
+    const v = saveRef.current;
+    const s = st.current;
+    const best = mode === "cypher" ? v.stats.cypherBest : v.stats.djBest;
+    // the first set in a while pays; play straight again and the crowd's thinner
+    const key = `paid-${mode}`;
+    const fresh = !(s.t - (s.fx[key] ?? -1e9) < 180);
+    const full = mode === "dj" ? (score >= 50 ? 15 + Math.round((score - 50) * 0.75) : Math.round(score * 0.1)) : Math.floor(score / 10) * 2;
+    const cash = fresh ? full : Math.floor(full / 3);
+    // respect for a good set the first time round, and for beating your best
+    const rep = (fresh ? Math.floor(score / (mode === "dj" ? 12 : 10)) : 0) + (score > best ? Math.floor((score - best) / 10) : 0);
+    if (fresh && score >= 30) s.fx[key] = s.t;
+    updateSave((x) => ({ ...x, stats: { ...x.stats, [mode === "cypher" ? "cypherBest" : "djBest"]: Math.max(best, score) }, heard: mode === "dj" ? { ...x.heard, dj: "a set" } : x.heard }));
+    if (cash) earn(cash);
+    if (rep) addRep(rep);
+    if (score >= 50) sfx.cheer();
+    find(mode === "cypher" ? "mic" : "crowd");
+    showToast(`${score}%: ${cash ? `+$${cash}` : "no money"}${rep ? `, +${rep} respect` : ""}${score > best ? " (your best)" : ""}${!fresh ? " · the crowd's thinner the second time" : ""}`, 4200);
+  };
+  // for the browser tests: a rhythm game's ending, without playing it
+  const rhythmRef = useRef<(mode: "cypher" | "dj", score: number) => void>(() => {});
+  useLayoutEffect(() => {
+    rhythmRef.current = rhythmDone;
   });
 
   // ------------------------------------------------------------ the studio
@@ -1373,7 +1430,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         music: music.current?.key ?? null,
         call: !!call.current,
         musicProject: music.current?.engine.project.name ?? null,
-        actors: life.current.map((a) => ({ id: a.id, kind: a.kind, place: a.place, x: a.x, y: a.y, stopped: a.stopped ?? 0, fly: a.fly ?? null, hidden: !!a.hidden, dir: a.dir })),
+        actors: life.current.map((a) => ({ id: a.id, kind: a.kind, place: a.place, x: a.x, y: a.y, stopped: a.stopped ?? 0, fly: a.fly ?? null, hidden: !!a.hidden, dir: a.dir, cop: !!a.cop, react: a.react ?? 0 })),
       }),
       studio: () => {
         const e = engine.current;
@@ -1392,6 +1449,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
       weaken: () => st.current.fight?.foes.forEach((a) => a.fighter && (a.fighter.hp = 1)),
       give: (patch: Partial<SaveData>) => updateSave((v) => ({ ...v, ...patch })),
       save: () => saveRef.current,
+      cop: sendCop,
+      /** Bring the storm over now. */
+      storm: () => {
+        st.current.nextBolt = 0;
+      },
       /** Pretend a rhythm game just finished with this score. */
       rhythm: (mode: "cypher" | "dj", score: number) => rhythmRef.current(mode, score),
       /** Open a mini-game or a menu tab straight away. */
@@ -1489,7 +1551,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
               a.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
             }
           }
-          if (s.pending.some((a) => Math.hypot(s.x - a.x, s.y - a.y) < 30)) confront();
+          // a police car rolling past: they think better of it
+          const cops = life.current.some((a) => a.cop && a.place === s.place && Math.abs(a.x - s.x) < 110);
+          if (cops) {
+            walkOff(s.pending);
+            showToast("They see the police car and think better of it.", 3200);
+          } else if (s.pending.some((a) => Math.hypot(s.x - a.x, s.y - a.y) < 30)) confront();
         }
         if (life.current.some((a) => a.fighter && a.hidden && !s.fight?.foes.includes(a))) life.current = life.current.filter((a) => !(a.fighter && a.hidden && !s.fight?.foes.includes(a)));
         // trouble, now and then, where it lives
@@ -1552,7 +1619,24 @@ export default function Game({ onExit }: { onExit: () => void }) {
       }
 
       // everyone else, and the music where you are
-      if (u.phase === "play") updateLife(life.current, dt, s.place, s.x, s.y, { honk: sfx.honk, bell: sfx.bell, flap: sfx.flap });
+      if (u.phase === "play") updateLife(life.current, dt, s.place, s.x, s.y, { honk: sfx.honk, bell: sfx.bell, flap: sfx.flap, siren: sfx.siren });
+      // now and then the storm comes over: lightning (not with reduced motion), then thunder
+      if (u.phase === "play" && scene.outdoors) {
+        s.nextBolt -= dt;
+        if (s.nextBolt <= 0) {
+          const delay = 0.5 + Math.random() * 2.5;
+          s.bolt = reduced ? 0 : 1;
+          s.bolts++;
+          s.thunderAt = s.t + delay;
+          s.thunderNear = 1 - (delay - 0.5) / 2.5;
+          s.nextBolt = 45 + Math.random() * 60;
+        }
+      }
+      if (s.thunderAt && s.t >= s.thunderAt) {
+        s.thunderAt = 0;
+        sfx.thunder(SCENES[s.place].outdoors ? s.thunderNear : s.thunderNear * 0.3);
+      }
+      s.bolt = Math.max(0, s.bolt - dt * 1.4);
       const beat = placeMusic(s.place, u.studio, dt);
       if (beat && !s.lastBeat) s.fx.beats++;
       s.lastBeat = beat;
@@ -1618,6 +1702,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         tag: saveRef.current.tag ? { name: saveRef.current.profile?.name || "you", color: saveRef.current.tag.color } : null,
         shake: s.shake,
         fx: s.fx,
+        lightning: s.bolt,
       });
       // zoomed in (phones held upright): keep you in the middle of the picture
       if (box) {
@@ -1671,29 +1756,6 @@ export default function Game({ onExit }: { onExit: () => void }) {
     st.current.fx.diceRoll = on ? 1 : 0;
   }, []);
   const sprayed = useCallback(() => sfx.spray(380), []);
-  const rhythmDone = (mode: "cypher" | "dj", score: number) => {
-    const v = saveRef.current;
-    const s = st.current;
-    const best = mode === "cypher" ? v.stats.cypherBest : v.stats.djBest;
-    // the first set in a while pays; play straight again and the crowd's thinner
-    const key = `paid-${mode}`;
-    const fresh = !(s.t - (s.fx[key] ?? -1e9) < 180);
-    const full = mode === "dj" ? (score >= 50 ? 15 + Math.round((score - 50) * 0.75) : Math.round(score * 0.1)) : Math.floor(score / 10) * 2;
-    const cash = fresh ? full : Math.floor(full / 3);
-    // respect for a good set the first time round, and for beating your best
-    const rep = (fresh ? Math.floor(score / (mode === "dj" ? 12 : 10)) : 0) + (score > best ? Math.floor((score - best) / 10) : 0);
-    if (fresh && score >= 30) s.fx[key] = s.t;
-    updateSave((x) => ({ ...x, stats: { ...x.stats, [mode === "cypher" ? "cypherBest" : "djBest"]: Math.max(best, score) }, heard: mode === "dj" ? { ...x.heard, dj: "a set" } : x.heard }));
-    if (cash) earn(cash);
-    if (rep) addRep(rep);
-    if (score >= 50) sfx.cheer();
-    find(mode === "cypher" ? "mic" : "crowd");
-    showToast(`${score}%: ${cash ? `+$${cash}` : "no money"}${rep ? `, +${rep} respect` : ""}${score > best ? " (your best)" : ""}${!fresh ? " · the crowd's thinner the second time" : ""}`, 4200);
-  };
-  const rhythmRef = useRef(rhythmDone);
-  useLayoutEffect(() => {
-    rhythmRef.current = rhythmDone;
-  });
   const dug = (r: DigResult) => {
     if (!spend(5)) return;
     updateSave((v) => ({ ...v, stats: { ...v.stats, digs: v.stats.digs + 1 } }));
@@ -1889,9 +1951,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
 
         {toast && (
           <p
-            className={`pointer-events-none absolute left-1/2 z-20 w-max max-w-[calc(100%-24px)] -translate-x-1/2 rounded-[3px] bg-[#6e1f18] px-3 py-2 text-center font-lcd text-[19px] leading-tight shadow-lg ${below ? "" : "top-3"}`}
-            // phones held upright: in the free space under the picture, clear of the pad
-            style={below ? { bottom: touch ? 206 : 16 } : undefined}
+            className={`pointer-events-none absolute left-1/2 z-20 w-max max-w-[calc(100%-24px)] -translate-x-1/2 rounded-[3px] bg-[#6e1f18] px-3 py-2 text-center font-lcd text-[19px] leading-tight shadow-lg ${below && !dialog ? "" : "top-3"}`}
+            // phones held upright: in the free space under the picture, clear of the pad (over the picture while someone's talking there)
+            style={below && !dialog ? { bottom: touch ? 206 : 16 } : undefined}
             role="status"
             data-testid="game-toast"
           >

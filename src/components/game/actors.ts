@@ -119,7 +119,9 @@ function drawPerson(g: G, a: Actor, t: number, beat: boolean, reduced: boolean) 
   // a fighter leans back to wind up, and into the swing
   const lean = f ? (f.state === "windup" ? (a.dir === "right" ? -1 : 1) : f.state === "strike" ? (a.dir === "right" ? 2 : -2) : 0) : 0;
   const sx = Math.round(a.x) - 6 + sway + lean;
-  const sy = Math.round(a.y) - img.height + nod + (a.pose === "sit" ? -3 : 0);
+  // cheering: a couple of little hops (still with reduced motion)
+  const hop = a.react && !reduced ? -Math.round(Math.abs(Math.sin(a.react * 9)) * 2) : 0;
+  const sy = Math.round(a.y) - img.height + nod + hop + (a.pose === "sit" ? -3 : 0);
   if (a.pose !== "sit") r(g, a.x - 4, a.y - 1, 8, 2, "rgba(0,0,0,0.35)");
   // draw the head with the nod, the legs planted
   if (nod) {
@@ -128,6 +130,11 @@ function drawPerson(g: G, a: Actor, t: number, beat: boolean, reduced: boolean) 
   } else g.drawImage(img, sx, sy);
   drawItem(g, a, sx, sy, t, reduced);
   if (a.item === "ball") drawBall(g, a, t, reduced);
+  if (a.react && a.react > 0.4) {
+    // a raised arm
+    const right = a.dir !== "left";
+    r(g, right ? sx + 10 : sx + 1, sy + 1, 1, 6, a.look!.skin);
+  }
   if (f) {
     if (f.state === "strike") {
       // the fist, out
@@ -253,7 +260,10 @@ function drawBall(g: G, a: Actor, t: number, reduced: boolean) {
   r(g, bx, by - 1, 1, 3, "#8a3a12");
 }
 
-function drawCar(g: G, a: Actor) {
+/** The police car's light bar: red and blue taking turns (steady with reduced motion). */
+const copPhase = (t: number, reduced: boolean) => (reduced ? -1 : Math.floor(t * 4) % 2);
+
+function drawCar(g: G, a: Actor, t = 0, reduced = false) {
   const right = (a.vx ?? 0) > 0;
   const x = Math.round(a.x - CAR_W / 2);
   const y = Math.round(a.y - 16);
@@ -268,6 +278,52 @@ function drawCar(g: G, a: Actor) {
   r(g, x + CAR_W - 11, y + 11, 6, 5, "#0b0b0d");
   r(g, right ? x + CAR_W - 2 : x, y + 6, 2, 2, "#fff2c0");
   r(g, right ? x : x + CAR_W - 2, y + 6, 2, 2, "#d0302a");
+  if (a.cop) {
+    // white doors, a stripe, the bar on the roof
+    r(g, x + 9, y + 6, CAR_W - 18, 5, "#e8e4da");
+    r(g, x + 1, y + 10, CAR_W - 2, 1, "#3a5ab3");
+    const ph = copPhase(t, reduced);
+    const bx = x + (right ? 14 : 16);
+    r(g, bx, y - 2, 8, 2, "#26262b");
+    r(g, bx, y - 2, 4, 2, ph === 0 ? "#ff3a3a" : "#7a1a1a");
+    r(g, bx + 4, y - 2, 4, 2, ph === 1 ? "#4a8aff" : "#1a2a6a");
+  }
+}
+
+let catFrames: HTMLCanvasElement[] | null = null;
+function catSprites(fur: string) {
+  if (catFrames) return catFrames;
+  const pal: Record<string, string> = { k: fur, d: "#3a3430", e: "#c8e86a", p: "#e8a0a0" };
+  const make = (rows: string[]) => {
+    const c = document.createElement("canvas");
+    c.width = rows[0].length;
+    c.height = rows.length;
+    const cg = c.getContext("2d")!;
+    rows.forEach((row, y) => [...row].forEach((ch, x) => pal[ch] && ((cg.fillStyle = pal[ch]), cg.fillRect(x, y, 1, 1))));
+    return c;
+  };
+  catFrames = [
+    // sitting, tail curled round
+    make(["........k.k.", "........kkk.", "........kek.", "....kkkkkkk.", "...kkkkkkk..", "..kkkkkkkk..", "kkkkkdkdkk.."]),
+    // trotting, two steps
+    make(["..........k.", "k........kkk", ".k.kkkkkkkek", "..kkkkkkkkk.", "...kkkkkkk..", "...k.k..k.k.", "..k...k.k..k"]),
+    make(["..........k.", "k........kkk", ".kkkkkkkkkek", "..kkkkkkkkk.", "...kkkkkkk..", "....kk..kk..", "....k.k..kk."]),
+  ];
+  return catFrames;
+}
+
+function drawCat(g: G, a: Actor, t: number) {
+  const [sit, w1, w2] = catSprites(a.color ?? "#6a6058");
+  const img = a.walking ? (Math.floor(t * (a.bolt ? 14 : 7)) % 2 ? w1 : w2) : sit;
+  const x = Math.round(a.x) - 6;
+  const y = Math.round(a.y) - img.height;
+  r(g, a.x - 5, a.y - 1, 10, 2, "rgba(0,0,0,0.3)");
+  if (a.dir === "left") {
+    g.save();
+    g.scale(-1, 1);
+    g.drawImage(img, -x - 12, y);
+    g.restore();
+  } else g.drawImage(img, x, y);
 }
 
 function drawBike(g: G, a: Actor, t: number) {
@@ -329,9 +385,11 @@ export function drawActor(g: G, a: Actor, t: number, beat: boolean, reduced: boo
     case "pigeon":
       return drawPigeon(g, a, t);
     case "car":
-      return drawCar(g, a);
+      return drawCar(g, a, t, reduced);
     case "bike":
       return drawBike(g, a, t);
+    case "cat":
+      return drawCat(g, a, t);
   }
 }
 
@@ -357,7 +415,7 @@ export function clearSmoke() {
 }
 
 /** Lights the inhabitants carry: headlights, phone screens. */
-export function actorLights(actors: Actor[], place: string): Light[] {
+export function actorLights(actors: Actor[], place: string, t = 0, reduced = false): Light[] {
   const out: Light[] = [];
   for (const a of actors) {
     if (a.place !== place || a.hidden) continue;
@@ -365,6 +423,10 @@ export function actorLights(actors: Actor[], place: string): Light[] {
       const right = (a.vx ?? 0) > 0;
       out.push({ x: a.x + (right ? CAR_W / 2 + 18 : -CAR_W / 2 - 18), y: a.y - 8, r: 42, color: "rgba(255,240,200,0.5)" });
       out.push({ x: a.x + (right ? -CAR_W / 2 : CAR_W / 2), y: a.y - 8, r: 14, color: "rgba(255,60,40,0.5)" });
+      if (a.cop) {
+        const ph = copPhase(t, reduced);
+        out.push({ x: a.x, y: a.y - 18, r: 46, color: ph === 0 ? "rgba(255,40,40,0.7)" : ph === 1 ? "rgba(60,110,255,0.7)" : "rgba(160,80,200,0.35)" });
+      }
     } else if (a.item === "phone" && a.kind === "person") out.push({ x: a.x + 3, y: a.y - 8, r: 14, color: "rgba(140,200,255,0.4)" });
     else if (a.item === "joint" && a.kind === "person") out.push({ x: a.x + 4, y: a.y - 8, r: 8, color: "rgba(255,120,40,0.5)" });
   }

@@ -96,6 +96,13 @@ neighbourhood:
   **The subway**: trains in and out. **The underpass**: the cypher, Dre
   (buys beats), and Tank.
 
+Life on the block: cars, bikes and now and then a police car rolling by
+with its lights going (trouble walking up to you thinks better of it);
+people walking through on the avenue; a cat in the alley that moves when
+it feels like it; a storm that comes over now and then, lightning and then
+thunder (no flash with reduced motion or still visuals). Win a fight and
+whoever saw it reacts.
+
 Things to do: make beats and **sell** them (Dre, the record shop; each tape
 sells once, priced by what's in it), **the cypher** and **a set at the club**
 (rhythm games: the kick, snare and keys drop out and you play them, D F J K;

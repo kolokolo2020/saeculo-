@@ -244,6 +244,14 @@ try {
   {
     const { ctx, page } = await open({ reduced: true });
     check("reduced motion: visuals start still", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("still"));
+    await page.evaluate(() => localStorage.setItem("saeculo-game", JSON.stringify({ found: [], seenHelp: true, unseen: [], profile: { name: "R", skin: 1, hair: "short", hairColor: 0, body: "slim" } })));
+    await page.getByTestId("icon-game").click();
+    await page.waitForTimeout(800);
+    await page.evaluate(() => window.__game.teleport("street", 18, 5.6, "down"));
+    await page.evaluate(() => window.__game.storm());
+    await page.waitForTimeout(150);
+    const calm = await page.evaluate(() => window.__game.state());
+    check("reduced motion: thunder, but no lightning flash", calm.bolts === 1 && calm.bolt === 0);
     await ctx.close();
   }
 
@@ -620,6 +628,7 @@ try {
     await page.waitForTimeout(800);
     const won = await saved();
     check("fight: win it, get paid, unlock the bat", won.stats.wins === 1 && won.weapons.includes("bat") && won.cash > 110, JSON.stringify(won.stats));
+    check("fight: people who saw it react", (await lifeNow()).actors.some((a) => a.react > 0));
     await closeDialog();
 
     // balance: trouble leaves you alone (the club set also gets you the crowd sound) for a while after; a second set straight away pays less
@@ -631,6 +640,19 @@ try {
     const cash2 = (await saved()).cash;
     check("club: a good set pays, the same set straight after pays a third", cash1 - cash0 === 26 && cash2 - cash1 === 8, `${cash1 - cash0}, ${cash2 - cash1}`);
     await closeDialog();
+
+    // more life: a police car, people passing on the avenue, the alley cat, the storm
+    check("alley: a cat", (await lifeNow()).actors.some((a) => a.kind === "cat" && a.place === "alley"));
+    await page.evaluate(() => window.__game.teleport("avenue", 20, 5, "down"));
+    await page.evaluate(() => window.__game.cop());
+    await page.waitForTimeout(1500);
+    const ave = (await lifeNow()).actors.filter((a) => a.place === "avenue");
+    check("avenue: a police car rolls by", ave.some((a) => a.cop));
+    check("avenue: people passing through", ave.some((a) => a.id.startsWith("passer")));
+    const bolts = (await game(page)).bolts;
+    await page.evaluate(() => window.__game.storm());
+    await page.waitForTimeout(150);
+    check("outside: lightning now and then", (await game(page)).bolts === bolts + 1 && (await game(page)).bolt > 0);
 
     await page.getByTestId("game-exit").click();
     await page.waitForTimeout(1400);
@@ -734,10 +756,13 @@ try {
     const { ctx, page } = await open();
     await page.getByTestId("icon-socials").click();
     await page.getByTestId("icon-contact").click();
+    // let the windows finish opening (mid-animation, colours read wrong)
+    await page.waitForTimeout(800);
     await page.addScriptTag({ content: axeSource });
-    const v = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+    const vs = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => ({ id: x.id, nodes: x.nodes.map((n) => [n.target, n.any?.[0]?.message]) })));
+    const v = vs.map((x) => `${x.id} (${x.nodes.length})`);
     check("axe: no violations on the desktop", v.length === 0, v.join(", "));
-    if (v.length) console.log(await page.evaluate(async () => JSON.stringify((await window.axe.run(document, { resultTypes: ["violations"] })).violations.flatMap((x) => x.nodes.map((n) => [n.target, n.any?.[0]?.message])))));
+    if (v.length) console.log(JSON.stringify(vs));
     await page.getByTestId("icon-game").click();
     await page.waitForTimeout(1600);
     const g = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));

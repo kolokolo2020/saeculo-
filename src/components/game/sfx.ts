@@ -272,6 +272,58 @@ export const sfx = {
       o.stop(t + 0.42);
     }
   },
+  /** Thunder, somewhere over the river: a crack (if it's close), then a long low roll. */
+  thunder(near = 0.5) {
+    if (!bus) return;
+    const c = ctx();
+    const t = c.currentTime;
+    const dur = 3.2 + Math.random() * 1.5;
+    const n = Math.floor(c.sampleRate * dur);
+    const buf = c.createBuffer(1, n, c.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < n; i++) {
+      // brown-ish noise with a few swells in it
+      last = (last + (Math.random() * 2 - 1) * 0.06) * 0.995;
+      const x = i / n;
+      const swell = Math.min(1, x * 12) * Math.exp(-x * 2.6) * (0.75 + 0.25 * Math.sin(x * 23));
+      d[i] = last * swell * 6;
+    }
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(260 + near * 500, t);
+    lp.frequency.exponentialRampToValueAtTime(90, t + dur);
+    const g = c.createGain();
+    g.gain.value = 0.35 + near * 0.35;
+    src.connect(lp).connect(g).connect(bus);
+    src.start(t);
+    if (near > 0.6) noise(c, t, 0.25, 1800, 0.12, 400);
+  },
+  /** A police car's two notes, short, as it rolls past. */
+  siren() {
+    if (!bus) return;
+    const c = ctx();
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    o.type = "triangle";
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.035, t + 0.05);
+    g.gain.setValueAtTime(0.035, t + 0.9);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+    o.frequency.setValueAtTime(620, t);
+    o.frequency.linearRampToValueAtTime(980, t + 0.3);
+    o.frequency.linearRampToValueAtTime(620, t + 0.55);
+    o.frequency.linearRampToValueAtTime(980, t + 0.85);
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 1600;
+    o.connect(lp).connect(g).connect(bus);
+    o.start(t);
+    o.stop(t + 1.15);
+  },
   bell() {
     blip(2100, 0.35, "sine", 0.04);
     setTimeout(() => blip(2100, 0.3, "sine", 0.03), 140);

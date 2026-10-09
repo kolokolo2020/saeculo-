@@ -30,10 +30,16 @@ commit + push after each step, extend scripts/verify.mjs).
    the first time or for beating your best. Trouble comes less often and
    leaves a minute's breather. Bike chain at 4 wins, knuckles at 7.
 
+6. More life: a police car on the street and the avenue (light bar, a
+   short siren as it nears; trouble walking up to you backs off), people
+   passing through on the avenue, a cat in the alley (wanders between
+   spots, bolts if you rush it, can be petted), a storm every minute or
+   two outdoors (flash, then thunder, nearer = sooner and louder; no flash
+   with reduced motion), and bystanders hop and cheer when you win a fight,
+   with a line from whoever's nearest. Also: verify.mjs waits for windows
+   to finish opening before the axe audit (it flaked mid-animation).
+
 ## Next (in order)
-3. More life on the map: a police car rolling by with lights, thunder and
-   lightning now and then (respect reduced motion), more passers-by on the
-   avenue, a cat in the alley, people reacting when you win a fight.
 4. More things that happen: a rival producer challenges you to a beat
    battle (the rhythm game, harder); the CD guy asks you for a beat; Dre
    gives a small "job" (deliver a tape) with a reward.

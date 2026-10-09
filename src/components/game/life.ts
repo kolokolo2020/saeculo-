@@ -8,7 +8,7 @@ import { sceneSize, SCENES, TILE, type Dir, type Rect } from "./world";
 // the place you're in is simulated (traffic keeps its own timer).
 
 export type Item = "cup" | "joint" | "bottle" | "phone" | "headphones" | "ball" | "keys" | "mic";
-export type ActorKind = "person" | "dog" | "pigeon" | "car" | "bike";
+export type ActorKind = "person" | "dog" | "pigeon" | "car" | "bike" | "cat";
 
 export interface Actor {
   id: string;
@@ -51,6 +51,17 @@ export interface Actor {
   dance?: boolean;
   /** In a fight with you (combat.ts moves them, not this). */
   fighter?: Fighter;
+  /** A police car: the light bar on the roof. */
+  cop?: boolean;
+  /** Walks its path once and is gone (people passing through). */
+  oneway?: boolean;
+  /** Seconds left of reacting to something (a fight you just won): a little hop. */
+  react?: number;
+  /** The cat: where it's going, and where it likes to sit. */
+  goal?: [number, number];
+  perches?: [number, number][];
+  /** Running, not strolling. */
+  bolt?: boolean;
 }
 
 const T = TILE;
@@ -137,6 +148,23 @@ export function makeLife(): Actor[] {
     // the alley: the dice game, someone warming their hands
     person("dice-1", "alley", 18.2, 6.9, { skin: "#5c3a26", hair: "#120d0a", top: "#1f2230", pants: "#2c2f38", style: "short", hat: "durag", hatColor: "#3a5ab3" }, { pose: "crouch", dir: "right", talk: "the dice game" }),
     person("dice-2", "alley", 21, 7.1, { skin: "#e0b193", hair: "#3a2416", top: "#4a4a32", pants: "#23252e", style: "short", topStyle: "hoodie" }, { pose: "crouch", dir: "left", talk: "the dice game" }),
+    {
+      id: "alley-cat",
+      kind: "cat",
+      place: "alley",
+      x: 3.2 * T,
+      y: 3.6 * T,
+      dir: "right",
+      talk: "the cat",
+      color: "#6a6058",
+      t: 0,
+      perches: [
+        [3.2 * T, 3.6 * T],
+        [22.3 * T, 4.2 * T],
+        [14.6 * T, 8.6 * T],
+        [5.5 * T, 8.4 * T],
+      ],
+    },
     person("barrel-man", "alley", 9.9, 5.6, { skin: "#d2a58a", hair: "#bdbdb8", top: "#4a3a2a", pants: "#2a2a30", style: "long", topStyle: "jacket", trim: "#6a5a4a" }, { dir: "left", talk: "talk" }),
 
     // the record shop
@@ -200,11 +228,46 @@ export const carRect = (a: Actor): Rect => ({ x: a.x - CAR_W / 2, y: a.y - 12, w
 let seq = 0;
 let nextCar = 3;
 let nextBike = 12;
+let nextCop = 25;
+let nextPasser = 2;
+/** Send the next police car now (for the browser tests). */
+export const sendCop = () => void (nextCop = 0);
 
 export interface LifeEvents {
   honk: () => void;
   bell: () => void;
   flap: () => void;
+  /** The police car's two notes, once, as it passes. */
+  siren?: () => void;
+}
+
+const SKINS = ["#f1d2bd", "#e8c0a4", "#d2a58a", "#c99a7c", "#b07a58", "#8d5a3b", "#6b4431", "#4e3020"];
+const TOPS = ["#3c5a86", "#5a2a3a", "#2f4a3a", "#26262b", "#c9c2b3", "#7a2a6a", "#d0a020", "#4a4a32", "#6e1f18"];
+const HAIRS: Hair[] = ["short", "long", "curly", "bun", "afro", "cap", "hood", "ponytail", "bald", "braids"];
+const pick = <X,>(xs: X[]) => xs[Math.floor(Math.random() * xs.length)];
+/** Someone walking down the avenue on their way somewhere else. */
+function passer(w: number): Actor {
+  const right = Math.random() < 0.5;
+  const y = (4.2 + Math.random() * 1.1) * T;
+  const look: Look = { skin: pick(SKINS), hair: pick(["#151010", "#3a2416", "#d8b35a", "#8a8a86", "#9a5a2a"]), top: pick(TOPS), pants: pick(["#1c1f26", "#2a2a30", "#2c3e5a", "#3a3a40"]), style: pick(HAIRS), accent: pick(["#111216", "#d0a020", "#9e2b22"]) };
+  if (Math.random() < 0.4) look.topStyle = pick(["puffer", "jacket", "hoodie", "track"]);
+  return {
+    id: `passer-${seq++}`,
+    kind: "person",
+    place: "avenue",
+    x: right ? -10 : w + 10,
+    y,
+    dir: right ? "right" : "left",
+    look,
+    pose: "stand",
+    solid: false,
+    oneway: true,
+    path: [[right ? w + 12 : -12, y]],
+    pi: 0,
+    speed: 15 + Math.random() * 10,
+    item: Math.random() < 0.5 ? pick<Item>(["phone", "headphones", "bottle", "cup"]) : undefined,
+    t: Math.random() * 10,
+  };
 }
 
 /** Advance everyone in the player's place by `dt` seconds. */
@@ -245,18 +308,38 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
       });
       nextBike = 16 + Math.random() * 16;
     }
+    // now and then a police car, slow, lights going, no hurry
+    nextCop -= dt;
+    if (nextCop <= 0) {
+      const lane = LANES[Math.random() < 0.5 ? 0 : 1];
+      actors.push({ id: `cop-${seq++}`, kind: "car", cop: true, place, x: lane.dir > 0 ? -CAR_W : w + CAR_W, y: lane.y, dir: lane.dir > 0 ? "right" : "left", vx: lane.dir * (38 + Math.random() * 10), color: "#1d2433", t: 0 });
+      nextCop = 50 + Math.random() * 60;
+    }
+  }
+  // the avenue's never empty: people walking through
+  if (place === "avenue") {
+    nextPasser -= dt;
+    if (nextPasser <= 0) {
+      if (actors.filter((a) => a.oneway && a.place === "avenue").length < 4) actors.push(passer(w));
+      nextPasser = 5 + Math.random() * 8;
+    }
   }
 
   for (let i = actors.length - 1; i >= 0; i--) {
     const a = actors[i];
     if (a.place !== place || a.fighter) continue;
     a.t += dt;
+    if (a.react) a.react = Math.max(0, a.react - dt);
 
     if (a.kind === "car") {
       // stop for someone standing in the lane ahead, and let them know
       const dirX = Math.sign(a.vx ?? 0);
       const ahead = (px - a.x) * dirX;
       const inLane = Math.abs(py - (a.y - 4)) < 12;
+      if (a.cop && !a.rung && Math.abs(a.x - px) < 120) {
+        a.rung = true;
+        ev.siren?.();
+      }
       if (inLane && ahead > 0 && ahead < CAR_W / 2 + 34) {
         a.stopped = (a.stopped ?? 0) + dt;
         if (a.stopped > 0.7 && (a.honkAt ?? 0) <= a.t) {
@@ -304,6 +387,33 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
       continue;
     }
 
+    if (a.kind === "cat") {
+      // sits a while, then pads off to somewhere else; runs if you rush it
+      const near = Math.hypot(a.x - px, a.y - py);
+      if (!a.goal && a.perches && (Math.random() < dt / 30 || (near < 14 && Math.random() < dt * 0.6))) {
+        const others = a.perches.filter(([x, y]) => Math.hypot(x - a.x, y - a.y) > 8);
+        a.goal = others[Math.floor(Math.random() * others.length)];
+        a.bolt = near < 30;
+      }
+      if (a.goal) {
+        const dx = a.goal[0] - a.x;
+        const dy = a.goal[1] - a.y;
+        const d = Math.hypot(dx, dy);
+        const step = Math.min(d, (a.bolt ? 70 : 18) * dt);
+        if (d < 1) {
+          a.goal = undefined;
+          a.bolt = false;
+          a.walking = false;
+        } else {
+          a.x += (dx / d) * step;
+          a.y += (dy / d) * step;
+          a.walking = true;
+          if (Math.abs(dx) > 0.5) a.dir = dx > 0 ? "right" : "left";
+        }
+      }
+      continue;
+    }
+
     if (a.kind === "dog") {
       const lead = actors.find((b) => b.id === a.follow);
       if (lead) {
@@ -330,6 +440,10 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
       const dist = Math.hypot(dx, dy);
       // step aside for nobody, but pause if the player is right in the way
       const blocked = Math.abs(px - (a.x + Math.sign(dx) * 10)) < 7 && Math.abs(py - a.y) < 6;
+      if (dist < 1 && a.oneway) {
+        actors.splice(i, 1);
+        continue;
+      }
       if (dist < 1) {
         a.pi = ((a.pi ?? 0) + 1) % a.path.length;
         a.wait = 1.5 + Math.random() * 2.5;
@@ -361,7 +475,7 @@ export function lifeTarget(actors: Actor[], place: Place, px: number, py: number
   let best: Actor | null = null;
   let bestD = 18;
   for (const a of actors) {
-    if (a.place !== place || !a.talk || a.hidden || a.fighter) continue;
+    if (a.place !== place || !a.talk || a.hidden || a.fighter || (a.kind === "cat" && a.goal)) continue;
     const d = Math.min(Math.hypot(a.x - fx, a.y - 3 - fy), Math.hypot(a.x - px, a.y - py) + 4);
     if (d < bestD) {
       bestD = d;
