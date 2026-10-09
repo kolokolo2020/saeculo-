@@ -9,35 +9,28 @@ night, with four things on it.
 - **Game**: a small top-down neighbourhood where you find sounds and make a
   beat with them.
 
-A first visit opens with a short intro: a title card, then the room (rain,
-the laptop, the cat), and the camera goes into the laptop screen, which
-becomes the desktop. It's skippable (Skip or Esc), plays once per browser,
+A first visit opens with a short intro: an old machine booting up. A BIOS
+check of the studio waits for a key (that click is what lets sound start),
+then a 2007-style loading bar, four streaks of light meeting in a spinning
+record with a startup chord in the key of the beat about to play, and a
+blue welcome screen while the beat comes up out of the machine. It's
+skippable (Skip or Esc; any key hurries it along), plays once per browser,
 and the clock menu in the taskbar replays it. Share links (`/#track=<id>`)
-skip it.
+skip it. Code: `src/components/intro/`.
 
 ## Beats
 
-The folder lists every track with its cover, key, tempo and length; the
-active one is highlighted. The player has play/pause, previous/next,
-repeat-one, shuffle, elapsed/total time, volume and mute, and a seek bar
-drawn as the track's own waveform (hover for the time, click or drag to
-seek, arrow keys step five seconds; tracks without analysis get a plain
-slider). Music lives in one `<audio>`
-element for the whole visit, so it keeps playing while you close windows,
-open others or minimise the player; the taskbar keeps a compact player
-(cover, title, progress, play/pause, next) visible at all times.
-
-The visualizer analyses the playing audio (Web Audio `AnalyserNode`). The
-cover sits dimmed underneath and the spectrum reveals it at full brightness,
-column by column, log-spaced so the kick and the hats both register; the low
-end breathes the image and lifts a glow in the cover's own colour, which is
-pulled from the artwork in the browser. The visuals button cycles
-**reveal** (that), **scan** (the cover cut into scanlines that drift and
-brighten with their band) and **still** (the plain cover, also in the
-clock menu); it starts still for
-visitors with reduced motion. On iPhones, where routing audio through Web
-Audio would stop it on lock, the visualizer follows the measured tempo
-instead.
+One album, one cover: "saeculo" lit up on a spectrum analyser, drawn by
+`scripts/make-cover.mjs` (from `src/components/beats/wordmark.ts`) into
+`public/covers/saeculo.svg` and `.jpg`. The window is a 2007 media player
+in night-blue glass: the cover, what's playing, a visualizer screen, the
+waveform seek bar, the transport (shuffle, repeat, previous, a big round
+play button, next, volume) and the tracklist with key, bpm and length.
+The visualizer is never on the cover: it's the wordmark on its own screen,
+with the real spectrum moving through and around the letters (**led**), or
+a mirrored trace of the waveform over the dimmed wordmark (**wave**), or
+**still** (also in the clock menu; the default with reduced motion). On
+iPhones it follows the measured tempo instead of the audio.
 
 **sample this** (in the status bar) takes the two bars playing right now
 into the game's studio: cut into four two-beat pieces at the track's own
@@ -87,42 +80,50 @@ copyable) for anyone without an email app set up.
 
 ## Game
 
-Open **Game** and the laptop lid comes down over the site: you're standing
-at the desk in the bedroom. Using the laptop again (or **Back to the site**,
-or Esc, at any time) lifts the lid back onto the site.
+Open **Game** and the laptop lid comes down over the site. The first time,
+you're at the mirror: a name, skin, hair style and colour, build. Then the
+neighbourhood:
 
-- **Bedroom**: the laptop, a window, a shelf for tapes, a bed, records.
-- **Street**: rain, a flickering lamp, a bench, a payphone that rings, a
-  cat, and something at the far end that isn't always there. Three
-  friends hang round a boombox outside the corner store, drinking and
-  smoking, nodding to what's playing (give them your tape and they play
-  your beat, louder and clearer as you walk up). A dog walker does laps
-  with their dog. Cars pass with their headlights on and stop and honk if
-  you stand in the road; cyclists ring their bells.
-- **Corner store**: the clerk.
-- **Studio** (the basement door with the red light): the sampler, quiet
-  music on the monitors, and three on the couch (a styrofoam cup of
-  something purple, a joint going round, headphones on), all bopping.
-  Ask the one with headphones and they'll play your beat.
-- **The park** (walk off the left end of the street): kids shooting
-  hoops (take a shot), pigeons that scatter, an old man on a bench,
-  swings, a fountain.
-- **The roof** (up the fire escape): the skyline, wind chimes on the
-  antenna, a water tank, a pigeon coop, someone sitting on the ledge.
+- **Your street**: your room, the corner store (food for later), the
+  studio in the basement, the park, the roof, the payphone, the crew
+  round the boombox.
+- **The avenue** (off the end of your street): the thrift shop (clothes,
+  a mirror), the alley, the record shop, a laundromat, the club (a queue
+  and a bouncer who wants 30 respect or 6 style), and the subway stairs.
+- **The alley**: a fire in a barrel, street dice with Jay, a wall for
+  your name. **The record shop**: dig the crates, a listening station,
+  an owner who buys tapes. **The club**: the floor, the bar, the decks.
+  **The subway**: trains in and out. **The underpass**: the cypher, Dre
+  (buys beats), and Tank.
 
-The loop: find a sound → take it to the studio → make a beat → save it
-→ it's a tape on your shelf, and something to play for people. They
-remember what you played them (the crew, the couch, the old man in the
-park, who asks to hear it and says what he makes of its tempo, and the
-girl on the roof, where the city's windows come on with your tape). The
-clerk's radio finds one of the real tracks between stations. A few
-things happen once, quietly: the payphone rings again and it's your
-beat down the line; a tape you didn't make turns up on your shelf. Six
-sounds are hidden around the neighbourhood (the window, the payphone,
-the store, the bench, the court, the roof); each turns up in the studio
-under **Found**. People and animals are drawn from a few pixel templates
-(`game/people.ts`), live in `game/life.ts` and are drawn in
-`game/actors.ts`.
+Things to do: make beats and **sell** them (Dre, the record shop; each tape
+sells once, priced by what's in it), **the cypher** and **a set at the club**
+(rhythm games: the kick, snare and keys drop out and you play them, D F J K),
+**dice**, **crate digging**, **hoops**, **tagging** the wall, buying clothes.
+Twelve sounds hide around the map for the studio's **Found** tab.
+
+**Trouble**: now and then, in the rougher places, a group of drunks walks up
+to you. Fight, pay them off, play them your beat, or walk away. Fights are
+real-time: E/Space swings (watch for the “!”, that's a swing coming),
+Shift dodges, Q eats something. Win and they leave cash behind; wins
+unlock weapons (bat, bike chain, brass knuckles, crowbar) and the leather
+jacket; Tank at the underpass gives up a mic stand. Go down and you wake
+up at home with a quarter of your cash gone. A door is always a way out.
+
+**The menu** (M, or the button up top): you, your wardrobe (25 pieces,
+most bought or earned), weapons and food, goals (16, each pays out),
+settings (sound and music levels, fight difficulty, shake, hints, start
+over). Cash, respect, health and everything else save in the browser.
+
+Controls: WASD or arrows, E / Space to use and talk, M for the menu, Esc
+back to the site. On touch screens, a pad, A (and B and eat in a fight).
+Reduced motion (or still visuals) turns off the rain, flicker and shake.
+
+Code: `src/components/game/`: `Game.tsx` (loop, input, dialogue, fights),
+`world.ts` and `places/` (the maps), `life.ts` (people), `people.ts`
+(sprites), `character.ts` (looks, clothes), `combat.ts`, `weapons.ts`,
+`goals.ts`, `scripts.ts` (what the newer places' people say and do),
+`Menu.tsx`, `minigames/`, `render.ts`, `sfx.ts`, `save.ts`, `studio/`.
 
 ### The studio
 

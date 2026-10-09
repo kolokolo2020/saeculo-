@@ -74,7 +74,7 @@ try {
     const { ctx, page } = await open({ seen: false });
     const intro = page.getByRole("dialog", { name: "Intro" });
     check("first visit: intro shows", await intro.isVisible());
-    await page.waitForTimeout(2200);
+    await page.waitForTimeout(3200);
     check("intro: the BIOS checks the crate", (await intro.textContent()).includes("3 beats found"));
     await page.keyboard.press("a");
     await page.waitForTimeout(700);
@@ -290,6 +290,14 @@ try {
     check("game opens in the bedroom", (await page.getByTestId("game").getAttribute("data-place")) === "bedroom");
     const held = await audio(page);
     check("game: site music paused, position kept", held.paused && held.t > 0);
+    check("game: first visit opens the mirror", await page.getByRole("dialog", { name: "Who are you?" }).isVisible());
+    await page.getByTestId("menu-name").fill("Tester");
+    await page.getByRole("button", { name: "mullet" }).click();
+    await page.getByRole("button", { name: "broad" }).click();
+    await page.getByTestId("menu-close").click();
+    await page.waitForTimeout(300);
+    const prof = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-game")).profile);
+    check("game: your name and look are saved", prof.name === "Tester" && prof.hair === "mullet" && prof.body === "broad");
     check("game: controls card on first visit", await page.getByTestId("game-help").isVisible());
     await page.evaluate(() => document.querySelector("audio").play());
     await page.waitForTimeout(300);
@@ -472,8 +480,11 @@ try {
     await page.waitForTimeout(250);
     await page.keyboard.press("e");
     await page.waitForTimeout(300);
+    await page.getByTestId("hoops-shoot").click();
+    await page.waitForTimeout(200);
     check("park: shooting hoops gives the basketball", (await saved()).found.includes("basketball"));
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
     await page.evaluate(() => window.__game.teleport("street", 10.5, 3.6, "up"));
     await page.keyboard.down("ArrowUp");
     await page.waitForTimeout(500);
@@ -559,13 +570,61 @@ try {
     check("bedroom: it's yours, slower, from further away", (await readAll()).includes("No label") && (await saved()).seen.includes("unlabelled") && !(await game(page)).strangeTape);
     await closeDialog();
 
+    // the bigger map, the menu, shops, a fight
+    await page.evaluate(() => window.__game.teleport("street", 39, 5, "right"));
+    await page.keyboard.down("ArrowRight");
+    await page.waitForTimeout(500);
+    await page.keyboard.up("ArrowRight");
+    await page.waitForTimeout(700);
+    check("street → the avenue", (await page.getByTestId("game").getAttribute("data-place")) === "avenue");
+    await page.keyboard.press("m");
+    await page.waitForTimeout(200);
+    check("menu: opens with M", await page.getByTestId("game-menu").isVisible());
+    await page.getByRole("tab", { name: "goals" }).click();
+    check("menu: goals listed, some reached", (await page.locator("[data-testid=menu-goals] [data-done=true]").count()) >= 2);
+    await page.getByRole("tab", { name: "settings" }).click();
+    await page.getByRole("button", { name: "chill" }).click();
+    check("menu: settings saved", (await saved()).settings.difficulty === "chill");
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => window.__game.give({ cash: 200 }));
+    await page.evaluate(() => window.__game.teleport("thrift", 3.5, 4.2, "up"));
+    await page.waitForTimeout(250);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: /buy the puffer/ }).click();
+    check("thrift: buy clothes into the wardrobe", (await saved()).owned.includes("puffer") && (await saved()).cash === 110);
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => window.__game.teleport("alley", 12, 6, "right"));
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.__game.trouble());
+    for (let i = 0; i < 25 && !(await page.getByRole("button", { name: "Fight", exact: true }).count()); i++) {
+      await page.waitForTimeout(400);
+      if (await page.getByTestId("game-dialog").count()) await page.keyboard.press("e");
+    }
+    check("alley: trouble walks up to you", (await page.getByRole("button", { name: "Fight", exact: true }).count()) === 1);
+    await page.getByRole("button", { name: "Fight", exact: true }).click();
+    await page.waitForTimeout(300);
+    check("fight: it starts, with health bars", (await page.evaluate(() => window.__game.fight()))?.foes.length >= 2);
+    await page.evaluate(() => window.__game.weaken());
+    for (let i = 0; i < 40 && (await page.evaluate(() => window.__game.fight()?.outcome)) === ""; i++) {
+      const f = await page.evaluate(() => window.__game.fight());
+      const foe = f.foes.find((x) => x.state !== "down" && x.state !== "flee");
+      if (foe) await page.evaluate(([x, y]) => window.__game.teleport("alley", (x - 9) / 16, y / 16, "right"), [foe.x, foe.y]);
+      await page.keyboard.press("e");
+      await page.waitForTimeout(380);
+    }
+    await page.waitForTimeout(800);
+    const won = await saved();
+    check("fight: win it, get paid, unlock the bat", won.stats.wins === 1 && won.weapons.includes("bat") && won.cash > 110, JSON.stringify(won.stats));
+    await closeDialog();
+
     await page.getByTestId("game-exit").click();
     await page.waitForTimeout(1400);
     check("game: exit returns to the site", (await page.getByTestId("game").count()) === 0);
     check("game: music picks up where it was", !(await audio(page)).paused);
     await page.getByTestId("icon-game").click();
     await page.waitForTimeout(1600);
-    check("game: remembers found sounds", (await page.getByTestId("game").textContent()).includes("sounds 6/6"));
+    check("game: remembers found sounds", (await page.getByTestId("game").textContent()).includes("sounds 6/12"));
     await page.getByTestId("game-to-studio").click();
     await page.waitForTimeout(500);
     check("game: straight to the studio", (await page.getByTestId("studio").isVisible()) && (await page.getByTestId("game").getAttribute("data-place")) === "studio");
@@ -610,6 +669,8 @@ try {
     await page.getByRole("button", { name: "Close Beats" }).tap();
     await page.getByTestId("icon-game").tap();
     await page.waitForTimeout(1800);
+    await page.getByTestId("menu-close").tap();
+    await page.waitForTimeout(300);
     check("phone: touch pad in the game", await page.getByRole("button", { name: "Walk right" }).isVisible());
     await page.getByRole("button", { name: "Got it" }).tap();
     const x0 = (await game(page)).x;

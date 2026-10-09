@@ -1,3 +1,7 @@
+import { hash, lampPole, paintGround, r, T, TILE, type Dir, type G, type Rect, type Scene } from "./places/kit";
+import { AVENUE } from "./places/avenue";
+import { CLUB, RECORDS, THRIFT } from "./places/interiors";
+import { ALLEY, SUBWAY, UNDERPASS } from "./places/underground";
 import type { Place } from "./sfx";
 
 // Four small places, 16-px tiles. Each has a tile map (walls vs floor), the
@@ -5,54 +9,7 @@ import type { Place } from "./sfx";
 // of each place is painted once into an offscreen canvas (paintPlace); the
 // things that move are drawn every frame in render.ts.
 
-export const TILE = 16;
-export type Dir = "up" | "down" | "left" | "right";
-
-export interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-/** A rect in tile units, converted to pixels. */
-const T = (x: number, y: number, w = 1, h = 1): Rect => ({ x: x * TILE, y: y * TILE, w: w * TILE, h: h * TILE });
-
-export interface Thing {
-  id: string;
-  /** Blocks walking, if set. */
-  body?: Rect;
-  /** Standing in (or facing into) this lets you use it. */
-  zone?: Rect;
-}
-
-export interface Door {
-  zone: Rect;
-  /** Shown when you're next to it. */
-  label: string;
-  to: Place;
-  spawn: { x: number; y: number; dir: Dir };
-}
-
-export interface Light {
-  x: number;
-  y: number;
-  r: number;
-  color: string;
-  /** "lamp" flickers now and then; "dead" is mostly off. */
-  kind?: "lamp" | "dead" | "screen";
-}
-
-export interface Scene {
-  id: Place;
-  name: string;
-  tiles: string[];
-  solid: string;
-  surface: (ch: string) => "wood" | "stone" | "tile" | "carpet";
-  things: Thing[];
-  doors: Door[];
-  lights: Light[];
-  darkness: number;
-}
+export { TILE, T, type Dir, type Rect, type Thing, type Door, type Light, type Scene } from "./places/kit";
 
 export const SCENES: Record<Place, Scene> = {
   bedroom: {
@@ -108,6 +65,7 @@ export const SCENES: Record<Place, Scene> = {
     ],
     solid: "Bbf",
     surface: () => "stone",
+    outdoors: true,
     things: [
       { id: "bench", body: { x: 8 * TILE, y: 3 * TILE, w: 2 * TILE, h: 10 }, zone: T(8, 3.6, 2, 1) },
       { id: "lamp1", body: { x: 12 * TILE + 6, y: 3 * TILE + 8, w: 4, h: 4 } },
@@ -124,6 +82,7 @@ export const SCENES: Record<Place, Scene> = {
       { zone: T(34, 2), to: "studio", label: "↑ studio", spawn: { x: 8 * TILE, y: 8.4 * TILE, dir: "up" } },
       { zone: T(10, 2), to: "rooftop", label: "↑ fire escape to the roof", spawn: { x: 1.6 * TILE, y: 5.8 * TILE, dir: "right" } },
       { zone: { x: 0, y: 3 * TILE, w: 6, h: 7 * TILE }, to: "park", label: "← the park", spawn: { x: 28.2 * TILE, y: 6 * TILE, dir: "left" } },
+      { zone: { x: 39 * TILE + 10, y: 3 * TILE, w: 6, h: 7 * TILE }, to: "avenue", label: "→ the avenue", spawn: { x: 1.4 * TILE, y: 4.4 * TILE, dir: "right" } },
     ],
     lights: [
       { x: 12.5 * TILE, y: 1.2 * TILE, r: 74, color: "rgba(255,196,120,0.55)", kind: "lamp" },
@@ -216,6 +175,7 @@ export const SCENES: Record<Place, Scene> = {
     ],
     solid: "Tf",
     surface: (ch) => (ch === "a" || ch === "p" ? "stone" : "carpet"),
+    outdoors: true,
     things: [
       { id: "park-bench", body: { x: 5 * TILE, y: 2 * TILE + 4, w: 2 * TILE, h: 12 } },
       { id: "swings", body: { x: 9 * TILE, y: 2 * TILE, w: 3 * TILE, h: 10 }, zone: T(9, 2.7, 3, 1) },
@@ -249,6 +209,7 @@ export const SCENES: Record<Place, Scene> = {
     ],
     solid: "SP",
     surface: () => "stone",
+    outdoors: true,
     things: [
       { id: "chimney", body: T(4, 4, 2, 1), zone: T(4, 5, 2, 1) },
       { id: "chimes", body: { x: 8 * TILE + 6, y: 4 * TILE + 8, w: 4, h: 6 }, zone: T(7.5, 4.4, 2, 1.4) },
@@ -263,6 +224,14 @@ export const SCENES: Record<Place, Scene> = {
     ],
     darkness: 0.58,
   },
+
+  avenue: AVENUE,
+  alley: ALLEY,
+  records: RECORDS,
+  thrift: THRIFT,
+  club: CLUB,
+  subway: SUBWAY,
+  underpass: UNDERPASS,
 };
 
 export const START = { place: "bedroom" as Place, x: 4 * TILE, y: 4.7 * TILE, dir: "up" as Dir };
@@ -292,17 +261,6 @@ export function blocked(s: Scene, box: Rect): boolean {
 }
 
 // ------------------------------------------------------------ painting
-
-type G = CanvasRenderingContext2D;
-const r = (g: G, x: number, y: number, w: number, h: number, c: string) => {
-  g.fillStyle = c;
-  g.fillRect(x, y, w, h);
-};
-/** Deterministic noise so the paint is the same every visit. */
-const hash = (x: number, y: number) => {
-  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return n - Math.floor(n);
-};
 
 function paintBedroom(g: G, s: Scene) {
   s.tiles.forEach((row, ty) =>
@@ -391,42 +349,7 @@ function paintBedroom(g: G, s: Scene) {
 }
 
 function paintStreet(g: G, s: Scene) {
-  s.tiles.forEach((row, ty) =>
-    [...row].forEach((ch, tx) => {
-      const x = tx * TILE;
-      const y = ty * TILE;
-      const n = hash(tx, ty);
-      switch (ch) {
-        case "B":
-        case "b":
-        case "D":
-          break; // facades are painted per building below
-        case "s":
-          r(g, x, y, TILE, TILE, "#34353c");
-          r(g, x, y, 1, TILE, "#2b2c32");
-          r(g, x, y + 15, TILE, 1, "#2b2c32");
-          if (n > 0.8) r(g, x + 5, y + 7, 3, 1, "#2a2b30");
-          break;
-        case "c":
-          r(g, x, y, TILE, TILE, "#1d1e24");
-          r(g, x, y + (ty === 5 ? 0 : 12), TILE, 4, "#4a4b52");
-          break;
-        case "a":
-          r(g, x, y, TILE, TILE, "#18191e");
-          if (n > 0.6) r(g, x + Math.floor(n * 12), y + Math.floor(n * 9), 2, 1, "#202128");
-          break;
-        case "l":
-          r(g, x, y, TILE, TILE, "#18191e");
-          if (tx % 3 !== 2) r(g, x + 2, y + 7, 12, 2, "#8a7a4a");
-          break;
-        case "f":
-          r(g, x, y, TILE, TILE, "#101014");
-          r(g, x, y, TILE, 3, "#2a2a30");
-          r(g, x + 7, y + 3, 2, 13, "#1c1c22");
-          break;
-      }
-    }),
-  );
+  paintGround(g, s);
   // puddles
   [
     [7, 6.4],
@@ -671,12 +594,6 @@ function paintRooftop(g: G, s: Scene) {
   for (let k = 0; k < 14; k++) r(g, 2 * TILE + k * 14, 3 * TILE + 6 + (k % 2), 2, 2, k % 3 ? "#f2c47a" : "#f08a5a");
 }
 
-function lampPole(g: G, x: number, baseY: number) {
-  r(g, x + 6, baseY - 44, 4, 56, "#2a2b30");
-  r(g, x + 2, baseY - 48, 16, 5, "#3a3b40");
-  r(g, x + 5, baseY - 43, 10, 2, "#77705e");
-}
-
 function paintStore(g: G, s: Scene) {
   s.tiles.forEach((row, ty) =>
     [...row].forEach((ch, tx) => {
@@ -770,7 +687,8 @@ export function paintPlace(s: Scene): HTMLCanvasElement {
   c.height = h;
   const g = c.getContext("2d")!;
   g.imageSmoothingEnabled = false;
-  ({ bedroom: paintBedroom, street: paintStreet, store: paintStore, studio: paintStudio, park: paintPark, rooftop: paintRooftop })[s.id](g, s);
+  const own: Partial<Record<Place, (g: G, s: Scene) => void>> = { bedroom: paintBedroom, street: paintStreet, store: paintStore, studio: paintStudio, park: paintPark, rooftop: paintRooftop };
+  (own[s.id] ?? s.paint)?.(g, s);
   return c;
 }
 

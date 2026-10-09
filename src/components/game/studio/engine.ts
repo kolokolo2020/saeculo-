@@ -186,6 +186,8 @@ export class Engine {
   pattern = 0;
   playing = false;
   loading = false;
+  /** Audio-clock time of the first step since start() (for things that play along). */
+  startTime = 0;
   private ctx: AudioContext | null = null;
   private graph: Graph | null = null;
   private timer = 0;
@@ -256,6 +258,7 @@ export class Engine {
     this.slotIdx = 0;
     this.queue = [];
     this.nextTime = ctx.currentTime + 0.08;
+    this.startTime = this.nextTime;
     this.tick();
     this.timer = window.setInterval(() => this.tick(), 25);
     this.emit();
@@ -310,6 +313,11 @@ export class Engine {
         this.slotIdx++;
       }
     }
+  }
+
+  /** The audio clock right now. */
+  now(): number {
+    return this.ctx?.currentTime ?? 0;
   }
 
   /** What's sounding now, for the playheads. */

@@ -544,6 +544,73 @@ const chimes: Play = (ctx, out, t, { vel, midi, dur }) => {
   });
 };
 
+const spray: Play = (ctx, out, t, { vel }) => {
+  // the ball rattling, then the hiss
+  for (let i = 0; i < 2; i++) {
+    const at = t + i * 0.07;
+    noiseSrc(ctx, at, at + 0.03, filter(ctx, "bandpass", 3200, 4, perc(ctx, out, at, 0.5 * vel, 0.001, 0.025)));
+    osc(ctx, "triangle", 2400 + i * 300, at, at + 0.03, perc(ctx, out, at, 0.12 * vel, 0.001, 0.02));
+  }
+  noiseSrc(ctx, t + 0.16, t + 0.5, filter(ctx, "highpass", 6500, 0.7, perc(ctx, out, t + 0.16, 0.35 * vel, 0.03, 0.3)));
+};
+
+const dice: Play = (ctx, out, t, { vel }) => {
+  // two dice: a shake in the hand, then the tumble on cardboard
+  [0, 0.05, 0.11, 0.2, 0.26, 0.31].forEach((d, i) => {
+    const at = t + d;
+    const f = 1800 + ((i * 523) % 1400);
+    noiseSrc(ctx, at, at + 0.03, filter(ctx, "bandpass", f, 5, perc(ctx, out, at, (0.45 - i * 0.04) * vel, 0.001, 0.02 + (i % 2) * 0.01)));
+    osc(ctx, "sine", f * 0.5, at, at + 0.04, perc(ctx, out, at, 0.1 * vel, 0.001, 0.03));
+  });
+};
+
+const scratch: Play = (ctx, out, t, { vel, midi }) => {
+  // a record pushed forward and pulled back
+  const k = tune(midi);
+  const bp = filter(ctx, "bandpass", 900 * k, 1.4, perc(ctx, out, t, 0.6 * vel, 0.01, 0.24));
+  bp.frequency.setValueAtTime(500 * k, t);
+  bp.frequency.exponentialRampToValueAtTime(2600 * k, t + 0.09);
+  bp.frequency.exponentialRampToValueAtTime(400 * k, t + 0.22);
+  noiseSrc(ctx, t, t + 0.26, bp);
+  const o = osc(ctx, "sawtooth", 180 * k, t, t + 0.25, perc(ctx, out, t, 0.12 * vel, 0.01, 0.22));
+  o.frequency.exponentialRampToValueAtTime(520 * k, t + 0.09);
+  o.frequency.exponentialRampToValueAtTime(140 * k, t + 0.22);
+};
+
+const train: Play = (ctx, out, t, { vel, midi, dur }) => {
+  // brakes: two scraping tones that won't agree, over a low rumble
+  const len = Math.max(0.5, dur + 0.3);
+  const post = ctx.createGain();
+  post.gain.value = 0.5;
+  post.connect(out);
+  const { g, stopAt } = held(ctx, post, t, 0.22 * vel, 0.04, 0.2, 0.7, len, 0.25);
+  for (const [iv, det] of [
+    [12, -9],
+    [13, 11],
+    [24, 4],
+  ])
+    osc(ctx, "sawtooth", hz(midi + iv), t, stopAt, filter(ctx, "bandpass", hz(midi + iv) * 2, 3, g), det);
+  noiseSrc(ctx, t, stopAt, filter(ctx, "lowpass", 180, 0.7, perc(ctx, post, t, 0.5 * vel, 0.05, len)));
+};
+
+const crowd: Play = (ctx, out, t, { vel }) => {
+  // a room full of people going up at once
+  for (let i = 0; i < 6; i++) {
+    const at = t + i * 0.02;
+    noiseSrc(ctx, at, at + 0.9, filter(ctx, "bandpass", 700 + i * 260, 2.5, perc(ctx, out, at, 0.16 * vel, 0.06, 0.75)));
+  }
+  [0.08, 0.2, 0.33].forEach((d) => noiseSrc(ctx, t + d, t + d + 0.03, filter(ctx, "bandpass", 1800, 1, perc(ctx, out, t + d, 0.25 * vel, 0.001, 0.02))));
+};
+
+const mic: Play = (ctx, out, t, { vel, midi }) => {
+  // a finger on the mic, and the PA answering with a little feedback
+  const k = tune(midi);
+  const o = osc(ctx, "sine", 120 * k, t, t + 0.2, perc(ctx, out, t, 0.7 * vel, 0.002, 0.14));
+  o.frequency.exponentialRampToValueAtTime(55 * k, t + 0.1);
+  noiseSrc(ctx, t, t + 0.04, filter(ctx, "lowpass", 900, 0.7, perc(ctx, out, t, 0.4 * vel, 0.001, 0.03)));
+  osc(ctx, "sine", 1960 * k, t + 0.05, t + 0.7, perc(ctx, out, t + 0.05, 0.05 * vel, 0.2, 0.4));
+};
+
 // ------------------------------------------------------------ files: chops and your samples
 
 const buffers = new Map<string, AudioBuffer>();
@@ -693,6 +760,12 @@ export const VOICES: Voice[] = [
   d("lighter", "lighter", "Found", lighter, "the bench"),
   d("basketball", "basketball", "Found", basketball, "the park"),
   m("chimes", "wind chimes", "Found", chimes, "the rooftop"),
+  d("spray", "spray can", "Found", spray, "the alley wall"),
+  d("dice", "dice", "Found", dice, "the dice game"),
+  d("scratch", "scratch", "Found", scratch, "the record shop"),
+  m("train", "train brakes", "Found", train, "the subway"),
+  d("crowd", "crowd", "Found", crowd, "the club"),
+  d("mic", "mic thump", "Found", mic, "the cypher"),
 
   ...chopVoices,
   ...sampleVoices,

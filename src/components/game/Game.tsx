@@ -4,9 +4,22 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { usePlayerStore } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { DEFAULT_PROFILE, ITEMS, lookOf, randomProfile, type Profile } from "./character";
+import { faceOff, foeLines, freshMe, isUp, makeFoe, moveMe, standDown, startDodge, swing, updateFoes, type FightEvents, type Me } from "./combat";
+import { newlyDone } from "./goals";
+import Menu, { type MenuTab } from "./Menu";
+import Crates, { type DigResult } from "./minigames/Crates";
+import Dice from "./minigames/Dice";
+import Hoops from "./minigames/Hoops";
+import Rhythm from "./minigames/Rhythm";
+import Shop from "./minigames/Shop";
+import Tag from "./minigames/Tag";
+import { overhead, trainAt } from "./places/underground";
 import { camera, draw, VIEW_H, VIEW_W } from "./render";
-import { loadSave, migrateOldTapes, writeSave, type SaveData } from "./save";
-import { duck, setPlace, setRing, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
+import { loadSave, MAX_HP, migrateOldTapes, resetSave, writeSave, type SaveData, type Settings } from "./save";
+import { clubOk, operate, promptFor as promptMore, talk as talkMore, type Api, type Mini } from "./scripts";
+import { duck, setPlace, setRing, setRumble, setSfxVolume, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
+import { CONSUMABLES, consumableById, unlockedByWins, weaponById } from "./weapons";
 import { Engine } from "./studio/engine";
 import { PRESETS } from "./studio/presets";
 import { loadStore } from "./studio/project";
@@ -48,8 +61,24 @@ const KEYMAP: Record<string, Dir> = {
   ArrowRight: "right",
   KeyD: "right",
 };
-const PLACE_NAMES: Record<Place, string> = { bedroom: "Your room", street: "Outside", store: "Corner store", studio: "Studio", park: "The park", rooftop: "The roof" };
-const HINT_AT: Record<string, string> = { rain: "window", phone: "phone", bottle: "counter", lighter: "bench", basketball: "hoop", chimes: "chimes" };
+const PLACE_NAMES: Record<Place, string> = {
+  bedroom: "Your room",
+  street: "Outside",
+  store: "Corner store",
+  studio: "Studio",
+  park: "The park",
+  rooftop: "The roof",
+  avenue: "The avenue",
+  alley: "The alley",
+  records: "Record shop",
+  thrift: "Thrift shop",
+  club: "The club",
+  subway: "Subway",
+  underpass: "Underpass",
+};
+const HINT_AT: Record<string, string> = { rain: "window", phone: "phone", bottle: "counter", lighter: "bench", basketball: "hoop", chimes: "chimes", spray: "wall", dice: "dice", scratch: "crates", train: "edge", crowd: "booth", mic: "speaker" };
+/** Where trouble finds you, and how likely it is when you walk in. */
+const ROUGH: Partial<Record<Place, number>> = { street: 0, park: 0, avenue: 0.1, alley: 0.4, subway: 0.15, underpass: 0.3 };
 const BOOMBOX = { x: 17.6 * TILE, y: 4.4 * TILE };
 
 /** Lines people say, cycled one set per conversation. */
@@ -99,6 +128,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const [prompt, setPrompt] = useState<string | null>(null);
   const [place, setPlaceName] = useState<Place>(START.place);
   const [help, setHelp] = useState(() => !loadSave().seenHelp);
+  // the menu (and, the first time, the mirror), a mini-game, being knocked out
+  const [menu, setMenu] = useState<{ tab: MenuTab; creator: boolean } | null>(null);
+  const [mini, setMini] = useState<Mini | null>(null);
+  const [ko, setKo] = useState<0 | 1 | 2>(0);
+  const [fighting, setFighting] = useState(false);
   const [touch, setTouch] = useState(() => window.matchMedia("(pointer: coarse)").matches);
   const [scale, setScale] = useState(2);
   // phones held upright: text goes in the free space under the picture
@@ -125,6 +159,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const musicPick = useRef<Record<string, Project>>({});
   // the save as of right now (state lags a render behind)
   const saveRef = useRef(save);
+  // you, as drawn
+  const lookRef = useRef(lookOf(save.profile ?? DEFAULT_PROFILE));
+  useLayoutEffect(() => {
+    lookRef.current = lookOf(save.profile ?? DEFAULT_PROFILE);
+  }, [save.profile]);
   const st = useRef({
     place: START.place as Place,
     x: START.x,
@@ -150,25 +189,89 @@ export default function Game({ onExit }: { onExit: () => void }) {
     callPending: false,
     playedLedge: false,
     counterVisits: 0,
+    // trouble: a group walking up to you, a fight in progress
+    pending: null as Actor[] | null,
+    fight: null as null | { foes: Actor[]; me: Me; boss: boolean; over: number; outcome: "" | "won" | "lost" },
+    encounterIn: 95,
+    shake: 0,
+    fx: { beats: 0, diceRoll: 0 } as Record<string, number>,
+    lastBeat: false,
+    visit: {} as Record<string, number>,
   });
   // the payphone playing your beat back down the line
   const call = useRef<{ engine: Engine; until: number } | null>(null);
   // the latest UI state, for the loop and key handlers
-  const ui = useRef({ dialog, studio, help, phase });
+  const ui = useRef({ dialog, studio, help, phase, menu, mini, ko });
   const view = useRef({ scale, below });
   useLayoutEffect(() => {
     view.current = { scale, below };
   }, [scale, below]);
   useLayoutEffect(() => {
-    ui.current = { dialog, studio, help, phase };
-  }, [dialog, studio, help, phase]);
+    ui.current = { dialog, studio, help, phase, menu, mini, ko };
+  }, [dialog, studio, help, phase, menu, mini, ko]);
 
   const updateSave = useCallback((fn: (s: SaveData) => SaveData) => {
-    const next = fn(saveRef.current);
+    let next = fn(saveRef.current);
+    // goals reached by this change pay out once
+    const reached = newlyDone(next, { tapes: shelfRef.current });
+    if (reached.length) {
+      next = {
+        ...next,
+        goals: [...next.goals, ...reached.map((g) => g.id)],
+        cash: next.cash + reached.reduce((n, g) => n + (g.reward.cash ?? 0), 0),
+        rep: next.rep + reached.reduce((n, g) => n + (g.reward.rep ?? 0), 0),
+      };
+      const pay = (g: (typeof reached)[number]) => [g.reward.cash ? `+$${g.reward.cash}` : "", g.reward.rep ? `+${g.reward.rep} respect` : ""].filter(Boolean).join(", ");
+      const msg = reached.map((g) => `Goal: ${g.name}${pay(g) ? ` (${pay(g)})` : ""}`).join(" · ");
+      window.setTimeout(() => {
+        sfx.unlock();
+        setToast(msg);
+        window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 5600);
+      }, 0);
+    }
+    // clothes earned rather than bought
+    const earned = ITEMS.filter((it) => !next.owned.includes(it.id) && ((it.unlock.kind === "goal" && next.goals.includes(it.unlock.goal)) || (it.unlock.kind === "wins" && next.stats.wins >= it.unlock.n)));
+    if (earned.length) {
+      next = { ...next, owned: [...next.owned, ...earned.map((it) => it.id)] };
+      const msg = `Unlocked: ${earned.map((it) => it.name).join(", ")} (wardrobe)`;
+      window.setTimeout(() => {
+        setToast(msg);
+        window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 5000);
+      }, reached.length ? 5200 : 0);
+    }
     saveRef.current = next;
     writeSave(next);
     setSaveState(next);
   }, []);
+
+  // ------------------------------------------------------------ money, respect, health
+
+  const earn = (n: number) => updateSave((v) => ({ ...v, cash: v.cash + n, stats: { ...v.stats, earned: v.stats.earned + Math.max(0, n) } }));
+  const spend = (n: number) => {
+    if (saveRef.current.cash < n) return false;
+    updateSave((v) => ({ ...v, cash: v.cash - n }));
+    return true;
+  };
+  const addRep = (n: number) => updateSave((v) => ({ ...v, rep: Math.max(0, v.rep + n) }));
+  const heal = (n: number) => {
+    const f = st.current.fight;
+    if (f) f.me.hp = Math.min(MAX_HP, f.me.hp + n);
+    updateSave((v) => ({ ...v, hp: Math.min(MAX_HP, (f ? f.me.hp : v.hp + n)) }));
+  };
+  /** Eat or drink the best thing you've got for how hurt you are. */
+  const eatSomething = (id?: string) => {
+    const v = saveRef.current;
+    const hp = st.current.fight?.me.hp ?? v.hp;
+    if (hp >= MAX_HP) return false;
+    const have = CONSUMABLES.filter((c) => (v.items[c.id] ?? 0) > 0);
+    const pick = id ? consumableById(id) : have.sort((a, b) => Math.abs(MAX_HP - hp - a.heal) - Math.abs(MAX_HP - hp - b.heal))[0];
+    if (!pick || !(v.items[pick.id] > 0)) return false;
+    updateSave((x) => ({ ...x, items: { ...x.items, [pick.id]: x.items[pick.id] - 1 } }));
+    heal(pick.heal);
+    sfx.gulp();
+    showToast(`${pick.name}: ${pick.line} (+${pick.heal})`, 2600);
+    return true;
+  };
 
   const say = (lines: string[], choices?: Choice[]) => {
     sfx.talk();
@@ -213,6 +316,13 @@ export default function Game({ onExit }: { onExit: () => void }) {
     setPhase("leaving");
     setDialog(null);
     setStudio(false);
+    setMenu(null);
+    setMini(null);
+    const f = st.current.fight;
+    if (f && !f.outcome) updateSave((v) => ({ ...v, hp: Math.max(1, f.me.hp) }));
+    st.current.fight = null;
+    st.current.pending = null;
+    setRumble(0);
     engine.current?.dispose();
     music.current?.engine.dispose();
     music.current = null;
@@ -234,7 +344,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       const lift = el.animate([{ clipPath: "inset(0 0 0 0)" }, { clipPath: "inset(0 0 100% 0)" }], { duration: 650, easing: "cubic-bezier(.5,0,.2,1)", fill: "forwards" });
       lift.onfinish = onExit;
     };
-  }, [onExit, reduced]);
+  }, [onExit, reduced, updateSave]);
 
   // ------------------------------------------------------------ arrival
 
@@ -242,11 +352,17 @@ export default function Game({ onExit }: { onExit: () => void }) {
     usePlayerStore.getState().hold("game");
     life.current = makeLife();
     startGameAudio();
+    setSfxVolume(saveRef.current.settings.sfx);
     setPlace("bedroom");
     const el = lid.current;
     const arrive = () => {
       setPhase("play");
       root.current?.focus();
+      // the first time: the mirror before anything else
+      if (!saveRef.current.profile) {
+        updateSave((v) => ({ ...v, profile: { ...randomProfile(), name: "" } }));
+        setMenu({ tab: "you", creator: true });
+      }
       const p = usePlayerStore.getState();
       if (p.heldBy === "game" && p.resumeOnRelease) showToast("Music paused. It carries on when you open the laptop again.", 4800);
     };
@@ -275,7 +391,233 @@ export default function Game({ onExit }: { onExit: () => void }) {
       stopGameAudio();
       usePlayerStore.getState().release("game");
     };
-  }, []);
+  }, [updateSave]);
+
+  // ------------------------------------------------------------ trouble
+
+  const fightEv: FightEvents = {
+    hit: (heavy) => sfx.hit(heavy),
+    whoosh: () => sfx.whoosh(),
+    hurt: () => sfx.hurt(),
+    down: () => sfx.down(),
+    shake: (n) => {
+      if (saveRef.current.settings.shake) st.current.shake = Math.max(st.current.shake, n);
+    },
+  };
+
+  /** Take foes out of the world (and put Tank and his friend back). */
+  const dropFoes = (foes?: Actor[]) => {
+    life.current = life.current.filter((a) => !a.fighter || (foes && !foes.includes(a)));
+    standDown(life.current);
+  };
+
+  /** Foes that aren't fighting any more turn and go. */
+  const walkOff = (foes: Actor[]) => {
+    for (const f of foes) if (f.fighter) Object.assign(f.fighter, { state: "flee", timer: 4 });
+    st.current.pending = null;
+  };
+
+  const startFight = (foes: Actor[], boss = false) => {
+    const s = st.current;
+    s.pending = null;
+    for (const f of foes) Object.assign(f.fighter!, { state: "approach", cd: 0.5 + Math.random() * 0.7 });
+    s.fight = { foes, me: freshMe(s.x, s.y, s.dir, saveRef.current.hp), boss, over: 0, outcome: "" };
+    s.sitting = false;
+    keys.current = [];
+    setFighting(true);
+    showToast(window.matchMedia("(pointer: coarse)").matches ? "A: swing · B: dodge · watch for the “!”" : "E / Space: swing · Shift: dodge · Q: eat · watch for the “!”", 3400);
+  };
+
+  /** A group comes up the street at you. */
+  const spawnTrouble = () => {
+    const s = st.current;
+    const v = saveRef.current;
+    const scene = SCENES[s.place];
+    const w = scene.tiles[0].length * TILE;
+    const n = v.stats.wins >= 3 && Math.random() < 0.5 ? 3 : 2;
+    const side = s.x > w / 2 ? -1 : 1;
+    const x0 = Math.max(14, Math.min(w - 14, s.x + side * 120));
+    const foes: Actor[] = [];
+    for (let i = 0; i < n; i++) {
+      let y = s.y + (i - (n - 1) / 2) * 12;
+      if (blocked(scene, { x: x0 - 4, y: y - 3, w: 8, h: 4 })) y = s.y;
+      const kind = i === 0 && v.stats.wins >= 4 && Math.random() < 0.6 ? "rowdy" : "drunk";
+      foes.push(makeFoe(kind, s.place, x0 + side * i * 8, y));
+    }
+    life.current.push(...foes);
+    s.pending = foes;
+  };
+
+  /** They've reached you: what now? */
+  const confront = () => {
+    const s = st.current;
+    const foes = s.pending!;
+    const v = saveRef.current;
+    faceOff(foes, s.x);
+    s.dir = foes[0].x < s.x ? "left" : "right";
+    keys.current = [];
+    const toll = Math.min(15, Math.max(5, Math.floor(v.cash * 0.3)));
+    const mine = latestTape();
+    say(foeLines(), [
+      { label: "Fight", run: () => startFight(foes) },
+      ...(mine
+        ? [
+            {
+              label: `Play them “${mine.name}”`,
+              run: () => {
+                if (Math.random() < 0.5 + Math.min(0.35, v.rep / 150)) {
+                  walkOff(foes);
+                  addRep(2);
+                  say(["You hold your phone up and press play.", "They stop. Listen. One of them starts nodding, then the other.", "“Alright. Alright. Go on then.”"]);
+                } else {
+                  say(["You hold your phone up and press play.", "They listen for about two bars.", "“That's rubbish, that.” Here it comes."]);
+                  startFight(foes);
+                }
+              },
+            },
+          ]
+        : []),
+      ...(v.cash >= toll
+        ? [
+            {
+              label: `Give them $${toll}`,
+              run: () => {
+                spend(toll);
+                addRep(-2);
+                walkOff(foes);
+                say(["They take it and go, laughing.", "Your face is hot all the way down the block."]);
+              },
+            },
+          ]
+        : []),
+      ...(v.rep >= 40
+        ? [
+            {
+              label: "Do you know who I am?",
+              run: () => {
+                walkOff(foes);
+                say(["One of them squints at you.", "“…Oh. Sorry. Didn't see it was you.”"]);
+              },
+            },
+          ]
+        : []),
+      {
+        label: "Walk away",
+        run: () => {
+          if (Math.random() < 0.5) {
+            walkOff(foes);
+            say(["You keep walking. They laugh, but they don't follow."]);
+          } else {
+            say(["You turn to go. One of them grabs your hood.", "No getting out of this one."]);
+            startFight(foes);
+          }
+        },
+      },
+    ]);
+  };
+
+  const bossFight = () => {
+    const s = st.current;
+    const tank = life.current.find((a) => a.id === "tank");
+    const goon = life.current.find((a) => a.id === "goon");
+    if (!tank) return;
+    tank.hidden = true;
+    if (goon) goon.hidden = true;
+    const boss = makeFoe("boss", "underpass", tank.x, tank.y);
+    const foes = [boss, ...(goon ? [makeFoe("goon", "underpass", goon.x, goon.y, goon.look)] : [])];
+    life.current.push(...foes);
+    say(["The cypher stops. Everyone steps back.", "Tank rolls his shoulders. His friend cracks his knuckles."]);
+    startFight(foes, true);
+    s.encounterIn = Math.max(s.encounterIn, 60);
+  };
+
+  const winFight = () => {
+    const s = st.current;
+    const f = s.fight!;
+    f.outcome = "won";
+    setFighting(false);
+    const v = saveRef.current;
+    const cash = f.foes.reduce((n, a) => n + (a.fighter?.purse ?? 0), 0);
+    const rep = f.boss ? 25 : 4 * f.foes.length;
+    const wins = v.stats.wins + 1;
+    const gained = [...unlockedByWins(wins), ...(f.boss ? ["mic"] : [])].filter((w) => !v.weapons.includes(w));
+    updateSave((x) => ({
+      ...x,
+      hp: f.me.hp,
+      cash: x.cash + cash,
+      rep: x.rep + rep,
+      stats: { ...x.stats, wins, earned: x.stats.earned + cash },
+      weapons: [...x.weapons, ...gained],
+      seen: f.boss && !x.seen.includes("tank-beaten") ? [...x.seen, "tank-beaten"] : x.seen,
+    }));
+    sfx.coins();
+    const w = gained.length ? weaponById(gained[gained.length - 1]) : null;
+    const lines = [
+      f.boss ? "Tank goes down, and stays down a while. Nobody in the cypher says a word." : f.foes.length > 2 ? "The last of them hits the pavement." : "Both of them on the ground. Your hands are shaking.",
+      `They leave $${cash} behind getting up. (+${rep} respect)`,
+      ...(w ? [w.found] : []),
+    ];
+    window.setTimeout(() => {
+      say(lines, w ? [
+        { label: `Use the ${w.name}`, run: () => updateSave((x) => ({ ...x, weapon: w.id })) },
+        { label: "Keep what I've got", run: () => setDialog(null) },
+      ] : undefined);
+    }, 500);
+  };
+
+  const knockout = () => {
+    const s = st.current;
+    s.fight!.outcome = "lost";
+    setFighting(false);
+    sfx.down();
+    setKo(1);
+    window.setTimeout(() => setKo(2), 1400);
+  };
+
+  const wake = () => {
+    const s = st.current;
+    const v = saveRef.current;
+    const lost = Math.floor(v.cash * 0.25);
+    updateSave((x) => ({ ...x, hp: 60, cash: x.cash - lost, stats: { ...x.stats, losses: x.stats.losses + 1 } }));
+    dropFoes();
+    s.fight = null;
+    s.pending = null;
+    if (s.place !== "bedroom") arriveRef.current("bedroom", s.place);
+    Object.assign(s, { place: "bedroom", x: 13.6 * TILE, y: 5.4 * TILE, dir: "right", sitting: false, trans: null });
+    setPlace("bedroom", s.windowOpen);
+    setPlaceName("bedroom");
+    setKo(0);
+    say(["You wake up on your bedroom floor. No idea how you got home.", lost ? `Your pockets are $${lost} lighter.` : "Your pockets were empty anyway.", "Your head's pounding. (health 60)"]);
+    root.current?.focus();
+  };
+
+  /** Out through a door mid-fight. */
+  const flee = () => {
+    const s = st.current;
+    const f = s.fight;
+    if (!f) return;
+    updateSave((x) => ({ ...x, hp: f.me.hp, rep: Math.max(0, x.rep - 1), stats: { ...x.stats, fled: x.stats.fled + 1 } }));
+    dropFoes(f.foes);
+    s.fight = null;
+    setFighting(false);
+    showToast("You got away.", 2400);
+  };
+
+  const attack = () => {
+    const s = st.current;
+    const f = s.fight;
+    if (!f || f.outcome || f.me.atkCd > 0) return;
+    const w = weaponById(saveRef.current.weapon);
+    f.me.atk = 0.18;
+    f.me.atkCd = w.cooldown;
+    f.me.dir = s.dir;
+    swing(f.foes, f.me, w, fightEv);
+  };
+
+  const dodge = () => {
+    const f = st.current.fight;
+    if (f && !f.outcome && startDodge(f.me, keys.current)) sfx.dodge();
+  };
 
   /** Walking into a place: what's waiting there this time. */
   const arriveAt = (to: Place, from: Place) => {
@@ -291,6 +633,21 @@ export default function Game({ onExit }: { onExit: () => void }) {
     // she was on the ledge while your tape played; come back up and she isn't
     const ledge = life.current.find((a) => a.id === "ledge");
     if (to === "rooftop" && ledge && s.playedLedge) ledge.hidden = true;
+    // trouble doesn't follow you through doors; a fight is a getaway
+    if (s.fight && !s.fight.outcome) flee();
+    if (s.pending) {
+      dropFoes(s.pending);
+      s.pending = null;
+    }
+    s.visit = {};
+    if (!v.places.includes(to)) updateSave((x) => ({ ...x, places: [...x.places, to] }));
+    // the rough places: sometimes they're waiting
+    const rough = ROUGH[to];
+    if (rough && v.profile?.name && Math.random() < rough && s.encounterIn > 4) s.encounterIn = 2.5 + Math.random() * 3;
+    // the bouncer steps aside for people he'll let in
+    const bouncer = life.current.find((a) => a.id === "bouncer");
+    if (to === "avenue" && bouncer) bouncer.x = (clubOk(v) ? 36.9 : 35.5) * TILE;
+    if (to === "club" && !v.places.includes("club")) window.setTimeout(() => showToast("The bass is in your chest before the door shuts.", 3600), 300);
   };
 
   const arriveRef = useRef(arriveAt);
@@ -473,13 +830,51 @@ export default function Game({ onExit }: { onExit: () => void }) {
       case "hooper-1":
       case "hooper-2":
         say(next, [
-          { label: "Take a shot", run: shoot },
+          { label: "Take a shot", run: () => setMini({ kind: "hoops" }) },
           { label: "Watch", run: () => setDialog(null) },
         ]);
         return;
       default:
-        say(next);
+        if (!talkMore(a, api)) say(next);
     }
+  };
+
+  /** What the newer places' scripts get to do (scripts.ts). */
+  const api: Api = {
+    say,
+    close: () => setDialog(null),
+    toast: showToast,
+    find,
+    save: () => saveRef.current,
+    update: updateSave,
+    earn,
+    spend,
+    addRep,
+    heal,
+    tape: latestTape,
+    open: (m) => {
+      setDialog(null);
+      setMini(m);
+    },
+    menu: (tab) => {
+      setDialog(null);
+      setMenu({ tab, creator: false });
+    },
+    bossFight,
+    happened,
+    markSeen,
+    radio: (ids) => void sfx.radio(ids),
+    someChops: () => {
+      const track = TRACKS[Math.floor(Math.random() * TRACKS.length)];
+      const i = 1 + Math.floor(Math.random() * 6);
+      return [`chop:${track.id}:${i}`, `chop:${track.id}:${i + 1}`, `chop:${track.id}:${i + 2}`];
+    },
+    sfx,
+    life: () => life.current,
+    t: () => st.current.t,
+    get visit() {
+      return st.current.visit;
+    },
   };
 
   const boombox = () => {
@@ -502,13 +897,6 @@ export default function Game({ onExit }: { onExit: () => void }) {
       { label: "Leave it", run: () => setDialog(null) },
     ];
     say(tape ? ["\u201cYou got something on you?\u201d"] : ["\u201cThis speaker's older than me.\u201d", "\u201cBring us a tape sometime. Something you made.\u201d"], choices);
-  };
-
-  const shoot = () => {
-    const made = Math.random() < 0.45;
-    sfx.voice("basketball");
-    if (find("basketball")) say([made ? "Swish. Nobody saw." : "Off the rim. Loud.", "The bounce echoes off the court. You keep it."]);
-    else say([made ? "Swish." : "Off the rim.", made ? "\u201cLucky.\u201d" : "\u201cNext.\u201d"]);
   };
 
   // ------------------------------------------------------------ interactions
@@ -574,7 +962,19 @@ export default function Game({ onExit }: { onExit: () => void }) {
           break;
         }
         case "bed":
-          say(["Not yet. The night isn't over."]);
+          if (saveRef.current.hp < MAX_HP)
+            say(["Your bed. Your whole body wants it."], [
+              {
+                label: "Sleep it off",
+                run: () => {
+                  updateSave((v) => ({ ...v, hp: MAX_HP }));
+                  sfx.gulp();
+                  say(["You lie down in your clothes. When you open your eyes it's still night. It's always still night.", "(health back to full)"]);
+                },
+              },
+              { label: "Not yet", run: () => setDialog(null) },
+            ]);
+          else say(["Not yet. The night isn't over."]);
           break;
         case "crate":
           say(["Records, mostly borrowed. Worn sleeves, no labels."]);
@@ -647,6 +1047,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
             { label: "A beer", run: bottle },
             { label: "Just water", run: bottle },
             { label: "Turn the radio up", run: radio },
+            { label: "Something to eat", run: () => setMini({ kind: "shop", shop: "store" }) },
           ]);
           break;
         }
@@ -664,7 +1065,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
           say(["You sit on the swing for a bit. It creaks every time."]);
           break;
         case "hoop":
-          shoot();
+          setMini({ kind: "hoops" });
           break;
         case "fountain":
           sfx.splash();
@@ -688,7 +1089,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
           if (id.startsWith("npc:")) {
             const a = life.current.find((x) => x.id === id.slice(4));
             if (a) talkTo(a);
-          }
+          } else operate(id, api);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -744,7 +1145,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         return "the pigeon coop";
       default:
         if (id.startsWith("npc:")) return life.current.find((a) => a.id === id.slice(4))?.talk ?? null;
-        return null;
+        return promptMore(id, api) ?? null;
     }
   };
 
@@ -763,9 +1164,20 @@ export default function Game({ onExit }: { onExit: () => void }) {
 
   // ------------------------------------------------------------ input
 
+  // the fight's actions, for handlers made once
+  const actions = useRef({ attack, dodge, eat: () => eatSomething() });
+  useLayoutEffect(() => {
+    actions.current = { attack, dodge, eat: () => eatSomething() };
+  });
+
   const tryInteract = useCallback(() => {
     const u = ui.current;
-    if (u.phase !== "play" || u.studio) return;
+    if (u.phase !== "play" || u.studio || u.menu || u.mini || u.ko) return;
+    const f = st.current.fight;
+    if (f && !f.outcome && !u.dialog) {
+      actions.current.attack();
+      return;
+    }
     if (u.help) {
       setHelp(false);
       updateSave((s) => ({ ...s, seenHelp: true }));
@@ -788,6 +1200,26 @@ export default function Game({ onExit }: { onExit: () => void }) {
         return;
       }
       if (u.phase !== "play") return;
+      if (u.menu || u.mini || u.ko) {
+        if (e.key === "Escape" && u.mini) setMini(null);
+        else if (e.key === "Escape" && u.menu && !u.menu.creator) setMenu(null);
+        return;
+      }
+      const fighting = !!st.current.fight && !st.current.fight.outcome && !u.dialog;
+      if (fighting && (e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK" || e.code === "KeyL")) {
+        e.preventDefault();
+        actions.current.dodge();
+        return;
+      }
+      if (e.code === "KeyQ" && !u.dialog && !e.repeat) {
+        if (!actions.current.eat()) showToast(saveRef.current.hp >= MAX_HP ? "You're fine." : "Nothing to eat. The corner store has noodles.", 2000);
+        return;
+      }
+      if (e.code === "KeyM" && !u.dialog && !fighting && !e.repeat) {
+        e.preventDefault();
+        setMenu({ tab: "you", creator: false });
+        return;
+      }
       if (e.key === "Escape") {
         e.preventDefault();
         if (u.dialog) setDialog(null);
@@ -803,7 +1235,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         if (!keys.current.includes(dir)) keys.current.push(dir);
         return;
       }
-      if (e.code === "KeyE" || e.code === "Space" || e.code === "Enter") {
+      if (e.code === "KeyE" || e.code === "Space" || e.code === "Enter" || (fighting && e.code === "KeyJ")) {
         const el = e.target as HTMLElement;
         if (el.closest("button, a") && el !== root.current) return;
         e.preventDefault();
@@ -852,13 +1284,27 @@ export default function Game({ onExit }: { onExit: () => void }) {
   // walk up. Returns whether it's on the beat right now, for the nodding.
   const musicClock = useRef(0);
   const placeMusic = (place: Place, inStudio: boolean, dt: number): boolean => {
-    const want = place === "street" ? "street" : place === "studio" && !inStudio ? "studio" : place === "rooftop" && musicPick.current.rooftop ? "rooftop" : null;
+    const playingLive = ui.current.mini?.kind === "rhythm";
+    const want =
+      playingLive
+        ? null
+        : place === "street"
+          ? "street"
+          : place === "studio" && !inStudio
+            ? "studio"
+            : place === "rooftop" && musicPick.current.rooftop
+              ? "rooftop"
+              : place === "club" || place === "underpass" || place === "avenue"
+                ? place
+                : null;
     if (music.current && music.current.key !== want) {
       music.current.engine.dispose();
       music.current = null;
     }
     if (want && !music.current && ui.current.phase === "play") {
-      const base = musicPick.current[want] ?? (want === "street" ? PRESETS[2].make() : PRESETS[0].make());
+      // the boombox plays trap, the club drill (through the wall, out on the avenue), the cypher boom bap
+      const preset = want === "street" ? 2 : want === "club" || want === "avenue" ? 3 : 0;
+      const base = musicPick.current[want] ?? PRESETS[preset].make();
       const project = clone(base);
       project.mode = project.song.some((x) => x >= 0) ? "song" : "pattern";
       const e = new Engine(project);
@@ -873,11 +1319,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
       musicClock.current = 0;
       const s = st.current;
       const base = m.engine.project;
-      const d = want === "street" ? Math.hypot(s.x - BOOMBOX.x, s.y - BOOMBOX.y) : 60;
-      const near = Math.max(0, 1 - d / 230);
+      const from = (x: number, y: number, range: number) => Math.max(0, 1 - Math.hypot(s.x - x, s.y - y) / range);
+      const near = want === "street" ? from(BOOMBOX.x, BOOMBOX.y, 230) : want === "underpass" ? from(17.5 * TILE, 6 * TILE, 260) : want === "avenue" ? from(35.5 * TILE, 2 * TILE, 190) : 1;
       // the boombox drops back while the payphone has your ear
-      const vol = want === "street" ? 0.75 * near * near * (call.current ? 0.2 : 1) : want === "rooftop" ? 0.32 : 0.4;
-      const cutoff = want === "street" ? 0.3 + 0.7 * near : want === "rooftop" ? 0.5 : 0.62;
+      const vol = (want === "street" ? 0.75 * near * near * (call.current ? 0.2 : 1) : want === "underpass" ? 0.6 * near * near : want === "avenue" ? 0.45 * near : want === "club" ? 0.5 : want === "rooftop" ? 0.32 : 0.4) * saveRef.current.settings.music;
+      const cutoff = want === "street" || want === "underpass" ? 0.3 + 0.7 * near : want === "avenue" ? 0.12 + 0.12 * near : want === "club" ? 1 : want === "rooftop" ? 0.5 : 0.62;
       m.engine.setProject({ ...base, master: { ...base.master, vol, cutoff } });
     }
     const p = m.engine.position();
@@ -927,11 +1373,24 @@ export default function Game({ onExit }: { onExit: () => void }) {
         const e = engine.current;
         return e ? { playing: e.playing, position: e.position(), project: e.project } : null;
       },
+      /** Bring trouble now (in a place where it happens). */
+      trouble: () => {
+        st.current.encounterIn = 0;
+      },
+      pending: () => st.current.pending?.length ?? 0,
+      fight: () => {
+        const f = st.current.fight;
+        return f ? { outcome: f.outcome, hp: f.me.hp, boss: f.boss, foes: f.foes.map((a) => ({ id: a.id, hp: a.fighter!.hp, state: a.fighter!.state, x: a.x, y: a.y })) } : null;
+      },
+      /** Leave every foe on one hit. */
+      weaken: () => st.current.fight?.foes.forEach((a) => a.fighter && (a.fighter.hp = 1)),
+      give: (patch: Partial<SaveData>) => updateSave((v) => ({ ...v, ...patch })),
+      save: () => saveRef.current,
     };
     return () => {
       delete w.__game;
     };
-  }, []);
+  }, [updateSave]);
 
   // ------------------------------------------------------------ the loop
 
@@ -950,11 +1409,13 @@ export default function Game({ onExit }: { onExit: () => void }) {
       s.t += dt;
       const u = ui.current;
       const scene = SCENES[s.place];
-      const frozen = u.phase !== "play" || !!u.dialog || u.studio || u.help || !!s.trans;
+      const frozen = u.phase !== "play" || !!u.dialog || u.studio || u.help || !!s.trans || !!u.menu || !!u.mini || !!u.ko;
+      const fight = s.fight;
+      const dashing = !!fight && fight.me.dodge > 0;
 
       // walking
       const held = keys.current;
-      if (!frozen && held.length) {
+      if (!frozen && held.length && !dashing && !(fight?.outcome === "lost")) {
         const dir = held[held.length - 1];
         let vx = (held.includes("right") ? 1 : 0) - (held.includes("left") ? 1 : 0);
         let vy = (held.includes("down") ? 1 : 0) - (held.includes("up") ? 1 : 0);
@@ -979,10 +1440,66 @@ export default function Game({ onExit }: { onExit: () => void }) {
         }
       } else s.walk = 0;
 
+      // the fight
+      if (fight && !frozen) {
+        const me = fight.me;
+        Object.assign(me, { x: s.x, y: s.y, dir: s.dir });
+        moveMe(me, dt, scene);
+        s.x = me.x;
+        s.y = me.y;
+        if (!fight.outcome || fight.outcome === "won") updateFoes(fight.foes.filter((a) => !a.hidden), me, dt, scene, saveRef.current.settings.difficulty, fightEv);
+        if (!fight.outcome) {
+          if (me.hp <= 0) knockout();
+          else if (!fight.foes.some(isUp)) winFight();
+        } else if (fight.outcome === "won") {
+          fight.over += dt;
+          if (fight.over > 4) {
+            dropFoes(fight.foes);
+            s.fight = null;
+          }
+        }
+      }
+      // foes who've had enough wander off; the ones walking up to you arrive
+      if (!frozen) {
+        const loose = life.current.filter((a) => a.fighter && a.place === s.place && !a.hidden && a.fighter.state === "flee" && !s.fight?.foes.includes(a));
+        if (loose.length) updateFoes(loose, freshMe(s.x, s.y, s.dir, 1), dt, scene, "normal", fightEv);
+        if (s.pending) {
+          for (const a of s.pending) {
+            const dx = s.x - a.x;
+            const dy = s.y - a.y;
+            const d = Math.hypot(dx, dy) || 1;
+            a.t += dt;
+            a.walking = d > 26;
+            if (d > 26) {
+              const nx = a.x + (dx / d) * 30 * dt;
+              const ny = a.y + (dy / d) * 30 * dt + Math.sin(a.t * 3 + a.x) * 8 * dt;
+              if (!blocked(scene, { x: nx - 4, y: a.y - 3, w: 8, h: 4 })) a.x = nx;
+              if (!blocked(scene, { x: a.x - 4, y: ny - 3, w: 8, h: 4 })) a.y = ny;
+              a.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
+            }
+          }
+          if (s.pending.some((a) => Math.hypot(s.x - a.x, s.y - a.y) < 30)) confront();
+        }
+        if (life.current.some((a) => a.fighter && a.hidden && !s.fight?.foes.includes(a))) life.current = life.current.filter((a) => !(a.fighter && a.hidden && !s.fight?.foes.includes(a)));
+        // trouble, now and then, where it lives
+        if (ROUGH[s.place] !== undefined && !s.fight && !s.pending && saveRef.current.profile?.name) {
+          s.encounterIn -= dt;
+          if (s.encounterIn <= 0) {
+            spawnTrouble();
+            s.encounterIn = 80 + Math.random() * 90;
+          }
+        }
+      }
+      s.shake = Math.max(0, s.shake - dt * 10);
+
       // doors
-      if (!s.trans && u.phase === "play") {
+      if (!s.trans && u.phase === "play" && !frozen) {
         const door = scene.doors.find((d) => inside(s.x, s.y - 1, d.zone));
-        if (door) {
+        if (door?.lock === "club" && !clubOk(saveRef.current)) {
+          s.y += 10;
+          keys.current = [];
+          say(["The bouncer puts a hand out without looking at you.", "\u201cNot tonight.\u201d"]);
+        } else if (door) {
           s.trans = { door, t: 0, swapped: false };
           sfx.door();
         }
@@ -1024,6 +1541,13 @@ export default function Game({ onExit }: { onExit: () => void }) {
       // everyone else, and the music where you are
       if (u.phase === "play") updateLife(life.current, dt, s.place, s.x, s.y, { honk: sfx.honk, bell: sfx.bell, flap: sfx.flap });
       const beat = placeMusic(s.place, u.studio, dt);
+      if (beat && !s.lastBeat) s.fx.beats++;
+      s.lastBeat = beat;
+      // trains: one in the station, one going over the bridge
+      const tr = s.place === "subway" ? trainAt(s.t) : null;
+      const over = s.place === "underpass" ? overhead(s.t) : 0;
+      setRumble(tr ? (tr.here ? (tr.open ? 0.2 : 0.6) : tr.arriving ? 0.3 : 0) : over);
+      if (over > 0.6 && saveRef.current.settings.shake) s.shake = Math.max(s.shake, 0.8);
 
       // the neighbourhood's own small events
       if (s.catLooking && s.t > s.catUntil) s.catLooking = false;
@@ -1054,10 +1578,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
         haze: reduced ? 0 : s.haze,
         catLooking: s.catLooking,
         tapes: Array.from({ length: 4 }, (_, i) => i < shelfRef.current),
-        hints: [
-          ...FINDABLE.filter((id) => !saveRef.current.found.includes(id)).map((id) => HINT_AT[id]),
-          ...(shelfRef.current ? [] : ["sampler"]),
-        ],
+        hints: saveRef.current.settings.hints
+          ? [...FINDABLE.filter((id) => !saveRef.current.found.includes(id)).map((id) => HINT_AT[id]), ...(shelfRef.current ? [] : ["sampler"])]
+          : [],
         reduced,
         actors: life.current,
         beat,
@@ -1066,6 +1589,15 @@ export default function Game({ onExit }: { onExit: () => void }) {
         ember: !!life.current.find((a) => a.id === "ledge")?.hidden,
         roofMusic: music.current?.key === "rooftop",
         dt,
+        look: lookRef.current,
+        weapon: weaponById(saveRef.current.weapon),
+        me: s.fight && s.fight.outcome !== "won" ? s.fight.me : null,
+        down: s.fight?.outcome === "lost",
+        hp: s.fight ? s.fight.me.hp : saveRef.current.hp,
+        maxHp: MAX_HP,
+        tag: saveRef.current.tag ? { name: saveRef.current.profile?.name || "you", color: saveRef.current.tag.color } : null,
+        shake: s.shake,
+        fx: s.fx,
       });
       // zoomed in (phones held upright): keep you in the middle of the picture
       const vw = view.current;
@@ -1086,6 +1618,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
+    // everything it calls works through refs, so it only restarts for reduced motion
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reduced]);
 
   // choices take focus so the keyboard can pick one
@@ -1110,6 +1644,51 @@ export default function Game({ onExit }: { onExit: () => void }) {
   };
 
   const foundCount = save.found.length;
+
+  // ------------------------------------------------------------ mini-games
+
+  const closeMini = () => {
+    setMini(null);
+    st.current.fx.diceRoll = 0;
+    root.current?.focus();
+  };
+  const setDiceRolling = useCallback((on: boolean) => {
+    st.current.fx.diceRoll = on ? 1 : 0;
+  }, []);
+  const sprayed = useCallback(() => sfx.spray(380), []);
+  const rhythmDone = (mode: "cypher" | "dj", score: number) => {
+    const v = saveRef.current;
+    const best = mode === "cypher" ? v.stats.cypherBest : v.stats.djBest;
+    const cash = mode === "dj" ? Math.round(score * 0.6) : Math.floor(score / 10) * 2;
+    const rep = Math.floor(score / (mode === "dj" ? 10 : 8));
+    updateSave((x) => ({ ...x, stats: { ...x.stats, [mode === "cypher" ? "cypherBest" : "djBest"]: Math.max(best, score) }, heard: mode === "dj" ? { ...x.heard, dj: "a set" } : x.heard }));
+    if (cash) earn(cash);
+    if (rep) addRep(rep);
+    if (score >= 50) sfx.cheer();
+    find(mode === "cypher" ? "mic" : "crowd");
+    showToast(`${score}%: ${cash ? `+$${cash}` : "no money"}${rep ? `, +${rep} respect` : ""}${score > best ? " (your best)" : ""}`, 4200);
+  };
+  const dug = (r: DigResult) => {
+    if (!spend(5)) return;
+    updateSave((v) => ({ ...v, stats: { ...v.stats, digs: v.stats.digs + 1 } }));
+    sfx.voice(saveRef.current.found.includes("scratch") || r === "first" ? "scratch" : "vinyl-pop");
+    if (r === "first") find("scratch");
+    else if (r === "rare") {
+      earn(15);
+      sfx.coins();
+    } else if (r === "break") addRep(1);
+  };
+  const buy = (id: string, price: number) => {
+    if (!spend(price)) return;
+    sfx.coins();
+    const food = consumableById(id);
+    if (food) updateSave((v) => ({ ...v, items: { ...v.items, [id]: (v.items[id] ?? 0) + 1 } }));
+    else {
+      updateSave((v) => ({ ...v, owned: [...v.owned, id] }));
+      showToast("In your wardrobe now: the mirror, or M.", 2600);
+    }
+  };
+
   const closeStudio = () => {
     if (!ui.current.studio) return;
     engine.current?.stop();
@@ -1139,19 +1718,38 @@ export default function Game({ onExit }: { onExit: () => void }) {
       {/* top bar: where you are, what you've found, the way out */}
       <div className={`relative z-40 flex min-h-0 flex-1 flex-col ${phase === "closing" || revealing ? "invisible" : ""}`}>
       <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-[#1d1b19] px-3 font-lcd text-[20px] leading-none whitespace-nowrap">
-        <span data-testid="game-place">{PLACE_NAMES[place]}</span>
-        <span className="text-[#8a8170]" aria-label={`${foundCount} of ${FINDABLE.length} sounds found`}>
+        <span data-testid="game-place" className="truncate">
+          {PLACE_NAMES[place]}
+        </span>
+        <span className="text-amber" data-testid="game-cash" aria-label={`$${Math.floor(save.cash)}, respect ${Math.floor(save.rep)}`}>
+          ${Math.floor(save.cash)}
+          <span className="ml-2 hidden text-[#b9b09e] md:inline">★{Math.floor(save.rep)}</span>
+        </span>
+        <span className="hidden text-[#8a8170] lg:inline" aria-label={`${foundCount} of ${FINDABLE.length} sounds found`}>
           sounds {foundCount}/{FINDABLE.length}
         </span>
         {!studio && (
-          <button
-            className="ml-auto rounded-[3px] border border-[#3a3733] bg-[#171615] px-3 py-1.5 font-sans text-[13px] hover:border-[#6d6558]"
-            onClick={goToStudio}
-            data-testid="game-to-studio"
-          >
-            <span className="sm:hidden">Studio</span>
-            <span className="hidden sm:inline">Go to the studio</span>
-          </button>
+          <>
+            <button
+              className="ml-auto rounded-[3px] border border-[#3a3733] bg-[#171615] px-2.5 py-1.5 font-sans text-[13px] hover:border-[#6d6558] sm:px-3"
+              onClick={() => !fighting && setMenu({ tab: "you", creator: false })}
+              disabled={fighting}
+              data-testid="game-menu-btn"
+              aria-label="Menu (M)"
+            >
+              <span className="sm:hidden">☰</span>
+              <span className="hidden sm:inline">Menu (M)</span>
+            </button>
+            <button
+              className="rounded-[3px] border border-[#3a3733] bg-[#171615] px-2.5 py-1.5 font-sans text-[13px] hover:border-[#6d6558] sm:px-3"
+              onClick={goToStudio}
+              disabled={fighting}
+              data-testid="game-to-studio"
+            >
+              <span className="sm:hidden">Studio</span>
+              <span className="hidden sm:inline">Go to the studio</span>
+            </button>
+          </>
         )}
         <button
           className={`${studio ? "ml-auto" : ""} flex items-center gap-2 rounded-[3px] border border-[#3a3733] bg-[#171615] px-3 py-1.5 font-sans text-[13px] hover:border-[#6d6558]`}
@@ -1223,7 +1821,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
           </div>
         )}
 
-        {help && phase === "play" && (
+        {help && phase === "play" && !menu && (
           <div
             style={{ top: below ? VIEW_H * scale + 10 : 12 }}
             className="absolute inset-x-3 z-20 mx-auto max-w-[440px] rounded-[3px] border-2 border-[#3a3733] bg-[#0f0e0d]/95 p-4 font-lcd text-[20px] leading-snug" data-testid="game-help">
@@ -1295,16 +1893,132 @@ export default function Game({ onExit }: { onExit: () => void }) {
                 </button>
               ))}
             </div>
-            <button
-              className="pad-btn pointer-events-auto h-20 w-20 rounded-full text-[28px]"
-              aria-label={prompt && !prompt.startsWith("@") ? `Use: ${prompt}` : "Use"}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                tryInteract();
-              }}
-            >
-              A
-            </button>
+            <div className="pointer-events-auto flex items-end gap-2">
+              {fighting && (
+                <div className="flex flex-col gap-2">
+                  <button
+                    className="pad-btn h-11 w-14 rounded-[4px] text-[16px]"
+                    aria-label="Eat"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      eatSomething();
+                    }}
+                  >
+                    eat
+                  </button>
+                  <button
+                    className="pad-btn h-16 w-16 rounded-full text-[24px]"
+                    aria-label="B: dodge"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      dodge();
+                    }}
+                  >
+                    B
+                  </button>
+                </div>
+              )}
+              <button
+                className="pad-btn h-20 w-20 rounded-full text-[28px]"
+                aria-label={fighting ? "A: swing" : prompt && !prompt.startsWith("@") ? `Use: ${prompt}` : "Use"}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  tryInteract();
+                }}
+              >
+                A
+              </button>
+            </div>
+          </div>
+        )}
+
+        {menu && (
+          <Menu
+            save={save}
+            tab={menu.tab}
+            creator={menu.creator}
+            tapes={shelf}
+            touch={touch}
+            onTab={(tab) => setMenu({ tab, creator: false })}
+            onProfile={(p: Profile) => updateSave((v) => ({ ...v, profile: p }))}
+            onEquip={(id) => updateSave((v) => ({ ...v, weapon: id }))}
+            onUse={(id) => eatSomething(id)}
+            onSettings={(set: Settings) => {
+              setSfxVolume(set.sfx);
+              updateSave((v) => ({ ...v, settings: set }));
+            }}
+            onReset={() => {
+              const fresh = resetSave();
+              saveRef.current = fresh;
+              setSaveState(fresh);
+              updateSave((v) => ({ ...v, profile: { ...randomProfile(), name: "" } }));
+              setMenu({ tab: "you", creator: true });
+              setHelp(true);
+            }}
+            onClose={() => {
+              if (menu.creator) updateSave((v) => ({ ...v, profile: v.profile && { ...v.profile, name: v.profile.name.trim() || "anon" } }));
+              setMenu(null);
+              root.current?.focus();
+            }}
+          />
+        )}
+
+        {mini?.kind === "rhythm" && <Rhythm mode={mini.mode} volume={save.settings.music} touch={touch} onFinish={(score) => rhythmDone(mini.mode, score)} onClose={closeMini} />}
+        {mini?.kind === "dice" && (
+          <Dice
+            cash={save.cash}
+            onSettle={(d) => {
+              earn(d);
+              if (d > 0) updateSave((v) => ({ ...v, stats: { ...v.stats, diceWon: v.stats.diceWon + 1 } }));
+              find("dice");
+            }}
+            onRolling={setDiceRolling}
+            onClose={closeMini}
+          />
+        )}
+        {mini?.kind === "crates" && <Crates cash={save.cash} first={!save.found.includes("scratch")} onDig={dug} onClose={closeMini} />}
+        {mini?.kind === "hoops" && (
+          <Hoops
+            cash={save.cash}
+            reduced={reduced}
+            onShot={(made) => {
+              sfx.voice("basketball");
+              find("basketball");
+              if (made) updateSave((v) => ({ ...v, stats: { ...v.stats, swishes: v.stats.swishes + 1 } }));
+            }}
+            onSettle={(d) => {
+              earn(d);
+              if (d > 0) sfx.coins();
+            }}
+            onClose={closeMini}
+          />
+        )}
+        {mini?.kind === "tag" && (
+          <Tag
+            name={save.profile?.name || "you"}
+            onSpray={sprayed}
+            onDone={(color) => {
+              const first = !saveRef.current.tag;
+              updateSave((v) => ({ ...v, tag: { color }, stats: { ...v.stats, tags: v.stats.tags + 1 } }));
+              if (first) addRep(6);
+              find("spray");
+            }}
+            onClose={closeMini}
+          />
+        )}
+        {mini?.kind === "shop" && <Shop kind={mini.shop} save={save} onBuy={buy} onClose={closeMini} />}
+
+        {ko > 0 && (
+          <div className="game-fade absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/90 font-lcd text-[24px]" role="alertdialog" aria-label="Knocked out" data-testid="game-ko">
+            {ko === 2 && (
+              <>
+                <p className="text-[34px] text-[#ff7a6a]">Knocked out.</p>
+                <p className="max-w-[420px] px-6 text-center text-[20px] text-[#b9b09e]">The ground comes up fast. Somebody’s going through your pockets. Then nothing.</p>
+                <button className="rounded-[2px] border border-[#4a4540] bg-[#1d1b19] px-4 py-1.5 text-[22px] hover:border-amber" onClick={wake} autoFocus data-testid="game-wake">
+                  Wake up
+                </button>
+              </>
+            )}
           </div>
         )}
 

@@ -1,4 +1,5 @@
-import type { Look, Pose } from "./people";
+import type { Fighter } from "./combat";
+import type { Hair, Look, Pose } from "./people";
 import type { Place } from "./sfx";
 import { sceneSize, SCENES, TILE, type Dir, type Rect } from "./world";
 
@@ -6,7 +7,7 @@ import { sceneSize, SCENES, TILE, type Dir, type Rect } from "./world";
 // their dog, traffic, cyclists, pigeons. Each place keeps its own; only
 // the place you're in is simulated (traffic keeps its own timer).
 
-export type Item = "cup" | "joint" | "bottle" | "phone" | "headphones" | "ball";
+export type Item = "cup" | "joint" | "bottle" | "phone" | "headphones" | "ball" | "keys" | "mic";
 export type ActorKind = "person" | "dog" | "pigeon" | "car" | "bike";
 
 export interface Actor {
@@ -46,6 +47,10 @@ export interface Actor {
   // animation clock and small events
   t: number;
   sip?: number;
+  /** Dancing: sways side to side on the beat. */
+  dance?: boolean;
+  /** In a fight with you (combat.ts moves them, not this). */
+  fighter?: Fighter;
 }
 
 const T = TILE;
@@ -111,6 +116,74 @@ export function makeLife(): Actor[] {
       [17.2, 6.8],
       [12.2, 8.6],
     ]),
+
+    // the avenue: the door, the queue, the man with the CDs, people passing
+    person("bouncer", "avenue", 35.5, 3.6, { skin: "#4e3020", hair: "#0d0a08", top: "#111216", trim: "#26262b", topStyle: "jacket", pants: "#111216", style: "bald", body: "broad", extra: "shades" }, { talk: "talk to the bouncer" }),
+    person("queue-1", "avenue", 38.4, 3.7, { skin: "#e8c0a4", hair: "#d06aa8", top: "#5a3a8a", pants: "#111216", style: "bun" }, { dir: "left", item: "phone", talk: "talk" }),
+    person("queue-2", "avenue", 39.5, 3.8, { skin: "#8d5a3b", hair: "#151010", top: "#d0a020", pants: "#26262b", style: "afro" }, { dir: "left", talk: "talk" }),
+    person("queue-3", "avenue", 40.6, 3.65, { skin: "#c99a7c", hair: "#3a2416", top: "#26262b", topStyle: "leather", trim: "#e8e0cf", pants: "#1c1f26", style: "mullet" }, { dir: "left", item: "joint" }),
+    person("cd-guy", "avenue", 24.4, 4.4, { skin: "#6b4431", hair: "#0f0b08", top: "#2f6b3a", topStyle: "track", trim: "#e8e0cf", pants: "#111216", style: "cap", accent: "#d0a020", extra: "backpack" }, { talk: "talk" }),
+    person("stroller", "avenue", 6, 4.6, { skin: "#f1d2bd", hair: "#8a8a86", top: "#3c5a86", topStyle: "puffer", pants: "#2a2a30", style: "short" }, {
+      solid: false,
+      talk: "talk",
+      path: [
+        [4 * T, 4.6 * T],
+        [30 * T, 4.6 * T],
+      ],
+      pi: 1,
+      speed: 14,
+    }),
+
+    // the alley: the dice game, someone warming their hands
+    person("dice-1", "alley", 18.2, 6.9, { skin: "#5c3a26", hair: "#120d0a", top: "#1f2230", pants: "#2c2f38", style: "short", hat: "durag", hatColor: "#3a5ab3" }, { pose: "crouch", dir: "right", talk: "the dice game" }),
+    person("dice-2", "alley", 21, 7.1, { skin: "#e0b193", hair: "#3a2416", top: "#4a4a32", pants: "#23252e", style: "short", topStyle: "hoodie" }, { pose: "crouch", dir: "left", talk: "the dice game" }),
+    person("barrel-man", "alley", 9.9, 5.6, { skin: "#d2a58a", hair: "#bdbdb8", top: "#4a3a2a", pants: "#2a2a30", style: "long", topStyle: "jacket", trim: "#6a5a4a" }, { dir: "left", talk: "talk" }),
+
+    // the record shop
+    person("records-owner", "records", 12.5, 3.75, { skin: "#b07a58", hair: "#e8e0cf", top: "#4a3a2a", pants: "#26262b", style: "afro", extra: "shades" }, { talk: "talk to the owner", solid: false }),
+    person("digger", "records", 5, 6.35, { skin: "#e8c0a4", hair: "#9a5a2a", top: "#2a4a2a", topStyle: "varsity", trim: "#e8e0cf", pants: "#1c1f26", style: "curly", extra: "headphones" }, { dir: "up", talk: "talk" }),
+
+    // the thrift shop
+    person("thrift-owner", "thrift", 10.5, 2.75, { skin: "#f1d2bd", hair: "#d06aa8", top: "#7a2a6a", topStyle: "tee", pants: "#26262b", style: "ponytail" }, { talk: "talk to her", solid: false }),
+
+    // the club: the DJ, the bar, the floor
+    person("dj", "club", 12, 3.15, { skin: "#8d5a3b", hair: "#151010", top: "#111216", pants: "#111216", style: "braids", extra: "headphones" }, { bob: true, talk: "talk to the DJ", solid: false }),
+    person("bartender", "club", 20.6, 6, { skin: "#e8c0a4", hair: "#151010", top: "#26262b", topStyle: "jacket", trim: "#e8e0cf", pants: "#111216", style: "bun" }, { dir: "left", talk: "the bar", solid: false }),
+    ...[
+      [7.5, 6.2, "#5a3a8a", "afro"],
+      [9.6, 7.4, "#2a4a7a", "long"],
+      [12.2, 6.6, "#d0a020", "curly"],
+      [14.6, 7.6, "#2f6b3a", "short"],
+      [16.4, 6.3, "#7a2a6a", "bun"],
+      [8.4, 9.2, "#26262b", "mullet"],
+      [11.3, 9.5, "#c9c2b3", "ponytail"],
+      [15.2, 9.3, "#3c5a86", "braids"],
+    ].map(([x, y, top, style], k) =>
+      person(`dancer-${k}`, "club", x as number, y as number, { skin: ["#f1d2bd", "#8d5a3b", "#c99a7c", "#4e3020", "#e8c0a4", "#6b4431", "#d2a58a", "#b07a58"][k], hair: ["#151010", "#d8b35a", "#3a2416", "#d06aa8"][k % 4], top: top as string, pants: "#1c1f26", style: style as Hair }, { dance: true, bob: true, solid: false, dir: k % 2 ? "left" : "down", talk: k % 3 === 0 ? "talk" : undefined }),
+    ),
+
+    // the subway
+    person("busker", "subway", 14, 3.6, { skin: "#c99a7c", hair: "#3a2416", top: "#4a3a2a", topStyle: "jacket", trim: "#c9c2b3", pants: "#2c3e5a", style: "long", hat: "beanie", hatColor: "#d0a020" }, { item: "keys", bob: true, talk: "talk" }),
+    person("commuter", "subway", 9.4, 2.85, { skin: "#e8c0a4", hair: "#151010", top: "#3c5a86", topStyle: "jacket", trim: "#e8e0cf", pants: "#1c1f26", style: "short" }, { pose: "sit", item: "phone", talk: "talk", solid: false }),
+    person("waiting", "subway", 24.5, 4.4, { skin: "#6b4431", hair: "#0f0b08", top: "#5a5d66", topStyle: "puffer", pants: "#26262b", style: "cap", accent: "#111216" }, { dir: "down", talk: "talk", item: "headphones" }),
+
+    // the underpass: the cypher, Dre, Tank
+    ...[
+      [15.6, 5.5, "right", "#2a4a7a", "cap"],
+      [19.4, 5.5, "left", "#5a3a8a", "hood"],
+      [16, 7.3, "up", "#26262b", "braids"],
+      [19, 7.3, "up", "#2f6b3a", "afro"],
+    ].map(([x, y, dir, top, style], k) =>
+      person(`mc-${k}`, "underpass", x as number, y as number, { skin: ["#5c3a26", "#e0b193", "#8d5a3b", "#c99a7c"][k], hair: "#120d0a", top: top as string, pants: "#1c1f26", style: style as Hair, accent: "#d0a020" }, { dir: dir as Dir, bob: true, talk: k === 0 ? "the cypher" : "talk", item: k === 1 ? "mic" : undefined }),
+    ),
+    person("dre", "underpass", 12.5, 6.8, { skin: "#4e3020", hair: "#0d0a08", top: "#e8e0cf", topStyle: "tee", pants: "#111216", style: "cap", accent: "#111216", extra: "chain", extraColor: "#d8b35a" }, { dir: "right", talk: "talk to Dre" }),
+    person("tank", "underpass", 27.2, 5.7, { skin: "#7a4a32", hair: "#0d0a08", top: "#141418", trim: "#d8b35a", topStyle: "leather", pants: "#1c1f26", style: "buzz", body: "broad", extra: "chain", extraColor: "#d8b35a" }, { dir: "right", talk: "talk to Tank" }),
+    person("goon", "underpass", 29.8, 6.4, { skin: "#c99a7c", hair: "#151010", top: "#26262b", topStyle: "hoodie", pants: "#2a2a30", style: "hood", body: "broad" }, { dir: "left", item: "joint" }),
+    ...pigeons("underpass", [
+      [4, 8.5],
+      [5.2, 8.8],
+      [31, 8.4],
+    ]),
   ];
 }
 
@@ -138,15 +211,15 @@ export interface LifeEvents {
 export function updateLife(actors: Actor[], dt: number, place: Place, px: number, py: number, ev: LifeEvents) {
   const { w } = sceneSize(SCENES[place]);
 
-  // traffic appears only on the street
-  if (place === "street") {
+  // traffic on the street and the avenue
+  if (place === "street" || place === "avenue") {
     nextCar -= dt;
     if (nextCar <= 0) {
       const lane = LANES[Math.random() < 0.5 ? 0 : 1];
       actors.push({
         id: `car-${seq++}`,
         kind: "car",
-        place: "street",
+        place,
         x: lane.dir > 0 ? -CAR_W : w + CAR_W,
         y: lane.y,
         dir: lane.dir > 0 ? "right" : "left",
@@ -162,7 +235,7 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
       actors.push({
         id: `bike-${seq++}`,
         kind: "bike",
-        place: "street",
+        place,
         x: right ? -20 : w + 20,
         y: right ? 7.45 * T : 7.2 * T,
         dir: right ? "right" : "left",
@@ -176,7 +249,7 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
 
   for (let i = actors.length - 1; i >= 0; i--) {
     const a = actors[i];
-    if (a.place !== place) continue;
+    if (a.place !== place || a.fighter) continue;
     a.t += dt;
 
     if (a.kind === "car") {
@@ -277,7 +350,7 @@ export function lifeBlocks(actors: Actor[], place: Place, box: Rect): boolean {
     if (a.place !== place) continue;
     let r: Rect | null = null;
     if (a.kind === "car") r = carRect(a);
-    else if (a.kind === "person" && a.solid && !a.path && !a.hidden) r = { x: a.x - 4, y: a.y - 3, w: 8, h: 4 };
+    else if (a.kind === "person" && a.solid && !a.path && !a.hidden && !a.fighter) r = { x: a.x - 4, y: a.y - 3, w: 8, h: 4 };
     if (r && box.x < r.x + r.w && box.x + box.w > r.x && box.y < r.y + r.h && box.y + box.h > r.y) return true;
   }
   return false;
@@ -288,7 +361,7 @@ export function lifeTarget(actors: Actor[], place: Place, px: number, py: number
   let best: Actor | null = null;
   let bestD = 18;
   for (const a of actors) {
-    if (a.place !== place || !a.talk || a.hidden) continue;
+    if (a.place !== place || !a.talk || a.hidden || a.fighter) continue;
     const d = Math.min(Math.hypot(a.x - fx, a.y - 3 - fy), Math.hypot(a.x - px, a.y - py) + 4);
     if (d < bestD) {
       bestD = d;

@@ -4,7 +4,8 @@ import { ensureLoaded, playVoice, trackTiming } from "./studio/voices";
 // The neighbourhood's sound: a room tone per place (rain, a fridge hum, a
 // quiet studio), footsteps, and small cues. One bus, torn down on exit.
 
-export type Place = "bedroom" | "street" | "store" | "studio" | "park" | "rooftop";
+export const PLACES = ["bedroom", "street", "store", "studio", "park", "rooftop", "avenue", "alley", "records", "thrift", "club", "subway", "underpass"] as const;
+export type Place = (typeof PLACES)[number];
 
 let bus: GainNode | null = null;
 let rainGain: GainNode | null = null;
@@ -14,6 +15,9 @@ let humOscs: OscillatorNode[] = [];
 let ringGain: GainNode | null = null;
 let ringOscs: OscillatorNode[] = [];
 let rainBuf: AudioBuffer | null = null;
+let level: GainNode | null = null;
+let sfxVolume = 0.8;
+let rumbleGain: GainNode | null = null;
 
 function ctx() {
   return getAudioContext();
@@ -50,7 +54,9 @@ export function startGameAudio() {
   bus = c.createGain();
   bus.gain.value = 0;
   bus.gain.setTargetAtTime(1, c.currentTime, 0.4);
-  bus.connect(c.destination);
+  level = c.createGain();
+  level.gain.value = sfxVolume;
+  bus.connect(level).connect(c.destination);
 
   rainBuf ??= renderRain(c);
   rainGain = c.createGain();
@@ -101,6 +107,31 @@ export function startGameAudio() {
   });
   pulse.start();
   ringOscs.push(pulse);
+
+  // trains: brown noise, low, swelling as one comes in or goes over
+  rumbleGain = c.createGain();
+  rumbleGain.gain.value = 0;
+  const rlp = c.createBiquadFilter();
+  rlp.type = "lowpass";
+  rlp.frequency.value = 220;
+  const rsrc = c.createBufferSource();
+  rsrc.buffer = rainBuf;
+  rsrc.loop = true;
+  rsrc.playbackRate.value = 0.35;
+  rsrc.connect(rlp).connect(rumbleGain).connect(bus);
+  rsrc.start();
+  ringOscs.push(rsrc as unknown as OscillatorNode);
+}
+
+/** How loud the game's own sounds are (the settings). */
+export function setSfxVolume(v: number) {
+  sfxVolume = v;
+  if (level) level.gain.setTargetAtTime(v, ctx().currentTime, 0.05);
+}
+
+/** A train's rumble (0 = none). */
+export function setRumble(v: number) {
+  if (rumbleGain) rumbleGain.gain.setTargetAtTime(v * 1.4, ctx().currentTime, 0.1);
 }
 
 export function stopGameAudio() {
@@ -108,6 +139,7 @@ export function stopGameAudio() {
   const b = bus;
   if (!b) return;
   b.gain.setTargetAtTime(0, c.currentTime, 0.15);
+  const lv = level;
   const stop = [rainSrc, ...humOscs, ...ringOscs];
   setTimeout(() => {
     stop.forEach((n) => {
@@ -118,8 +150,9 @@ export function stopGameAudio() {
       }
     });
     b.disconnect();
+    lv?.disconnect();
   }, 900);
-  bus = rainGain = humGain = ringGain = null;
+  bus = rainGain = humGain = ringGain = rumbleGain = level = null;
   rainSrc = null;
   humOscs = [];
   ringOscs = [];
@@ -129,10 +162,10 @@ export function stopGameAudio() {
 export function setPlace(place: Place, windowOpen = false) {
   const c = ctx();
   const at = c.currentTime;
-  const rain = { bedroom: windowOpen ? 0.3 : 0.1, street: 0.34, store: 0.03, studio: 0, park: 0.26, rooftop: 0.4 }[place];
-  const hum = { bedroom: 0.004, street: 0, store: 0.02, studio: 0.006, park: 0, rooftop: 0 }[place];
-  rainGain?.gain.setTargetAtTime(rain, at, 0.3);
-  humGain?.gain.setTargetAtTime(hum, at, 0.3);
+  const rain: Record<Place, number> = { bedroom: windowOpen ? 0.3 : 0.1, street: 0.34, store: 0.03, studio: 0, park: 0.26, rooftop: 0.4, avenue: 0.32, alley: 0.3, records: 0.02, thrift: 0.02, club: 0, subway: 0, underpass: 0.12 };
+  const hum: Record<Place, number> = { bedroom: 0.004, street: 0, store: 0.02, studio: 0.006, park: 0, rooftop: 0, avenue: 0, alley: 0.003, records: 0.006, thrift: 0.008, club: 0.004, subway: 0.016, underpass: 0 };
+  rainGain?.gain.setTargetAtTime(rain[place], at, 0.3);
+  humGain?.gain.setTargetAtTime(hum[place], at, 0.3);
 }
 
 /** Duck the room tone under the sampler. */
@@ -166,6 +199,25 @@ function blip(freq: number, dur: number, type: OscillatorType = "square", level 
   o.connect(lp).connect(g).connect(bus);
   o.start(t);
   o.stop(t + dur + 0.02);
+}
+
+/** A burst of filtered noise on the bus; `sweep` glides the filter there. */
+function noise(c: AudioContext, t: number, dur: number, freq: number, lvl: number, sweep?: number) {
+  if (!bus) return;
+  const n = Math.floor(c.sampleRate * dur);
+  const buf = c.createBuffer(1, n, c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const f = c.createBiquadFilter();
+  f.type = "bandpass";
+  f.frequency.setValueAtTime(freq, t);
+  if (sweep) f.frequency.exponentialRampToValueAtTime(sweep, t + dur);
+  const g = c.createGain();
+  g.gain.value = lvl;
+  src.connect(f).connect(g).connect(bus);
+  src.start(t);
 }
 
 export const sfx = {
@@ -294,6 +346,69 @@ export const sfx = {
     }
     hiss(at - 0.1, 0.9, 0.05);
     setTimeout(() => hp.disconnect(), (at - c.currentTime + 2) * 1000);
+  },
+  /** A fist (or worse) landing. */
+  hit(heavy = false) {
+    if (!bus) return;
+    const c = ctx();
+    const t = c.currentTime;
+    const o = c.createOscillator();
+    o.frequency.setValueAtTime(heavy ? 150 : 190, t);
+    o.frequency.exponentialRampToValueAtTime(50, t + 0.09);
+    const g = c.createGain();
+    g.gain.setValueAtTime(heavy ? 0.5 : 0.35, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    o.connect(g).connect(bus);
+    o.start(t);
+    o.stop(t + 0.16);
+    noise(c, t, 0.05, heavy ? 900 : 1500, heavy ? 0.35 : 0.25);
+  },
+  /** A swing that finds nothing. */
+  whoosh() {
+    if (!bus) return;
+    const c = ctx();
+    noise(c, c.currentTime, 0.12, 2400, 0.08, 600);
+  },
+  /** Taking one. */
+  hurt() {
+    blip(140, 0.12, "sawtooth", 0.06);
+    setTimeout(() => blip(95, 0.14, "sawtooth", 0.05), 50);
+  },
+  /** Someone going down. */
+  down() {
+    if (!bus) return;
+    const c = ctx();
+    noise(c, c.currentTime, 0.25, 300, 0.4);
+    blip(70, 0.3, "sine", 0.2);
+  },
+  dodge() {
+    if (!bus) return;
+    const c = ctx();
+    noise(c, c.currentTime, 0.08, 3600, 0.05, 1500);
+  },
+  coins() {
+    [1318, 1760, 2093].forEach((f, i) => setTimeout(() => blip(f, 0.12, "square", 0.025), i * 60));
+  },
+  /** Something to eat or drink. */
+  gulp() {
+    blip(220, 0.08, "sine", 0.08);
+    setTimeout(() => blip(260, 0.08, "sine", 0.06), 110);
+  },
+  /** A short, rising "yes": a goal, an unlock. */
+  unlock() {
+    [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => blip(f, 0.22, "triangle", 0.05), i * 90));
+  },
+  /** A crowd, briefly. */
+  cheer() {
+    if (!bus) return;
+    const c = ctx();
+    for (let i = 0; i < 6; i++) noise(c, c.currentTime + i * 0.07, 0.6, 900 + i * 220, 0.05);
+  },
+  /** A spray can: the rattle, then the hiss. */
+  spray(ms = 500) {
+    if (!bus) return;
+    const c = ctx();
+    noise(c, c.currentTime, ms / 1000, 5200, 0.06);
   },
   splash() {
     blip(1800, 0.05, "sine", 0.04);
