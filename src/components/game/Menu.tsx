@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BODIES, DEFAULT_PROFILE, HAIR_COLORS, HAIR_STYLES, ITEMS, itemById, lookOf, SKINS, SLOTS, styleOf, type Item, type Profile, type Slot } from "./character";
 import { GOALS } from "./goals";
+import { jobText } from "./scripts";
 import { personSprites } from "./people";
 import { MAX_HP, type SaveData, type Settings } from "./save";
 import { CONSUMABLES, WEAPONS } from "./weapons";
@@ -199,8 +200,14 @@ function Fight({ save, onEquip, onUse, touch }: { save: SaveData; onEquip: (id: 
 }
 
 function Goals({ save, tapes }: { save: SaveData; tapes: number }) {
+  const job = jobText(save);
   return (
     <ul className="flex flex-col gap-2" data-testid="menu-goals">
+      {job && (
+        <li className="rounded-[2px] border border-[#3a3733] px-2 py-1" data-testid="menu-job">
+          <span className="text-amber">job:</span> {job}
+        </li>
+      )}
       {GOALS.map((g) => {
         const done = save.goals.includes(g.id);
         const pr = g.progress?.(save, { tapes });

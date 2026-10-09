@@ -204,6 +204,8 @@ export function makeLife(): Actor[] {
     ].map(([x, y, dir, top, style], k) =>
       person(`mc-${k}`, "underpass", x as number, y as number, { skin: ["#5c3a26", "#e0b193", "#8d5a3b", "#c99a7c"][k], hair: "#120d0a", top: top as string, pants: "#1c1f26", style: style as Hair, accent: "#d0a020" }, { dir: dir as Dir, bob: true, talk: k === 0 ? "the cypher" : "talk", item: k === 1 ? "mic" : undefined }),
     ),
+    // Vee: another producer, there once you've made a name (Game.tsx shows her)
+    person("vee", "underpass", 22.6, 6.3, { skin: "#b07a58", hair: "#151010", top: "#5a3a8a", topStyle: "track", trim: "#e8e0cf", pants: "#111216", style: "braids", extra: "headphones", extraColor: "#d0a020" }, { dir: "left", talk: "talk to Vee", hidden: true, bob: true }),
     person("dre", "underpass", 12.5, 6.8, { skin: "#4e3020", hair: "#0d0a08", top: "#e8e0cf", topStyle: "tee", pants: "#111216", style: "cap", accent: "#111216", extra: "chain", extraColor: "#d8b35a" }, { dir: "right", talk: "talk to Dre" }),
     person("tank", "underpass", 27.2, 5.7, { skin: "#7a4a32", hair: "#0d0a08", top: "#141418", trim: "#d8b35a", topStyle: "leather", pants: "#1c1f26", style: "buzz", body: "broad", extra: "chain", extraColor: "#d8b35a" }, { dir: "right", talk: "talk to Tank" }),
     person("goon", "underpass", 29.8, 6.4, { skin: "#c99a7c", hair: "#151010", top: "#26262b", topStyle: "hoodie", pants: "#2a2a30", style: "hood", body: "broad" }, { dir: "left", item: "joint" }),
@@ -456,6 +458,11 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
       a.walking = !blocked && dist >= 1;
     }
   }
+}
+
+/** Everyone matching gets excited for a couple of seconds (a little hop, a raised arm). */
+export function cheerFor(actors: Actor[], which: (a: Actor) => boolean, secs = 2.4) {
+  for (const a of actors) if (a.kind === "person" && !a.fighter && !a.hidden && which(a)) a.react = secs;
 }
 
 /** Does anyone stand where this box wants to go? */

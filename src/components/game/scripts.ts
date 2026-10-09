@@ -15,7 +15,7 @@ export interface Choice {
   label: string;
   run: () => void;
 }
-export type Mini = { kind: "rhythm"; mode: RhythmMode } | { kind: "dice" } | { kind: "crates" } | { kind: "hoops" } | { kind: "tag" } | { kind: "shop"; shop: ShopKind };
+export type Mini = { kind: "rhythm"; mode: RhythmMode; rival?: { name: string; score: number; stake: number } } | { kind: "dice" } | { kind: "crates" } | { kind: "hoops" } | { kind: "tag" } | { kind: "shop"; shop: ShopKind };
 
 export interface Api {
   say: (lines: string[], choices?: Choice[]) => void;
@@ -286,10 +286,114 @@ function cypher(api: Api) {
   ]);
 }
 
+/** The CD guy wants a beat for his next CD: something slow. */
+const CD_TEMPO = 90;
+function cdAsk(api: Api) {
+  const tape = api.tape();
+  if (!api.happened("cd-ask")) {
+    api.markSeen("cd-ask");
+    api.say(["“Listen. Listen. Next CD. I need a beat for track four.”", `“Slow. Under ${CD_TEMPO}. Rain-on-the-window slow. You make that, I pay. Twenty-five.”`, "(make a beat under 90 BPM in the studio, save it, bring it here)"]);
+    return;
+  }
+  if (!tape) {
+    api.say([`“Track four. Slow. Under ${CD_TEMPO}. Still waiting.”`]);
+    return;
+  }
+  if (tape.tempo >= CD_TEMPO) {
+    api.say([`He listens to ‘${tape.name}’ for four bars.`, `“That's ${tape.tempo}. I said slow. Under ${CD_TEMPO}. Like walking home.”`]);
+    return;
+  }
+  api.say([`He listens to ‘${tape.name}’ with his eyes shut. ${tape.tempo} BPM. His head barely moves.`, "“That's it. That's track four.”"], [
+    {
+      label: "It's yours ($25)",
+      run: () => {
+        api.markSeen("cd-done");
+        api.earn(25);
+        api.addRep(4);
+        api.sfx.coins();
+        api.say(["He counts out twenty-five in ones and fives.", "“Your name's going on the back. Small. But it's going on.”"]);
+      },
+    },
+    { label: "Not that one", run: () => api.say(["“Then bring me the slow one.”"]) },
+  ]);
+}
+
+/** What it costs to battle Vee, and what Vee scores (better each time you win). */
+export const BATTLE_STAKE = 20;
+const rivalScore = (s: SaveData) => Math.min(90, 60 + 6 * s.stats.battleWins + Math.floor(Math.random() * 9));
+
+/** Vee, the other producer at the underpass: a beat battle for money. */
+export function battle(api: Api, first = false) {
+  const s = api.save();
+  const go = () => {
+    if (!api.spend(BATTLE_STAKE)) return api.say(["“No money, no battle. Come back with twenty.”"]);
+    api.open({ kind: "rhythm", mode: "battle", rival: { name: "Vee", score: rivalScore(api.save()), stake: BATTLE_STAKE } });
+  };
+  const lines = first
+    ? ["Someone peels off from the cypher and walks straight at you, a sampler under her arm.", "“You're the one Dre keeps buying from? I'm Vee.”", `“Beat battle. My beat, both of us play it live. $${BATTLE_STAKE} says I do it better.”`]
+    : s.stats.battleWins
+      ? [s.stats.battleWins > s.stats.battleLosses ? "“Run it back. I've been practising.”" : "“Again? Fine. Same stakes.”", `(you ${s.stats.battleWins} · Vee ${s.stats.battleLosses})`]
+      : s.stats.battleLosses
+        ? ["“Back for more? I'll take your money all night.”"]
+        : ["“Still scared? Twenty dollars. My beat, both of us live.”"];
+  api.say(lines, [
+    { label: `Battle ($${BATTLE_STAKE})`, run: go },
+    { label: "Not tonight", run: () => api.say([first ? "“Thought so. I'm here when you've got the nerve.”" : "“Your loss. Well. My win.”"]) },
+  ]);
+}
+
+/** Who Dre sends you to, in turn. */
+const JOB_TO: { id: string; where: string; ok?: (s: SaveData) => boolean }[] = [
+  { id: "busker", where: "the busker, down in the subway" },
+  { id: "records-owner", where: "the man at the record shop" },
+  { id: "bartender", where: "the bartender at the club", ok: clubOk },
+];
+const JOB_HANDOVER: Record<string, string[]> = {
+  busker: ["You hand the busker Dre's tape. He doesn't stop playing; he takes it with one hand and the chords don't miss.", "He nods at his case. There's an envelope in it. “For Dre. Don't open it.”"],
+  "records-owner": ["You put the tape on the counter. He turns it over, reads something on the label you can't see, and laughs.", "He slides an envelope back. “Tell Dre: Thursday.”"],
+  bartender: ["The bartender takes the tape like it's a drink order and slips it under the till.", "An envelope comes back across the bar. “Not here. Go.”"],
+};
+
+/** Dre's work: carry a tape, bring back what you're given. */
+function dreJob(api: Api) {
+  const s = api.save();
+  const options = JOB_TO.filter((j) => !j.ok || j.ok(s));
+  const pick = options[s.stats.jobs % options.length];
+  const pay = 20 + 5 * Math.min(4, s.stats.jobs);
+  api.say(["Dre looks round, then holds out a tape with no label.", `“Take this to ${pick.where}. Don't play it. Bring back what they give you.”`, `“$${pay} when you're back.”`], [
+    {
+      label: "I'll take it",
+      run: () => {
+        api.update((x) => ({ ...x, job: { to: pick.id, stage: "carry", pay } }));
+        api.toast(`Job: take Dre's tape to ${pick.where}. (The menu has it too.)`, 4600);
+        api.close();
+      },
+    },
+    { label: "Not now", run: () => api.say(["“Work's there when you want it.”"]) },
+  ]);
+}
+
+/** Where your current job stands, in a few words (the menu shows it). */
+export function jobText(s: SaveData): string | null {
+  if (!s.job) return null;
+  const where = JOB_TO.find((j) => j.id === s.job!.to)?.where ?? "someone";
+  return s.job.stage === "carry" ? `take Dre's tape to ${where}` : `bring the envelope back to Dre at the underpass ($${s.job.pay})`;
+}
+
 /** People in the newer places. Returns false for anyone it doesn't know. */
 export function talk(a: Actor, api: Api): boolean {
   const s = api.save();
+  // a delivery for Dre
+  if (s.job?.stage === "carry" && s.job.to === a.id) {
+    api.update((x) => ({ ...x, job: x.job && { ...x.job, stage: "back" } }));
+    api.sfx.select();
+    api.say([...(JOB_HANDOVER[a.id] ?? ["You hand it over."]), "(take it back to Dre)"]);
+    return true;
+  }
   switch (a.id) {
+    case "vee":
+      battle(api);
+      return true;
     case "bouncer": {
       if (clubOk(s)) {
         a.x = 36.9 * 16;
@@ -314,7 +418,8 @@ export function talk(a: Actor, api: Api): boolean {
           },
           { label: "Not now", run: () => api.say(["“I'm here every night. Every. Night.”"]) },
         ]);
-      } else api.say([["“How's the CD? Track four, right? Track four.”"], ["“The club's letting people in who look the part. Thrift shop's right there.”"], ["“Win a few fights and people start to know you. Not that I'd know.”"]][Math.floor(api.t()) % 3]);
+      } else if (!api.happened("cd-done")) cdAsk(api);
+      else api.say([["“How's the CD? Track four, right? Track four. That's yours.”"], ["“The club's letting people in who look the part. Thrift shop's right there.”"], ["“Win a few fights and people start to know you. Not that I'd know.”"]][Math.floor(api.t()) % 3]);
       return true;
     case "dice-1":
     case "dice-2":
@@ -369,12 +474,30 @@ export function talk(a: Actor, api: Api): boolean {
     case "mc-0":
       cypher(api);
       return true;
-    case "dre":
-      api.say(api.tape() ? ["“You got something for me?”"] : ["“I buy beats. Bring me one.”"], api.tape() ? [
-        { label: "Sell him your newest", run: () => sellTape(api, "dre") },
+    case "dre": {
+      if (s.job?.stage === "back") {
+        const pay = s.job.pay;
+        api.update((x) => ({ ...x, job: null, stats: { ...x.stats, jobs: x.stats.jobs + 1 } }));
+        api.earn(pay);
+        api.addRep(3);
+        api.sfx.coins();
+        api.say(["Dre takes the envelope without looking in it and puts it away.", `“Good. $${pay}.” He counts it out on the speaker. (+3 respect)`]);
+        return true;
+      }
+      if (s.job?.stage === "carry") {
+        api.say([`“Why are you still here? ${jobText(s)?.replace(/^take/, "Take") ?? ""}.”`]);
+        return true;
+      }
+      // work, once you've shown you can be trusted with a tape
+      const trusted = s.stats.beatsSold > 0 || s.rep >= 20;
+      const choices = [
+        ...(api.tape() ? [{ label: "Sell him your newest", run: () => sellTape(api, "dre") }] : []),
+        ...(trusted ? [{ label: "Got any work?", run: () => dreJob(api) }] : []),
         { label: "Not yet", run: () => api.say(["“I'm not going anywhere.”"]) },
-      ] : undefined);
+      ];
+      api.say(api.tape() ? ["“You got something for me?”"] : ["“I buy beats. Bring me one.”"], choices.length > 1 ? choices : undefined);
       return true;
+    }
     case "tank":
       if (api.happened("tank-beaten")) {
         api.say([["“Respect.”"], ["“The stand still working? Good.”"], ["“People know you now. That's a weight. Carry it.”"]][Math.floor(api.t()) % 3]);

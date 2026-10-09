@@ -17,7 +17,7 @@ import Tag from "./minigames/Tag";
 import { overhead, trainAt } from "./places/underground";
 import { camera, draw, VIEW_H, VIEW_W } from "./render";
 import { loadSave, MAX_HP, migrateOldTapes, resetSave, writeSave, type SaveData, type Settings } from "./save";
-import { clubOk, operate, promptFor as promptMore, talk as talkMore, type Api, type Mini } from "./scripts";
+import { battle, clubOk, operate, promptFor as promptMore, talk as talkMore, type Api, type Mini } from "./scripts";
 import { duck, setPlace, setRing, setRumble, setSfxVolume, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
 import { CONSUMABLES, consumableById, unlockedByWins, weaponById } from "./weapons";
 import { Engine } from "./studio/engine";
@@ -26,7 +26,7 @@ import { loadStore } from "./studio/project";
 import Studio from "./studio/Studio";
 import { FINDABLE, playVoice, voiceById, VOICES } from "./studio/voices";
 import { clearSmoke } from "./actors";
-import { lifeBlocks, lifeTarget, makeLife, sendCop, updateLife, type Actor } from "./life";
+import { cheerFor, lifeBlocks, lifeTarget, makeLife, sendCop, updateLife, type Actor } from "./life";
 import { clone, type Project } from "./studio/project";
 import { sampleProject } from "./studio/sample";
 import { TRACKS } from "@/data/tracks";
@@ -658,6 +658,49 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (f && !f.outcome && startDodge(f.me, keys.current)) sfx.dodge();
   };
 
+  const latestTape = (): Project | null => {
+    const slots = loadStore().slots.filter((p): p is Project => !!p);
+    return slots.length ? slots[slots.length - 1] : null;
+  };
+
+  /** What the newer places' scripts get to do (scripts.ts). */
+  const api: Api = {
+    say,
+    close: () => setDialog(null),
+    toast: showToast,
+    find,
+    save: () => saveRef.current,
+    update: updateSave,
+    earn,
+    spend,
+    addRep,
+    heal,
+    tape: latestTape,
+    open: (m) => {
+      setDialog(null);
+      setMini(m);
+    },
+    menu: (tab) => {
+      setDialog(null);
+      setMenu({ tab, creator: false });
+    },
+    bossFight,
+    happened,
+    markSeen,
+    radio: (ids) => void sfx.radio(ids),
+    someChops: () => {
+      const track = TRACKS[Math.floor(Math.random() * TRACKS.length)];
+      const i = 1 + Math.floor(Math.random() * 6);
+      return [`chop:${track.id}:${i}`, `chop:${track.id}:${i + 1}`, `chop:${track.id}:${i + 2}`];
+    },
+    sfx,
+    life: () => life.current,
+    t: () => st.current.t,
+    get visit() {
+      return st.current.visit;
+    },
+  };
+
   /** Walking into a place: what's waiting there this time. */
   const arriveAt = (to: Place, from: Place) => {
     const s = st.current;
@@ -672,8 +715,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
     // she was on the ledge while your tape played; come back up and she isn't
     const ledge = life.current.find((a) => a.id === "ledge");
     if (to === "rooftop" && ledge && s.playedLedge) ledge.hidden = true;
-    // trouble doesn't follow you through doors; a fight is a getaway
+    // trouble doesn't follow you through doors; a fight is a getaway (and one you've won is over)
     if (s.fight && !s.fight.outcome) flee();
+    else if (s.fight?.outcome === "won") {
+      dropFoes(s.fight.foes);
+      s.fight = null;
+    }
     if (s.pending) {
       dropFoes(s.pending);
       s.pending = null;
@@ -683,6 +730,20 @@ export default function Game({ onExit }: { onExit: () => void }) {
     // the rough places: sometimes they're waiting
     const rough = ROUGH[to];
     if (rough && v.profile?.name && s.t - s.lastTrouble > BREATHER && Math.random() < rough && s.encounterIn > 4) s.encounterIn = 2.5 + Math.random() * 3;
+    // Vee shows up at the underpass once you've sold a beat or played the cypher; the first time, she comes to you
+    const vee = life.current.find((a) => a.id === "vee");
+    if (vee) vee.hidden = !(v.stats.beatsSold > 0 || v.stats.cypherBest > 0 || v.stats.battleWins + v.stats.battleLosses > 0);
+    if (to === "underpass" && vee && !vee.hidden && !v.seen.includes("vee")) {
+      // as soon as you're free (not talking, not fighting), while you're still here
+      const call = (tries: number) => {
+        const s2 = st.current;
+        if (s2.place !== "underpass" || happened("vee") || tries > 40) return;
+        if (ui.current.dialog || ui.current.mini || ui.current.menu || (s2.fight && !s2.fight.outcome) || s2.pending) return void window.setTimeout(() => call(tries + 1), 500);
+        markSeen("vee");
+        battle(api, true);
+      };
+      window.setTimeout(() => call(0), 900);
+    }
     // the bouncer steps aside for people he'll let in
     const bouncer = life.current.find((a) => a.id === "bouncer");
     if (to === "avenue" && bouncer) bouncer.x = (clubOk(v) ? 36.9 : 35.5) * TILE;
@@ -712,10 +773,24 @@ export default function Game({ onExit }: { onExit: () => void }) {
     find(mode === "cypher" ? "mic" : "crowd");
     showToast(`${score}%: ${cash ? `+$${cash}` : "no money"}${rep ? `, +${rep} respect` : ""}${score > best ? " (your best)" : ""}${!fresh ? " · the crowd's thinner the second time" : ""}`, 4200);
   };
+  /** The end of a beat battle: the stake was paid going in; a win pays it back double. */
+  const battleDone = (score: number, rival: { name: string; score: number; stake: number }) => {
+    const won = score >= rival.score;
+    updateSave((x) => ({ ...x, stats: { ...x.stats, battleWins: x.stats.battleWins + (won ? 1 : 0), battleLosses: x.stats.battleLosses + (won ? 0 : 1) } }));
+    if (won) {
+      earn(rival.stake * 2);
+      addRep(8);
+      sfx.cheer();
+      cheerFor(life.current, (a) => a.place === "underpass" && a.id.startsWith("mc-"));
+    }
+    showToast(won ? `${score}% to ${rival.name}'s ${rival.score}%: +$${rival.stake * 2}, +8 respect` : `${score}% to ${rival.name}'s ${rival.score}%: ${rival.name} keeps your $${rival.stake}`, 4600);
+  };
   // for the browser tests: a rhythm game's ending, without playing it
   const rhythmRef = useRef<(mode: "cypher" | "dj", score: number) => void>(() => {});
+  const battleRef = useRef(battleDone);
   useLayoutEffect(() => {
     rhythmRef.current = rhythmDone;
+    battleRef.current = battleDone;
   });
 
   // ------------------------------------------------------------ the studio
@@ -762,11 +837,6 @@ export default function Game({ onExit }: { onExit: () => void }) {
   }, []);
 
   // ------------------------------------------------------------ people
-
-  const latestTape = (): Project | null => {
-    const slots = loadStore().slots.filter((p): p is Project => !!p);
-    return slots.length ? slots[slots.length - 1] : null;
-  };
 
   const smokeWith = () => {
     const s = st.current;
@@ -900,44 +970,6 @@ export default function Game({ onExit }: { onExit: () => void }) {
       default:
         if (!talkMore(a, api)) say(next);
     }
-  };
-
-  /** What the newer places' scripts get to do (scripts.ts). */
-  const api: Api = {
-    say,
-    close: () => setDialog(null),
-    toast: showToast,
-    find,
-    save: () => saveRef.current,
-    update: updateSave,
-    earn,
-    spend,
-    addRep,
-    heal,
-    tape: latestTape,
-    open: (m) => {
-      setDialog(null);
-      setMini(m);
-    },
-    menu: (tab) => {
-      setDialog(null);
-      setMenu({ tab, creator: false });
-    },
-    bossFight,
-    happened,
-    markSeen,
-    radio: (ids) => void sfx.radio(ids),
-    someChops: () => {
-      const track = TRACKS[Math.floor(Math.random() * TRACKS.length)];
-      const i = 1 + Math.floor(Math.random() * 6);
-      return [`chop:${track.id}:${i}`, `chop:${track.id}:${i + 1}`, `chop:${track.id}:${i + 2}`];
-    },
-    sfx,
-    life: () => life.current,
-    t: () => st.current.t,
-    get visit() {
-      return st.current.visit;
-    },
   };
 
   const boombox = () => {
@@ -1456,6 +1488,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       },
       /** Pretend a rhythm game just finished with this score. */
       rhythm: (mode: "cypher" | "dj", score: number) => rhythmRef.current(mode, score),
+      battle: (score: number, rival: number) => battleRef.current(score, { name: "Vee", score: rival, stake: 20 }),
       /** Open a mini-game or a menu tab straight away. */
       mini: (m: Mini | null) => setMini(m),
       menu: (tab: MenuTab | null) => setMenu(tab ? { tab, creator: false } : null),
@@ -2057,7 +2090,16 @@ export default function Game({ onExit }: { onExit: () => void }) {
           />
         )}
 
-        {mini?.kind === "rhythm" && <Rhythm mode={mini.mode} volume={save.settings.music} touch={touch} onFinish={(score) => rhythmDone(mini.mode, score)} onClose={closeMini} />}
+        {mini?.kind === "rhythm" && (
+          <Rhythm
+            mode={mini.mode}
+            rival={mini.rival}
+            volume={save.settings.music}
+            touch={touch}
+            onFinish={(score) => (mini.mode === "battle" && mini.rival ? battleDone(score, mini.rival) : mini.mode !== "battle" && rhythmDone(mini.mode, score))}
+            onClose={closeMini}
+          />
+        )}
         {mini?.kind === "dice" && (
           <Dice
             cash={save.cash}

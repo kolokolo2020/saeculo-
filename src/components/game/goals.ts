@@ -40,6 +40,8 @@ export const GOALS: Goal[] = [
   { id: "club", name: "On the list", hint: "Get past the door at the club. Respect or style.", done: (s) => s.places.includes("club"), reward: { rep: 5 } },
   { id: "dj", name: "Play the club", hint: "Play a set at the club and keep the floor (70%).", done: (s) => s.stats.djBest >= 70, progress: (s) => [Math.min(70, s.stats.djBest), 70], reward: { cash: 60, rep: 10 } },
   { id: "cypher", name: "Rock the cypher", hint: "Keep the beat going under the bridge (70%).", done: (s) => s.stats.cypherBest >= 70, progress: (s) => [Math.min(70, s.stats.cypherBest), 70], reward: { rep: 15 } },
+  { id: "battle", name: "Battle tested", hint: "Beat Vee in a beat battle at the underpass.", done: (s) => s.stats.battleWins > 0, reward: { cash: 20, rep: 10 } },
+  { id: "job", name: "On the payroll", hint: "Do a job for Dre.", done: (s) => s.stats.jobs > 0, reward: { rep: 5 } },
   { id: "tag", name: "Get up", hint: "Put your name on the alley wall.", done: (s) => !!s.tag, reward: { rep: 5 } },
   { id: "digger", name: "Crate digger", hint: "Dig the crates at the record shop five times.", done: (s) => s.stats.digs >= 5, progress: (s) => [Math.min(5, s.stats.digs), 5], reward: { rep: 5 } },
   { id: "tank", name: "Under the bridge", hint: "Tank runs the underpass. Win enough fights and he'll notice you.", done: (s) => s.seen.includes("tank-beaten"), reward: { cash: 80, rep: 20 } },

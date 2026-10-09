@@ -35,6 +35,17 @@ export interface Stats {
   digs: number;
   tags: number;
   swishes: number;
+  battleWins: number;
+  battleLosses: number;
+  jobs: number;
+}
+
+/** A job from Dre: a tape to take somewhere, then back to him for the money. */
+export interface Job {
+  /** Who it goes to (an actor id). */
+  to: string;
+  stage: "carry" | "back";
+  pay: number;
 }
 
 export interface SaveData {
@@ -67,13 +78,15 @@ export interface SaveData {
   places: string[];
   /** Your tag on the alley wall, if you've sprayed it. */
   tag: { color: string } | null;
+  /** The job you're on, if any. */
+  job: Job | null;
   settings: Settings;
 }
 
 const KEY = "saeculo-game";
 
 export const DEFAULT_SETTINGS: Settings = { sfx: 0.8, music: 0.8, shake: true, hints: true, difficulty: "normal" };
-const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0 };
+const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0, battleWins: 0, battleLosses: 0, jobs: 0 };
 
 export function freshSave(): SaveData {
   return {
@@ -95,6 +108,7 @@ export function freshSave(): SaveData {
     sold: [],
     places: ["bedroom"],
     tag: null,
+    job: null,
     settings: { ...DEFAULT_SETTINGS },
   };
 }
@@ -137,6 +151,7 @@ export function loadSave(): SaveData {
       sold: strings(raw.sold),
       places: [...new Set(["bedroom", ...strings(raw.places)])],
       tag: raw.tag && typeof raw.tag.color === "string" ? { color: raw.tag.color } : null,
+      job: raw.job && typeof raw.job.to === "string" && (raw.job.stage === "carry" || raw.job.stage === "back") ? { to: raw.job.to, stage: raw.job.stage, pay: num(raw.job.pay, 0, 500, 25) } : null,
       settings: {
         sfx: num(st.sfx, 0, 1, DEFAULT_SETTINGS.sfx),
         music: num(st.music, 0, 1, DEFAULT_SETTINGS.music),

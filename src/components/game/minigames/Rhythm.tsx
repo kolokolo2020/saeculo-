@@ -12,9 +12,10 @@ import Frame, { miniBtn } from "./Frame";
 // kick, the snare and the keys (or the 808) drop out and it's on you: hit
 // each one as it reaches the line and it plays; miss and there's a hole.
 // The hats keep time either way. Keys: D F J K (or the arrows); on a
-// phone, the four pads.
+// phone, the four pads. A beat battle is the hard one: the rival's drill
+// beat, the hats on you too, every eighth, and less room either side.
 
-export type RhythmMode = "cypher" | "dj";
+export type RhythmMode = "cypher" | "dj" | "battle";
 
 interface Hit {
   t: number;
@@ -34,13 +35,16 @@ const LANES = [
   { name: "keys", key: "K", color: "#7ddc3a" },
 ];
 const KEYS: Record<string, number> = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3, ArrowLeft: 0, ArrowDown: 1, ArrowUp: 2, ArrowRight: 3 };
-const FALL = 1.5;
-const PERFECT = 0.06;
-const LATE = 0.17;
+/** How long a bar takes to fall, and how close counts, per mode. */
+const FEEL: Record<RhythmMode, { fall: number; perfect: number; late: number; gap: number; loops: number; preset: number }> = {
+  cypher: { fall: 1.5, perfect: 0.06, late: 0.17, gap: 0.2, loops: 4, preset: 0 },
+  dj: { fall: 1.5, perfect: 0.06, late: 0.17, gap: 0.17, loops: 5, preset: 2 },
+  battle: { fall: 1.2, perfect: 0.045, late: 0.13, gap: 0.13, loops: 4, preset: 3 },
+};
 
 function chart(p: Project, start: number, loops: number, mode: RhythmMode): { hits: Hit[]; lanes: (string | null)[]; end: number } {
   const byCat = (cats: string[], melodic = false) => p.channels.find((c) => cats.includes(voiceById(c.voice)?.cat ?? "") && (!melodic || voiceById(c.voice)?.kind === "melodic"));
-  const lanes = [byCat(["Kicks"]), byCat(["Snares & claps"]), byCat(["Hats"]), mode === "dj" ? byCat(["808 & bass"], true) : (byCat(["Keys"], true) ?? byCat(["Synths"], true))];
+  const lanes = [byCat(["Kicks"]), byCat(["Snares & claps"]), byCat(["Hats"]), mode !== "cypher" ? byCat(["808 & bass"], true) : (byCat(["Keys"], true) ?? byCat(["Synths"], true))];
   const step = 60 / p.tempo / 4;
   const pat = p.patterns[0];
   const hits: Hit[] = [];
@@ -59,10 +63,10 @@ function chart(p: Project, start: number, loops: number, mode: RhythmMode): { hi
           len = n.len;
         } else {
           if (!(pat.steps[ch.id]?.[s] > 0)) return;
-          if (lane === 2 && s % 4 !== 0) return;
+          if (lane === 2 && s % (mode === "battle" ? 2 : 4) !== 0) return;
         }
         // keep it playable: no two in a lane closer than this
-        if (t - last[lane] < (mode === "dj" ? 0.17 : 0.2)) return;
+        if (t - last[lane] < FEEL[mode].gap) return;
         last[lane] = t;
         hits.push({ t, lane, channel: ch.id, voice: ch.voice, midi, len, state: 0 });
       });
@@ -70,7 +74,10 @@ function chart(p: Project, start: number, loops: number, mode: RhythmMode): { hi
   return { hits, lanes: lanes.map((c) => c?.id ?? null), end: start + (loops + 1) * p.length * step };
 }
 
-export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mode: RhythmMode; volume: number; touch: boolean; onFinish: (score: number) => void; onClose: () => void }) {
+export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }: { mode: RhythmMode; volume: number; touch: boolean; onFinish: (score: number) => void; onClose: () => void; rival?: { name: string; score: number } }) {
+  const { fall: FALL, perfect: PERFECT, late: LATE } = FEEL[mode];
+  // the fourth lane is the keys under the bridge, the 808 anywhere else
+  const laneName = (i: number) => (i === 3 && mode !== "cypher" ? "808" : LANES[i].name);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<"ready" | "play" | "done">("ready");
   const [result, setResult] = useState({ score: 0, perfect: 0, good: 0, missed: 0, combo: 0 });
@@ -80,13 +87,12 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mod
   const begin = () => {
     run.current?.engine.dispose();
     run.current = null;
-    const base = clone((mode === "cypher" ? PRESETS[0] : PRESETS[2]).make());
+    const base = clone(PRESETS[FEEL[mode].preset].make());
     base.mode = "pattern";
     base.master = { ...base.master, vol: base.master.vol * Math.max(0.15, volume) };
     const engine = new Engine(base);
     void engine.start().then(() => {
-      const loops = mode === "cypher" ? 4 : 5;
-      const c = chart(base, engine.startTime, loops, mode);
+      const c = chart(base, engine.startTime, FEEL[mode].loops, mode);
       run.current = { engine, ...c, muted: false, start: engine.startTime, loopLen: base.length * (60 / base.tempo / 4), combo: 0, best: 0, hype: 0.5, flash: [] };
       setPhase("play");
     });
@@ -115,7 +121,7 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mod
     }
     const d = Math.abs(cand.t - now);
     cand.state = d <= PERFECT ? 1 : 2;
-    if (lane !== 2) {
+    if (lane !== 2 || mode === "battle") {
       const stop = r.engine.noteOn(cand.voice, cand.midi, cand.channel, cand.state === 1 ? 1 : 0.75);
       setTimeout(stop, Math.max(100, cand.len * (60 / r.engine.project.tempo / 4) * 1000));
     }
@@ -164,7 +170,7 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mod
         r.muted = true;
         const p = clone(r.engine.project);
         p.channels.forEach((ch) => {
-          if ([r.lanes[0], r.lanes[1], r.lanes[3]].includes(ch.id)) ch.mute = true;
+          if ([r.lanes[0], r.lanes[1], r.lanes[3], ...(mode === "battle" ? [r.lanes[2]] : [])].includes(ch.id)) ch.mute = true;
         });
         r.engine.setProject(p);
       }
@@ -227,7 +233,7 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mod
         g.fillStyle = LANES[i].color;
         g.font = "14px monospace";
         g.textAlign = "center";
-        g.fillText(touch ? LANES[i].name : `${LANES[i].key} ${LANES[i].name}`, i * lw + lw / 2, H - 12);
+        g.fillText(touch ? laneName(i) : `${LANES[i].key} ${laneName(i)}`, i * lw + lw / 2, H - 12);
       }
       g.textAlign = "left";
       if (now > r.end + 0.4) {
@@ -248,9 +254,13 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mod
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  const title = mode === "cypher" ? "The cypher" : "Your set";
+  const title = mode === "cypher" ? "The cypher" : mode === "battle" ? "Beat battle" : "Your set";
   const verdict = (s: number) =>
-    mode === "cypher"
+    rival
+      ? s >= rival.score
+        ? `${rival.name} got ${rival.score}%. The crowd's on your side. ${rival.name} shakes your hand, not happy about it.`
+        : `${rival.name} got ${rival.score}%. Close isn't enough. ${rival.name} takes the money and grins.`
+      : mode === "cypher"
       ? s >= 85
         ? "They go off. Somebody films it."
         : s >= 70
@@ -267,11 +277,17 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mod
             : "The floor empties a bit. The DJ takes over again.";
 
   return (
-    <Frame title={title} sub={mode === "cypher" ? "keep the beat going" : "keep the floor"} onClose={onClose} testid="rhythm" wide>
+    <Frame title={title} sub={mode === "cypher" ? "keep the beat going" : mode === "battle" ? (rival ? `beat ${rival.name}'s ${rival.score}%` : "the hard one") : "keep the floor"} onClose={onClose} testid="rhythm" wide>
       {phase === "ready" && (
         <div className="flex flex-col gap-3">
-          <p>{mode === "cypher" ? "They'll rap over whatever you play. One loop of the beat, then the kick, the snare and the keys are yours." : "Your set. One loop to get the feel, then the kick, the snare and the 808 are yours. Keep the floor."}</p>
-          <p className="text-[17px] text-[#b9b09e]">{touch ? "Tap the pads as the bars reach the line." : "D F J K (or ← ↓ ↑ →) as the bars reach the line. The hats keep time."}</p>
+          <p>
+            {mode === "cypher"
+              ? "They'll rap over whatever you play. One loop of the beat, then the kick, the snare and the keys are yours."
+              : mode === "battle"
+                ? `${rival?.name ?? "They"} played theirs: ${rival?.score ?? "?"}%. Now yours: one loop to hear it, then everything's on you, hats too. Faster, and less room for error.`
+                : "Your set. One loop to get the feel, then the kick, the snare and the 808 are yours. Keep the floor."}
+          </p>
+          <p className="text-[17px] text-[#b9b09e]">{touch ? "Tap the pads as the bars reach the line." : `D F J K (or ← ↓ ↑ →) as the bars reach the line.${mode === "battle" ? "" : " The hats keep time."}`}</p>
           <button className={miniBtn} onClick={begin} data-autofocus data-testid="rhythm-start">
             Start
           </button>
@@ -288,7 +304,7 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mod
                   className="pad-btn h-16 rounded-[4px]"
                   data-down={down === i}
                   style={{ borderColor: l.color }}
-                  aria-label={`${l.name} pad`}
+                  aria-label={`${laneName(i)} pad`}
                   onPointerDown={(e) => {
                     e.preventDefault();
                     setDown(i);
@@ -296,7 +312,7 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mod
                   }}
                   onPointerUp={() => setDown(null)}
                 >
-                  {l.name}
+                  {laneName(i)}
                 </button>
               ))}
             </div>
@@ -309,9 +325,11 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose }: { mod
                 perfect {result.perfect} · good {result.good} · missed {result.missed} · best run {result.combo}
               </p>
               <div className="flex gap-2">
-                <button className={miniBtn} onClick={() => setPhase("ready")}>
-                  Again
-                </button>
+                {!rival && (
+                  <button className={miniBtn} onClick={() => setPhase("ready")}>
+                    Again
+                  </button>
+                )}
                 <button className={miniBtn} onClick={onClose}>
                   Done
                 </button>

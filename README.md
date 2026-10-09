@@ -110,6 +110,16 @@ the first set in a while pays, a second straight after pays a third),
 **dice**, **crate digging**, **hoops**, **tagging** the wall, buying clothes.
 Twelve sounds hide around the map for the studio's **Found** tab.
 
+**Things that happen**: once you've sold a beat or played the cypher, Vee
+(another producer) comes over at the underpass and challenges you to a
+**beat battle**: $20 in, her beat, both of you play it live (the hard
+rhythm game: faster, tighter, the hats on you too); beat her score and you
+get $40 back, and she gets better each time you win. The CD guy, once
+you've bought his CD, wants a slow beat (under 90 BPM) for track four.
+Dre, once you've sold him something, has **jobs**: take a tape to the
+busker, the record shop or the bar, bring back what they give you, get
+paid. The current job is in the menu under goals.
+
 **Trouble**: now and then, in the rougher places, a group of drunks walks up
 to you. Fight, pay them off, play them your beat, or walk away. Fights are
 real-time: E/Space swings (watch for the “!”, that's a swing coming),
@@ -123,7 +133,7 @@ stand. After trouble the block leaves you alone for a minute or so. Go down and 
 up at home with a quarter of your cash gone. A door is always a way out.
 
 **The menu** (M, or the button up top): you, your wardrobe (25 pieces,
-most bought or earned), weapons and food, goals (16, each pays out),
+most bought or earned), weapons and food, goals (18, each pays out),
 settings (sound and music levels, fight difficulty, shake, hints, start
 over). Cash, respect, health and everything else save in the browser.
 

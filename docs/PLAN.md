@@ -39,10 +39,16 @@ commit + push after each step, extend scripts/verify.mjs).
    with a line from whoever's nearest. Also: verify.mjs waits for windows
    to finish opening before the axe audit (it flaked mid-animation).
 
+7. Things that happen: Vee, a rival producer at the underpass (shows up
+   after your first sale or cypher), challenges you to a beat battle: a
+   "battle" rhythm mode (drill beat, hats on you too at eighths, tighter
+   windows, faster fall), $20 stake, her score rises with each of your
+   wins. The CD guy asks for a beat under 90 BPM for track four ($25). Dre
+   hands out delivery jobs in turn (busker, record shop, bar once you can
+   get in), paid on return; the job shows in the menu. Two new goals
+   (18). A fight you've won is cleared when you walk out of the place.
+
 ## Next (in order)
-4. More things that happen: a rival producer challenges you to a beat
-   battle (the rhythm game, harder); the CD guy asks you for a beat; Dre
-   gives a small "job" (deliver a tape) with a reward.
 5. Subway as fast travel: board the train when the doors are open and get
    off at "your block" (the street) or the avenue.
 6. Sound polish: footsteps per surface in the new places, crowd murmur in

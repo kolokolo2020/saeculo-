@@ -641,6 +641,49 @@ try {
     check("club: a good set pays, the same set straight after pays a third", cash1 - cash0 === 26 && cash2 - cash1 === 8, `${cash1 - cash0}, ${cash2 - cash1}`);
     await closeDialog();
 
+    // things that happen: Vee's beat battle, Dre's job, the CD guy's request
+    const talkTo = async (place, x, y, dir = "right") => {
+      await closeDialog();
+      await page.evaluate(([p, x, y, d]) => window.__game.teleport(p, x, y, d), [place, x, y, dir]);
+      await page.waitForTimeout(250);
+      await page.keyboard.press("e");
+      await page.waitForTimeout(250);
+    };
+    const pick = async (name) => {
+      for (let i = 0; i < 6 && !(await page.getByTestId("game-dialog").getByRole("button", { name }).count()); i++) {
+        await page.keyboard.press("e");
+        await page.waitForTimeout(150);
+      }
+      await page.getByTestId("game-dialog").getByRole("button", { name }).click();
+      await page.waitForTimeout(250);
+    };
+    await page.evaluate(() => window.__game.give({ cash: 200, stats: { ...window.__game.save().stats, beatsSold: 1 } }));
+    await page.evaluate(() => window.__game.teleport("underpass", 8, 6.5, "right"));
+    await page.waitForTimeout(1400);
+    const veeTalk = (await page.getByTestId("game-dialog").count()) ? await dialogText() : "";
+    check("underpass: Vee comes over and challenges you", /walks straight at you/.test(veeTalk) && (await saved()).seen.includes("vee"), veeTalk);
+    await pick(/Battle/);
+    check("battle: the stake goes in, the hard rhythm game opens", (await saved()).cash === 180 && (await page.getByRole("dialog", { name: "Beat battle" }).isVisible()));
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => window.__game.battle(80, 70));
+    const bt = await saved();
+    check("battle: win it, double your money, a goal", bt.cash >= 220 && bt.stats.battleWins === 1 && bt.goals.includes("battle"), `${bt.cash}`);
+    await talkTo("underpass", 11.6, 6.8);
+    await pick("Got any work?");
+    await pick("I'll take it");
+    check("Dre: a job, carrying a tape", (await saved()).job?.to === "busker" && (await saved()).job.stage === "carry");
+    await talkTo("subway", 13.1, 3.6);
+    check("subway: the busker takes it and gives you something back", (await saved()).job?.stage === "back");
+    const cashBack = (await saved()).cash;
+    await talkTo("underpass", 11.6, 6.8);
+    const paid = await saved();
+    check("Dre: back with the envelope, paid", paid.job === null && paid.stats.jobs === 1 && paid.cash > cashBack && paid.goals.includes("job"));
+    await page.evaluate(() => window.__game.give({ seen: [...window.__game.save().seen, "cd"] }));
+    await talkTo("avenue", 23.5, 4.4);
+    const cdText = (await page.getByTestId("game-dialog").count()) ? await dialogText() : "";
+    check("avenue: the CD guy wants a slow beat", (await saved()).seen.includes("cd-ask") && /track four/i.test(cdText), cdText);
+    await closeDialog();
+
     // more life: a police car, people passing on the avenue, the alley cat, the storm
     check("alley: a cat", (await lifeNow()).actors.some((a) => a.kind === "cat" && a.place === "alley"));
     await page.evaluate(() => window.__game.teleport("avenue", 20, 5, "down"));
