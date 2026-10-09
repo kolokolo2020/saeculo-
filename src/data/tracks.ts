@@ -1,18 +1,18 @@
 import type { Track } from "@/lib/types";
 import analysis from "./trackAnalysis.json";
 
-// The beats, as one album under one cover (the wordmark on a spectrum
-// analyser, drawn by scripts/make-cover.mjs). To add a beat:
+// The beats, as one album under one cover (the owner's artwork,
+// public/covers/saeculo.jpg). To add a beat:
 //   1. put the MP3 in public/audio/
 //   2. add an entry below (newest first; only id, title and src are required)
 //   3. optional: `node scripts/analyze-tracks.mjs` measures the exact tempo,
-//      first beat and waveform so the seek bar and the visualizer line up.
+//      first beat and waveform so the seek bar lines up.
 // The player reads the length from the file itself, so nothing else needs
 // updating.
 export const ALBUM = {
   title: "saeculo",
   /** Shown on the site. */
-  cover: "/covers/saeculo.svg",
+  cover: "/covers/saeculo.jpg",
   /** The same cover as a JPEG, for share cards and lock screens. */
   coverJpg: "/covers/saeculo.jpg",
 };
