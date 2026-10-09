@@ -78,7 +78,9 @@ const PLACE_NAMES: Record<Place, string> = {
 };
 const HINT_AT: Record<string, string> = { rain: "window", phone: "phone", bottle: "counter", lighter: "bench", basketball: "hoop", chimes: "chimes", spray: "wall", dice: "dice", scratch: "crates", train: "edge", crowd: "booth", mic: "speaker" };
 /** Where trouble finds you, and how likely it is when you walk in. */
-const ROUGH: Partial<Record<Place, number>> = { street: 0, park: 0, avenue: 0.1, alley: 0.4, subway: 0.15, underpass: 0.3 };
+const ROUGH: Partial<Record<Place, number>> = { street: 0, park: 0, avenue: 0.05, alley: 0.25, subway: 0.1, underpass: 0.2 };
+/** Seconds of peace after trouble, whichever way it went. */
+const BREATHER = 60;
 const BOOMBOX = { x: 17.6 * TILE, y: 4.4 * TILE };
 
 /** Lines people say, cycled one set per conversation. */
@@ -199,6 +201,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     visit: {} as Record<string, number>,
     // where the visible picture starts, for the health bar
     hudX: 0,
+    lastTrouble: -1e9,
   });
   // the payphone playing your beat back down the line
   const call = useRef<{ engine: Engine; until: number } | null>(null);
@@ -422,7 +425,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const startFight = (foes: Actor[], boss = false) => {
     const s = st.current;
     s.pending = null;
-    for (const f of foes) Object.assign(f.fighter!, { state: "approach", cd: 0.5 + Math.random() * 0.7 });
+    for (const f of foes) Object.assign(f.fighter!, { state: "approach", cd: 0.25 + Math.random() * 0.6 });
     s.fight = { foes, me: freshMe(s.x, s.y, s.dir, saveRef.current.hp), boss, over: 0, outcome: "" };
     s.sitting = false;
     keys.current = [];
@@ -444,7 +447,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       let y = s.y + (i - (n - 1) / 2) * 12;
       if (blocked(scene, { x: x0 - 4, y: y - 3, w: 8, h: 4 })) y = s.y;
       const kind = i === 0 && v.stats.wins >= 4 && Math.random() < 0.6 ? "rowdy" : "drunk";
-      foes.push(makeFoe(kind, s.place, x0 + side * i * 8, y));
+      foes.push(makeFoe(kind, s.place, x0 + side * i * 8, y, undefined, v.settings.difficulty));
     }
     life.current.push(...foes);
     s.pending = foes;
@@ -525,8 +528,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (!tank) return;
     tank.hidden = true;
     if (goon) goon.hidden = true;
-    const boss = makeFoe("boss", "underpass", tank.x, tank.y);
-    const foes = [boss, ...(goon ? [makeFoe("goon", "underpass", goon.x, goon.y, goon.look)] : [])];
+    const diff = saveRef.current.settings.difficulty;
+    const boss = makeFoe("boss", "underpass", tank.x, tank.y, undefined, diff);
+    const foes = [boss, ...(goon ? [makeFoe("goon", "underpass", goon.x, goon.y, goon.look, diff)] : [])];
     life.current.push(...foes);
     say(["The cypher stops. Everyone steps back.", "Tank rolls his shoulders. His friend cracks his knuckles."]);
     startFight(foes, true);
@@ -645,7 +649,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (!v.places.includes(to)) updateSave((x) => ({ ...x, places: [...x.places, to] }));
     // the rough places: sometimes they're waiting
     const rough = ROUGH[to];
-    if (rough && v.profile?.name && Math.random() < rough && s.encounterIn > 4) s.encounterIn = 2.5 + Math.random() * 3;
+    if (rough && v.profile?.name && s.t - s.lastTrouble > BREATHER && Math.random() < rough && s.encounterIn > 4) s.encounterIn = 2.5 + Math.random() * 3;
     // the bouncer steps aside for people he'll let in
     const bouncer = life.current.find((a) => a.id === "bouncer");
     if (to === "avenue" && bouncer) bouncer.x = (clubOk(v) ? 36.9 : 35.5) * TILE;
@@ -1388,6 +1392,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
       weaken: () => st.current.fight?.foes.forEach((a) => a.fighter && (a.fighter.hp = 1)),
       give: (patch: Partial<SaveData>) => updateSave((v) => ({ ...v, ...patch })),
       save: () => saveRef.current,
+      /** Pretend a rhythm game just finished with this score. */
+      rhythm: (mode: "cypher" | "dj", score: number) => rhythmRef.current(mode, score),
       /** Open a mini-game or a menu tab straight away. */
       mini: (m: Mini | null) => setMini(m),
       menu: (tab: MenuTab | null) => setMenu(tab ? { tab, creator: false } : null),
@@ -1491,7 +1497,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
           s.encounterIn -= dt;
           if (s.encounterIn <= 0) {
             spawnTrouble();
-            s.encounterIn = 80 + Math.random() * 90;
+            s.lastTrouble = s.t;
+            s.encounterIn = 100 + Math.random() * 100;
           }
         }
       }
@@ -1666,16 +1673,27 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const sprayed = useCallback(() => sfx.spray(380), []);
   const rhythmDone = (mode: "cypher" | "dj", score: number) => {
     const v = saveRef.current;
+    const s = st.current;
     const best = mode === "cypher" ? v.stats.cypherBest : v.stats.djBest;
-    const cash = mode === "dj" ? Math.round(score * 0.6) : Math.floor(score / 10) * 2;
-    const rep = Math.floor(score / (mode === "dj" ? 10 : 8));
+    // the first set in a while pays; play straight again and the crowd's thinner
+    const key = `paid-${mode}`;
+    const fresh = !(s.t - (s.fx[key] ?? -1e9) < 180);
+    const full = mode === "dj" ? (score >= 50 ? 15 + Math.round((score - 50) * 0.75) : Math.round(score * 0.1)) : Math.floor(score / 10) * 2;
+    const cash = fresh ? full : Math.floor(full / 3);
+    // respect for a good set the first time round, and for beating your best
+    const rep = (fresh ? Math.floor(score / (mode === "dj" ? 12 : 10)) : 0) + (score > best ? Math.floor((score - best) / 10) : 0);
+    if (fresh && score >= 30) s.fx[key] = s.t;
     updateSave((x) => ({ ...x, stats: { ...x.stats, [mode === "cypher" ? "cypherBest" : "djBest"]: Math.max(best, score) }, heard: mode === "dj" ? { ...x.heard, dj: "a set" } : x.heard }));
     if (cash) earn(cash);
     if (rep) addRep(rep);
     if (score >= 50) sfx.cheer();
     find(mode === "cypher" ? "mic" : "crowd");
-    showToast(`${score}%: ${cash ? `+$${cash}` : "no money"}${rep ? `, +${rep} respect` : ""}${score > best ? " (your best)" : ""}`, 4200);
+    showToast(`${score}%: ${cash ? `+$${cash}` : "no money"}${rep ? `, +${rep} respect` : ""}${score > best ? " (your best)" : ""}${!fresh ? " · the crowd's thinner the second time" : ""}`, 4200);
   };
+  const rhythmRef = useRef(rhythmDone);
+  useLayoutEffect(() => {
+    rhythmRef.current = rhythmDone;
+  });
   const dug = (r: DigResult) => {
     if (!spend(5)) return;
     updateSave((v) => ({ ...v, stats: { ...v.stats, digs: v.stats.digs + 1 } }));

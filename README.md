@@ -98,16 +98,21 @@ neighbourhood:
 
 Things to do: make beats and **sell** them (Dre, the record shop; each tape
 sells once, priced by what's in it), **the cypher** and **a set at the club**
-(rhythm games: the kick, snare and keys drop out and you play them, D F J K),
+(rhythm games: the kick, snare and keys drop out and you play them, D F J K;
+the first set in a while pays, a second straight after pays a third),
 **dice**, **crate digging**, **hoops**, **tagging** the wall, buying clothes.
 Twelve sounds hide around the map for the studio's **Found** tab.
 
 **Trouble**: now and then, in the rougher places, a group of drunks walks up
 to you. Fight, pay them off, play them your beat, or walk away. Fights are
 real-time: E/Space swings (watch for the “!”, that's a swing coming),
-Shift dodges, Q eats something. Win and they leave cash behind; wins
-unlock weapons (bat, bike chain, brass knuckles, crowbar) and the leather
-jacket; Tank at the underpass gives up a mic stand. Go down and you wake
+Shift dodges, Q eats something. A hit staggers them, but then they shrug
+hits off for a moment and swing back, so mashing alone won't do: dodge the
+“!”. Chill, normal and hard change how hard they hit, how much they take,
+how long they wind up and how soon they come again. Win and they leave cash
+behind; wins unlock weapons (bat at 1, bike chain at 4, brass knuckles at 7,
+crowbar at 10) and the leather jacket; Tank at the underpass gives up a mic
+stand. After trouble the block leaves you alone for a minute or so. Go down and you wake
 up at home with a quarter of your cash gone. A door is always a way out.
 
 **The menu** (M, or the button up top): you, your wardrobe (25 pieces,

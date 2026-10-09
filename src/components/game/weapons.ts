@@ -25,10 +25,10 @@ export interface Weapon {
 }
 
 export const WEAPONS: Weapon[] = [
-  { id: "fists", name: "fists", dmg: 8, reach: 11, cooldown: 0.32, knock: 60, unlock: { start: true }, found: "", colors: ["#c99a7c", "#c99a7c"], len: 0 },
+  { id: "fists", name: "fists", dmg: 7, reach: 11, cooldown: 0.36, knock: 60, unlock: { start: true }, found: "", colors: ["#c99a7c", "#c99a7c"], len: 0 },
   { id: "bat", name: "wooden bat", dmg: 13, reach: 16, cooldown: 0.48, knock: 110, unlock: { wins: 1 }, found: "One of them leaves a wooden bat behind. It's yours now.", colors: ["#8a6038", "#b88a52"], len: 9 },
-  { id: "chain", name: "bike chain", dmg: 11, reach: 19, cooldown: 0.42, knock: 80, sweep: true, unlock: { wins: 3 }, found: "Someone's bike chain, swinging off a railing. You wrap it round your hand.", colors: ["#8a8d94", "#c9ccd4"], len: 10 },
-  { id: "knuckles", name: "brass knuckles", dmg: 16, reach: 11, cooldown: 0.28, knock: 90, unlock: { wins: 6 }, found: "Brass knuckles, dropped in the gutter as they ran. Heavy, cold.", colors: ["#d8b35a", "#f0d080"], len: 2 },
+  { id: "chain", name: "bike chain", dmg: 11, reach: 19, cooldown: 0.42, knock: 80, sweep: true, unlock: { wins: 4 }, found: "Someone's bike chain, swinging off a railing. You wrap it round your hand.", colors: ["#8a8d94", "#c9ccd4"], len: 10 },
+  { id: "knuckles", name: "brass knuckles", dmg: 16, reach: 11, cooldown: 0.28, knock: 90, unlock: { wins: 7 }, found: "Brass knuckles, dropped in the gutter as they ran. Heavy, cold.", colors: ["#d8b35a", "#f0d080"], len: 2 },
   { id: "crowbar", name: "crowbar", dmg: 19, reach: 17, cooldown: 0.6, knock: 140, unlock: { wins: 10 }, found: "A crowbar in the skip by the alley. You've earned it, apparently.", colors: ["#3a3c42", "#9a3a2a"], len: 10 },
   { id: "mic", name: "mic stand", dmg: 22, reach: 22, cooldown: 0.62, knock: 190, sweep: true, unlock: { boss: true }, found: "Tank's mic stand from the cypher. “Keep it. You've got the voice for it.”", colors: ["#2a2c33", "#9aa0aa"], len: 13 },
 ];

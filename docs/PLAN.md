@@ -20,9 +20,17 @@ commit + push after each step, extend scripts/verify.mjs).
    a finger lands, touch screens see A/B/eat instead of key names; no
    "talk" prompt mid-fight.
 
+5. Balance (tuned with a headless fight simulation of a casual and a decent
+   player): foes stagger, then shrug hits off for a moment, so they get
+   swings in; they hit harder and come again sooner. Difficulty scales
+   damage, health, wind-up and rest. Drunks stay easy (normal: ~10 health
+   lost), a rowdy group costs ~25, Tank with a bat ~50 (hard: often a loss
+   without dodging). Club sets paid $60 per 20 seconds: now $15–$52 the
+   first time in three minutes, a third after that; respect for a set only
+   the first time or for beating your best. Trouble comes less often and
+   leaves a minute's breather. Bike chain at 4 wins, knuckles at 7.
+
 ## Next (in order)
-2. Balance: fight difficulty per setting, cash/respect rewards, prices,
-   how often trouble comes, the weapon unlock pace. Keep it fun, not grindy.
 3. More life on the map: a police car rolling by with lights, thunder and
    lightning now and then (respect reduced motion), more passers-by on the
    avenue, a cat in the alley, people reacting when you win a fight.

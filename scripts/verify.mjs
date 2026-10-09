@@ -606,6 +606,8 @@ try {
     await page.waitForTimeout(300);
     check("fight: it starts, with health bars", (await page.evaluate(() => window.__game.fight()))?.foes.length >= 2);
     await page.waitForTimeout(200);
+    const foeHp = (await page.evaluate(() => window.__game.fight())).foes.map((f) => f.hp);
+    check("fight: on chill they're softer (a drunk 31 health, not 36)", foeHp.every((h) => h === 31 || h === 44), String(foeHp));
     check("fight: no talking mid-fight (E swings)", !/talk/.test((await page.getByTestId("game-prompt").textContent().catch(() => "")) ?? ""));
     await page.evaluate(() => window.__game.weaken());
     for (let i = 0; i < 40 && (await page.evaluate(() => window.__game.fight()?.outcome)) === ""; i++) {
@@ -620,13 +622,23 @@ try {
     check("fight: win it, get paid, unlock the bat", won.stats.wins === 1 && won.weapons.includes("bat") && won.cash > 110, JSON.stringify(won.stats));
     await closeDialog();
 
+    // balance: trouble leaves you alone (the club set also gets you the crowd sound) for a while after; a second set straight away pays less
+    check("trouble: a breather after it", (await game(page)).lastTrouble > 0 && (await game(page)).encounterIn >= 100);
+    const cash0 = (await saved()).cash;
+    await page.evaluate(() => window.__game.rhythm("dj", 65));
+    const cash1 = (await saved()).cash;
+    await page.evaluate(() => window.__game.rhythm("dj", 65));
+    const cash2 = (await saved()).cash;
+    check("club: a good set pays, the same set straight after pays a third", cash1 - cash0 === 26 && cash2 - cash1 === 8, `${cash1 - cash0}, ${cash2 - cash1}`);
+    await closeDialog();
+
     await page.getByTestId("game-exit").click();
     await page.waitForTimeout(1400);
     check("game: exit returns to the site", (await page.getByTestId("game").count()) === 0);
     check("game: music picks up where it was", !(await audio(page)).paused);
     await page.getByTestId("icon-game").click();
     await page.waitForTimeout(1600);
-    check("game: remembers found sounds", (await page.getByTestId("game").textContent()).includes("sounds 6/12"));
+    check("game: remembers found sounds", (await page.getByTestId("game").textContent()).includes("sounds 7/12"));
     await page.getByTestId("game-to-studio").click();
     await page.waitForTimeout(500);
     check("game: straight to the studio", (await page.getByTestId("studio").isVisible()) && (await page.getByTestId("game").getAttribute("data-place")) === "studio");

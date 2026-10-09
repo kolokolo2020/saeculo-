@@ -34,6 +34,8 @@ export interface Fighter {
   seed: number;
   /** Cash in their pockets, dropped when they go down. */
   purse: number;
+  /** After a stagger they shrug hits off for a moment (no stun-locking). */
+  guard: number;
 }
 
 export interface Me {
@@ -64,13 +66,20 @@ export interface FightEvents {
   shake: (amount: number) => void;
 }
 
-const STATS: Record<FoeKind, Omit<Fighter, "kind" | "state" | "timer" | "cd" | "flash" | "kvx" | "kvy" | "seed" | "purse">> = {
-  drunk: { hp: 30, maxHp: 30, dmg: 7, speed: 30, reach: 12, windup: 0.6 },
-  rowdy: { hp: 42, maxHp: 42, dmg: 9, speed: 38, reach: 12, windup: 0.48 },
-  goon: { hp: 50, maxHp: 50, dmg: 10, speed: 40, reach: 13, windup: 0.45 },
-  boss: { hp: 170, maxHp: 170, dmg: 15, speed: 36, reach: 16, windup: 0.62 },
+const STATS: Record<FoeKind, Omit<Fighter, "kind" | "state" | "timer" | "cd" | "flash" | "kvx" | "kvy" | "seed" | "purse" | "guard">> = {
+  drunk: { hp: 36, maxHp: 36, dmg: 11, speed: 34, reach: 12, windup: 0.58 },
+  rowdy: { hp: 52, maxHp: 52, dmg: 13, speed: 42, reach: 12, windup: 0.48 },
+  goon: { hp: 60, maxHp: 60, dmg: 13, speed: 42, reach: 13, windup: 0.45 },
+  boss: { hp: 190, maxHp: 190, dmg: 19, speed: 38, reach: 16, windup: 0.6 },
 };
-const DMG_SCALE: Record<Difficulty, number> = { chill: 0.55, normal: 1, hard: 1.45 };
+/** How much harder (or softer) each setting makes them. */
+export const TUNING: Record<Difficulty, { dmg: number; hp: number; windup: number; rest: number }> = {
+  chill: { dmg: 0.55, hp: 0.85, windup: 1.3, rest: 1.35 },
+  normal: { dmg: 1, hp: 1, windup: 1, rest: 1 },
+  hard: { dmg: 1.3, hp: 1.2, windup: 0.82, rest: 0.7 },
+};
+/** How long each kind shrugs off hits after being staggered. */
+const GUARD: Record<FoeKind, number> = { drunk: 1.5, rowdy: 1.9, goon: 2, boss: 2.6 };
 
 const LOOKS: Look[] = [
   { skin: "#e0b193", hair: "#6b3a1c", top: "#5a2a3a", pants: "#23252e", style: "short", body: "broad" },
@@ -85,8 +94,10 @@ const TANK: Look = { skin: "#7a4a32", hair: "#0d0a08", top: "#141418", trim: "#d
 let seq = 0;
 
 /** A foe, standing at (x, y), ready to come at you. */
-export function makeFoe(kind: FoeKind, place: Actor["place"], x: number, y: number, look?: Look): Actor {
-  const s = STATS[kind];
+export function makeFoe(kind: FoeKind, place: Actor["place"], x: number, y: number, look?: Look, difficulty: Difficulty = "normal"): Actor {
+  const s = { ...STATS[kind] };
+  s.hp = s.maxHp = Math.round(s.hp * TUNING[difficulty].hp);
+  s.windup *= TUNING[difficulty].windup;
   return {
     id: `foe-${kind}-${seq++}`,
     kind: "person",
@@ -109,7 +120,8 @@ export function makeFoe(kind: FoeKind, place: Actor["place"], x: number, y: numb
       kvx: 0,
       kvy: 0,
       seed: Math.random() * 10,
-      purse: kind === "boss" ? 60 : kind === "goon" ? 14 : 6 + Math.floor(Math.random() * 10),
+      purse: kind === "boss" ? 60 : kind === "goon" ? 14 : kind === "rowdy" ? 10 + Math.floor(Math.random() * 10) : 6 + Math.floor(Math.random() * 8),
+      guard: 0,
     },
   };
 }
@@ -129,6 +141,7 @@ export function updateFoes(foes: Actor[], me: Me, dt: number, scene: Scene, diff
     a.t += dt;
     f.flash = Math.max(0, f.flash - dt);
     f.cd = Math.max(0, f.cd - dt);
+    f.guard = Math.max(0, f.guard - dt);
     // being shoved
     if (Math.abs(f.kvx) + Math.abs(f.kvy) > 1) {
       move(a, a.x + f.kvx * dt, a.y + f.kvy * dt, scene);
@@ -194,7 +207,7 @@ export function updateFoes(foes: Actor[], me: Me, dt: number, scene: Scene, diff
           const facing = a.dir === "right" ? 1 : -1;
           const inFront = dx * facing > -2 && Math.abs(dx) < f.reach + 5 && Math.abs(dy) < 9;
           if (inFront && me.iframes <= 0 && me.dodge <= 0) {
-            const dmg = Math.round(f.dmg * DMG_SCALE[difficulty] * (0.85 + Math.random() * 0.3));
+            const dmg = Math.round(f.dmg * TUNING[difficulty].dmg * (0.85 + Math.random() * 0.3));
             me.hp = Math.max(0, me.hp - dmg);
             me.iframes = 0.55;
             me.flash = 0.18;
@@ -216,7 +229,7 @@ export function updateFoes(foes: Actor[], me: Me, dt: number, scene: Scene, diff
         f.timer -= dt;
         if (f.timer <= 0) {
           f.state = "approach";
-          f.cd = (f.kind === "boss" ? 0.6 : 0.9) + Math.random() * 0.9;
+          f.cd = ((f.kind === "boss" ? 0.45 : 0.4) + Math.random() * 0.7) * TUNING[difficulty].rest;
         }
         break;
     }
@@ -261,7 +274,8 @@ export function swing(foes: Actor[], me: Me, w: Weapon, ev: FightEvents): { hits
     const dmg = Math.round(w.dmg * (0.9 + Math.random() * 0.2) * (crit ? 1.5 : 1) * (interrupt ? 1.2 : 1));
     f.hp = Math.max(0, f.hp - dmg);
     f.flash = 0.14;
-    const k = w.knock * (f.kind === "boss" ? 0.35 : 1);
+    // while they're shrugging hits off, they barely move
+    const k = w.knock * (f.kind === "boss" ? 0.35 : 1) * (f.guard > 0 && !crit ? 0.35 : 1);
     f.kvx = (fx || Math.sign(a.x - me.x) || 1) * k;
     f.kvy = fy * k;
     if (f.hp <= 0) {
@@ -269,9 +283,11 @@ export function swing(foes: Actor[], me: Me, w: Weapon, ev: FightEvents): { hits
       f.timer = 1.6;
       downed.push(a);
       ev.down();
-    } else if (interrupt || crit || f.kind !== "boss") {
+    } else if (crit || (f.guard <= 0 && (interrupt || f.kind !== "boss"))) {
+      // a stagger, then a moment where hits land but don't stop them
       f.state = "stagger";
       f.timer = interrupt ? 0.55 : 0.25;
+      f.guard = GUARD[f.kind] + f.timer;
     }
     hits.push(a);
   }
