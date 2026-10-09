@@ -1,20 +1,28 @@
 import type { Track } from "@/lib/types";
 import analysis from "./trackAnalysis.json";
 
-// The beats folder. To add one:
-//   1. put the MP3 in public/audio/ and a square JPG/PNG cover in public/covers/
+// The beats, as one album under one cover (the wordmark on a spectrum
+// analyser, drawn by scripts/make-cover.mjs). To add a beat:
+//   1. put the MP3 in public/audio/
 //   2. add an entry below (newest first; only id, title and src are required)
 //   3. optional: `node scripts/analyze-tracks.mjs` measures the exact tempo,
-//      first beat and waveform so the visualizer's beat pulse lines up.
-// The player reads the length from the file itself and pulls the colours
-// from the cover while it plays, so nothing else needs updating.
+//      first beat and waveform so the seek bar and the visualizer line up.
+// The player reads the length from the file itself, so nothing else needs
+// updating.
+export const ALBUM = {
+  title: "saeculo",
+  /** Shown on the site. */
+  cover: "/covers/saeculo.svg",
+  /** The same cover as a JPEG, for share cards and lock screens. */
+  coverJpg: "/covers/saeculo.jpg",
+};
+
 export const TRACKS: Track[] = [
   {
     id: "care4me",
     title: "care4me",
     bpm: 143,
     key: "F major",
-    cover: "/covers/care4me.jpg",
     src: "/audio/care4me.mp3",
   },
   {
@@ -22,7 +30,6 @@ export const TRACKS: Track[] = [
     title: "elbtunnel",
     bpm: 136,
     key: "A♭ major",
-    cover: "/covers/elbtunnel.jpg",
     src: "/audio/elbtunnel.mp3",
   },
   {
@@ -30,7 +37,6 @@ export const TRACKS: Track[] = [
     title: "dull knife",
     bpm: 148,
     key: "D major",
-    cover: "/covers/dull-knife.jpg",
     src: "/audio/dull-knife.mp3",
   },
 ];

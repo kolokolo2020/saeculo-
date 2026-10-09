@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
 import { NextGlyph, PauseGlyph, PlayGlyph, PrevGlyph, RepeatGlyph, ShuffleGlyph, VolumeGlyph } from "@/components/site/Icons";
-import { TRACKS, isNew } from "@/data/tracks";
+import { ALBUM, TRACKS, isNew } from "@/data/tracks";
 import analysis from "@/data/trackAnalysis.json";
 import { formatTime } from "@/lib/audio";
 import { trackUrl } from "@/lib/trackLink";
@@ -182,12 +182,8 @@ function Folder() {
               onClick={() => (current ? toggle() : selectTrack(i))}
               aria-label={`${t.title}${current ? (playing ? ", playing" : ", selected") : ""}${bad ? ", file unavailable" : ""}`}
             >
-              {t.cover ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={t.cover} alt="" width={34} height={34} loading="lazy" className="h-[34px] w-[34px] object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.4)]" />
-              ) : (
-                <span className="h-[34px] w-[34px] bg-[#2a2622]" />
-              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ALBUM.cover} alt="" width={34} height={34} loading="lazy" className="h-[34px] w-[34px] object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.4)]" />
               <span className="min-w-0">
                 <span className="flex items-center gap-2">
                   <span className={`truncate text-[14px] ${current ? "font-bold" : ""}`}>{t.title}</span>
@@ -215,7 +211,7 @@ function Folder() {
 
 export default function BeatsWindow() {
   const track = useCurrentTrack();
-  const palette = usePalette(track?.cover);
+  const palette = usePalette(ALBUM.cover);
   const calm = useSiteStore((s) => s.calm);
   const vis = useSiteStore((s) => s.vis);
   const [copied, setCopied] = useState(false);

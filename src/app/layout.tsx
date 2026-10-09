@@ -1,18 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, IM_Fell_English_SC, VT323 } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, VT323 } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
-import { TRACKS } from "@/data/tracks";
+import { ALBUM, TRACKS } from "@/data/tracks";
 import "./globals.css";
 
 // Tahoma leads --font-ui (see globals.css) for the old-Windows feel where
 // it's installed; Plex Sans is the loaded stand-in everywhere else.
-const uiFont = IBM_Plex_Sans({ weight: ["400", "500", "700"], subsets: ["latin"], variable: "--nf-ui" });
+const uiFont = IBM_Plex_Sans({ weight: ["300", "400", "500", "700"], subsets: ["latin"], variable: "--nf-ui" });
 const monoFont = IBM_Plex_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "--nf-mono" });
-// the player's display and the game's text
+// the boot screen, the player's display and the game's text
 const lcdFont = VT323({ weight: "400", subsets: ["latin"], variable: "--nf-lcd" });
-// the intro's title card
-const filmFont = IM_Fell_English_SC({ weight: "400", subsets: ["latin"], variable: "--nf-film" });
 
 const title = "saeculo — instrumentals & beats";
 const description = "Instrumentals by saeculo. Listen to the beats, find the socials, get in touch, or walk around the neighbourhood and make a beat.";
@@ -41,7 +39,8 @@ const jsonLd = {
     name: t.title,
     url: `${siteUrl}/#track=${t.id}`,
     byArtist: { "@type": "MusicGroup", name: PROFILE.artistName },
-    ...(t.cover ? { image: `${siteUrl}${t.cover}` } : {}),
+    inAlbum: { "@type": "MusicAlbum", name: ALBUM.title },
+    image: `${siteUrl}${ALBUM.coverJpg}`,
   })),
 };
 
@@ -58,7 +57,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${uiFont.variable} ${monoFont.variable} ${lcdFont.variable} ${filmFont.variable} h-full`}
+      className={`${uiFont.variable} ${monoFont.variable} ${lcdFont.variable} h-full`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: bootScript }} />

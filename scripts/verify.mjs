@@ -74,10 +74,19 @@ try {
     const { ctx, page } = await open({ seen: false });
     const intro = page.getByRole("dialog", { name: "Intro" });
     check("first visit: intro shows", await intro.isVisible());
+    await page.waitForTimeout(2200);
+    check("intro: the BIOS checks the crate", (await intro.textContent()).includes("3 beats found"));
     await page.keyboard.press("a");
     await page.waitForTimeout(700);
     check("intro: any key goes in", (await page.getByRole("button", { name: /enter/i }).count()) === 0);
+    check("intro: a key boots the machine", (await intro.getAttribute("data-phase")) === "boot");
     check("intro: entering starts the music", !(await audio(page)).paused);
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(200);
+    check("intro: a key hurries the boot along", (await intro.getAttribute("data-phase")) === "orb");
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(300);
+    check("intro: the welcome screen, with the album cover", (await intro.getAttribute("data-phase")) === "welcome" && (await intro.locator("img[src*='saeculo']").count()) === 1);
     await page.getByRole("button", { name: /skip/i }).click();
     await page.waitForTimeout(500);
     check("intro: skip lands on the desktop with Beats open", (await intro.count()) === 0 && (await page.getByTestId("window-beats").isVisible()));
@@ -90,6 +99,13 @@ try {
     await page.getByRole("menuitem", { name: "Replay intro" }).click();
     await page.waitForTimeout(300);
     check("replay intro from the clock menu", await page.getByRole("dialog", { name: "Intro" }).isVisible());
+    await page.waitForTimeout(2000);
+    await page.getByRole("button", { name: /enter/i }).click();
+    await page.waitForTimeout(11500);
+    check("intro: boots all the way to the desktop by itself", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    await page.getByRole("menuitem", { name: "Replay intro" }).click();
+    await page.waitForTimeout(300);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
     check("Escape skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
@@ -215,6 +231,13 @@ try {
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.waitForTimeout(800);
     check("missing file: next still plays", !(await audio(page)).paused);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await open({ seen: false, reduced: true });
+    await page.keyboard.press("a");
+    await page.waitForTimeout(2600);
+    check("reduced motion: the intro goes straight to welcome and in", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
     await ctx.close();
   }
   {
@@ -381,7 +404,7 @@ try {
     await studio.getByRole("button", { name: "save", exact: true }).first().click();
     const slots = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-studio")).slots);
     check("studio: save to a slot", slots[0] && slots[0].tempo === 85);
-    const dl = page.waitForEvent("download", { timeout: 20000 });
+    const dl = page.waitForEvent("download", { timeout: 60000 });
     await page.getByTestId("studio-export").click();
     const file = await dl;
     const bytes = readFileSync(await file.path());

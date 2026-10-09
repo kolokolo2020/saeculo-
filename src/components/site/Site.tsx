@@ -3,7 +3,8 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import AudioEngine from "@/components/player/AudioEngine";
-import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
+import { usePlayerStore } from "@/components/player/playerStore";
+import { ALBUM } from "@/data/tracks";
 import BeatsWindow from "@/components/beats/BeatsWindow";
 import { trackIndexFromHash } from "@/lib/trackLink";
 import ContactWindow from "./ContactWindow";
@@ -18,7 +19,7 @@ import Window from "./Window";
 // The intro and the game are only downloaded when they're needed: returning
 // visitors never fetch the intro, and nobody fetches the game until they
 // open it.
-const RoomIntro = dynamic(() => import("@/components/room/RoomIntro"), { ssr: false });
+const BootIntro = dynamic(() => import("@/components/intro/BootIntro"), { ssr: false });
 const Game = dynamic(() => import("@/components/game/Game"), { ssr: false, loading: () => <GameLoading /> });
 
 const SEEN_KEY = "saeculo-intro-seen";
@@ -33,10 +34,9 @@ function GameLoading() {
 }
 
 function Wallpaper() {
-  const track = useCurrentTrack();
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      <div className="wallpaper" style={{ ["--cover" as string]: track?.cover ? `url(${track.cover})` : "none" }} />
+      <div className="wallpaper" style={{ ["--cover" as string]: `url(${ALBUM.cover})` }} />
       <div className="wallpaper-scan" />
     </div>
   );
@@ -145,7 +145,7 @@ export default function Site() {
 
       <div className="grain" aria-hidden />
       {!ready && <div className="intro-cover" aria-hidden />}
-      {introOpen && <RoomIntro onDone={endIntro} />}
+      {introOpen && <BootIntro onDone={endIntro} />}
       {gameOpen && <Game onExit={() => useSiteStore.getState().setGameOpen(false)} />}
     </main>
   );

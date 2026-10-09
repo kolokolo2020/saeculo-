@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { readFrequencies } from "@/components/player/spectrum";
 import { usePlayerStore } from "@/components/player/playerStore";
 import type { Track } from "@/lib/types";
+import { ALBUM } from "@/data/tracks";
 import type { Palette } from "./palette";
 
 // The cover is the visualizer. A dim print of the artwork sits underneath;
@@ -43,7 +44,7 @@ export default function CoverVisualizer({ track, palette, calm, mode = "reveal" 
     const c = canvas.current;
     const g = c?.getContext("2d");
     if (!c || !g) return;
-    const img = track?.cover ? imageFor(track.cover) : null;
+    const img = track ? imageFor(ALBUM.cover) : null;
     const freq = new Uint8Array(new ArrayBuffer(512));
     // log-spaced bin edges over ~40 Hz … 12 kHz of a 1024-point FFT
     const edges = Array.from({ length: COLS + 1 }, (_, i) => Math.round(2 * Math.pow(280 / 2, i / COLS)));

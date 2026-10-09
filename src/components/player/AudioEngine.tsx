@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { ALBUM } from "@/data/tracks";
 import { usePlayerStore, useCurrentTrack } from "./playerStore";
 
 // The session's single <audio> element. Mounted once by the site and
@@ -25,11 +26,11 @@ export default function AudioEngine() {
   useEffect(() => {
     if (!("mediaSession" in navigator) || !track) return;
     const session = navigator.mediaSession;
-    const cover = track.cover ? new URL(track.cover, window.location.href).href : undefined;
     session.metadata = new MediaMetadata({
       title: track.title,
       artist: "saeculo",
-      artwork: cover ? [{ src: cover, sizes: "640x640", type: "image/jpeg" }] : [],
+      album: ALBUM.title,
+      artwork: [{ src: new URL(ALBUM.coverJpg, window.location.href).href, sizes: "1200x1200", type: "image/jpeg" }],
     });
   }, [track]);
 

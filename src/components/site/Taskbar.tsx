@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
 import { NextGlyph, PauseGlyph, PlayGlyph } from "./Icons";
+import { ALBUM } from "@/data/tracks";
 import { activeWindow, useSiteStore, WINDOW_IDS, WINDOW_TITLES } from "./siteStore";
 import { TASKBAR_H } from "./Window";
 
@@ -23,12 +24,8 @@ function MiniPlayer() {
   return (
     <div className="bevel-in flex h-[34px] min-w-0 items-center gap-1 px-1" data-testid="mini-player">
       <button className="flex min-w-0 items-center gap-2 pr-1 text-left" onClick={() => openWindow("beats")} aria-label={`Open Beats: ${track.title}`}>
-        {track.cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={track.cover} alt="" width={26} height={26} className="h-[26px] w-[26px] shrink-0 object-cover" />
-        ) : (
-          <span className="h-[26px] w-[26px] shrink-0 bg-[#2a2622]" />
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={ALBUM.cover} alt="" width={26} height={26} className="h-[26px] w-[26px] shrink-0 object-cover" />
         <span className="flex min-w-0 flex-col leading-tight">
           <span className="max-w-[20vw] truncate text-[12.5px] font-bold sm:max-w-[160px]">{track.title}</span>
           <span className="relative mt-0.5 hidden h-[3px] w-[110px] bg-face-lo sm:block" aria-hidden>
@@ -74,17 +71,18 @@ function Clock({ onReplayIntro }: { onReplayIntro: () => void }) {
     };
   }, [open]);
 
+  const time = now ? now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
   return (
     <div ref={box} className="relative">
       <button
         className="bevel-in flex h-[34px] items-center gap-1.5 px-2.5 font-mono text-[12px] tabular-nums"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Clock and settings"
+        aria-label={`${time ? `${time}, ` : ""}Clock and settings`}
         onClick={() => setOpen((o) => !o)}
       >
         <span aria-hidden className="text-[10px] text-mute">▲</span>
-        <span suppressHydrationWarning>{now ? now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</span>
+        <span suppressHydrationWarning>{time}</span>
       </button>
       {open && (
         <div role="menu" className="bevel-out absolute right-0 bottom-[40px] z-50 flex w-52 flex-col p-1 text-[13px]">
