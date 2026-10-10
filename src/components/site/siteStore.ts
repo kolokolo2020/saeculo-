@@ -19,17 +19,14 @@ interface WinState {
   y: number;
 }
 
-export type VisMode = "reveal" | "scan";
-
 interface SiteState {
   windows: Record<WindowId, WinState>;
   /** Back-to-front stacking order of open windows. */
   order: WindowId[];
   gameOpen: boolean;
   introOpen: boolean;
+  /** "Still visuals": no animation anywhere (also on with reduced motion). */
   calm: boolean;
-  /** The moving visualizer's look (when not calm). */
-  vis: VisMode;
   shortcutsOpen: boolean;
   /** "Sample this": a track and a moment, waiting for the studio to pick it up. */
   sample: { trackId: string; at: number } | null;
@@ -42,8 +39,6 @@ interface SiteState {
   setGameOpen: (open: boolean) => void;
   setIntroOpen: (open: boolean) => void;
   setCalm: (calm: boolean) => void;
-  /** Visuals: reveal → scan → still → reveal. */
-  cycleVisuals: () => void;
   toggleMaximize: (id: WindowId) => void;
   /** Remember where the windows sit, for the next visit. */
   rememberPositions: () => void;
@@ -53,7 +48,8 @@ interface SiteState {
 }
 
 const CALM_KEY = "saeculo-calm";
-const VIS_KEY = "saeculo-vis";
+/** The old visualizer's look; no longer used, cleared on the next visit. */
+const OLD_VIS_KEY = "saeculo-vis";
 const POS_KEY = "saeculo-windows";
 
 const initialWindows: Record<WindowId, WinState> = {
@@ -68,7 +64,6 @@ export const useSiteStore = create<SiteState>((set, get) => ({
   gameOpen: false,
   introOpen: false,
   calm: false,
-  vis: "reveal",
   shortcutsOpen: false,
   sample: null,
 
@@ -108,19 +103,6 @@ export const useSiteStore = create<SiteState>((set, get) => ({
     document.documentElement.dataset.calm = String(calm);
     set({ calm });
   },
-  cycleVisuals: () => {
-    const { calm, vis, setCalm } = get();
-    if (calm) {
-      setCalm(false);
-      set({ vis: "reveal" });
-    } else if (vis === "reveal") set({ vis: "scan" });
-    else setCalm(true);
-    try {
-      localStorage.setItem(VIS_KEY, get().vis);
-    } catch {
-      // not remembered
-    }
-  },
   toggleMaximize: (id) => set((s) => ({ windows: { ...s.windows, [id]: { ...s.windows[id], maximized: !s.windows[id].maximized, minimized: false } } })),
   rememberPositions: () => {
     try {
@@ -135,12 +117,11 @@ export const useSiteStore = create<SiteState>((set, get) => ({
   sampleInStudio: (trackId, at) => set({ sample: { trackId, at }, gameOpen: true }),
 }));
 
-/** Saved look and window positions, applied after the first render. */
+/** Saved window positions, applied after the first render. */
 export function restoreSitePrefs() {
   const patch: Partial<SiteState> = {};
   try {
-    const vis = localStorage.getItem(VIS_KEY);
-    if (vis === "scan" || vis === "reveal") patch.vis = vis;
+    localStorage.removeItem(OLD_VIS_KEY);
     const pos = JSON.parse(localStorage.getItem(POS_KEY) ?? "null");
     if (pos && typeof pos === "object") {
       const windows = { ...useSiteStore.getState().windows };

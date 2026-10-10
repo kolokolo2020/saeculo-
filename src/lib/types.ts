@@ -10,8 +10,6 @@ export interface Track {
   beatOffset?: number;
   /** Key or a short note, shown next to the title. Optional. */
   key?: string;
-  /** Square cover art under public/. Optional: a plain sleeve is drawn without it. */
-  cover?: string;
   /** The MP3 under public/. */
   src: string;
   /** When it went up (YYYY-MM-DD). Tracks from the last 30 days get a "new" tag. */

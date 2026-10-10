@@ -1,6 +1,8 @@
 import { TRACKS, gridTempo } from "@/data/tracks";
 import { usePlayerStore } from "./playerStore";
 
+// (Nothing on the site reads this any more: the player has no visualizer
+// now. Kept, not deleted.)
 // What the visualizers and the level meter read each frame. Normally it's
 // the real analyser. On iOS the player skips the Web Audio graph (Safari
 // suspends Web Audio when the screen locks, which would stop the music),

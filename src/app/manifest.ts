@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Instrumentals by saeculo.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0c0d0d",
-    theme_color: "#0c0d0d",
+    background_color: "#cfc8b9",
+    theme_color: "#f3eee4",
     icons: [{ src: "/favicon.ico", sizes: "any", type: "image/x-icon" }],
   };
 }

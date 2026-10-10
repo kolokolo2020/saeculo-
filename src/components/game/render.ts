@@ -1,5 +1,9 @@
-import { actorLights, drawActor, drawBoombox, drawChimes, drawSmoke } from "./actors";
+import { actorLights, drawActor, drawBoombox, drawChimes, drawMe, drawSmoke } from "./actors";
+import type { Me } from "./combat";
 import type { Actor } from "./life";
+import type { Look } from "./people";
+import { sign, type Fx } from "./places/kit";
+import type { Weapon } from "./weapons";
 import { paintForeground, paintPlace, sceneSize, SCENES, skylineWindows, TILE, type Dir, type Scene } from "./world";
 import type { Place } from "./sfx";
 
@@ -30,45 +34,11 @@ function sprite(rows: string[], pal: Record<string, string>): HTMLCanvasElement 
   return c;
 }
 
-const ME = { h: "#1b1512", s: "#c99a7c", e: "#1b1512", c: "#35384a", C: "#2a2c3b", k: "#6e1f18", p: "#23252e", o: "#0e0e10" };
-const BODY_DOWN = ["....hhhh....", "...hhhhhh...", "..khhhhhhk..", "..kssssssk..", "...sesses...", "...ssssss...", "....ssss....", "...cccccc...", "..cccccccc..", "..scCccCcs..", "..sccccccs..", "...cccccc..."];
-const BODY_UP = ["....hhhh....", "...hhhhhh...", "..khhhhhhk..", "..khhhhhhk..", "...hhhhhh...", "...shhhhs...", "....ssss....", "...cccccc...", "..cccccccc..", "..scccccCs..", "..sccccccs..", "...cccccc..."];
-const BODY_SIDE = ["....hhhh....", "...hhhhhh...", "...hhhkhhs..", "...hhkksss..", "...hhsssse..", "....sssss...", ".....sss....", "....ccccc...", "...ccccccc..", "...cccCccs..", "...ccccccs..", "....cccccc.."];
-const LEGS = {
-  still: ["...pp..pp...", "...pp..pp...", "...oo..oo..."],
-  a: ["...pp..pp...", "..pp....pp..", "..oo....oo.."],
-  b: ["...pp..pp...", "...pp..pp...", "...oo..oo..."],
-  sideA: ["....pp.pp...", "...pp...pp..", "...oo...oo.."],
-  sideB: ["....ppp.....", "....ppp.....", "....ooo....."],
-};
-
-type Frames = Record<Dir, HTMLCanvasElement[]>;
-let me: Frames | null = null;
 let clerk: HTMLCanvasElement | null = null;
 let cat: HTMLCanvasElement[] | null = null;
 let figure: HTMLCanvasElement | null = null;
-let sitting: HTMLCanvasElement | null = null;
-
 function buildSprites() {
-  if (me) return;
-  const f = (body: string[], legs: string[]) => sprite([...body, ...legs], ME);
-  const side = [f(BODY_SIDE, LEGS.still), f(BODY_SIDE, LEGS.sideA), f(BODY_SIDE, LEGS.sideB)];
-  const flip = (c: HTMLCanvasElement) => {
-    const o = document.createElement("canvas");
-    o.width = c.width;
-    o.height = c.height;
-    const g = o.getContext("2d")!;
-    g.scale(-1, 1);
-    g.drawImage(c, -c.width, 0);
-    return o;
-  };
-  me = {
-    down: [f(BODY_DOWN, LEGS.still), f(BODY_DOWN, LEGS.a), f(BODY_DOWN, LEGS.b)],
-    up: [f(BODY_UP, LEGS.still), f(BODY_UP, LEGS.a), f(BODY_UP, LEGS.b)],
-    right: side,
-    left: side.map(flip),
-  };
-  sitting = sprite([...BODY_DOWN, "..pppppppp..", "..oo....oo.."], ME);
+  if (clerk) return;
   clerk = sprite(
     ["....gggg....", "...gggggg...", "...gssssg...", "...sesses...", "...ssssss...", "....ssss....", "..vvvvvvvv..", ".vvvvvvvvvv.", ".svvvvvvvvs."],
     { g: "#8a8a86", s: "#b98f72", e: "#1b1512", v: "#3c5a4a" },
@@ -115,6 +85,25 @@ export interface View {
   /** Your tape playing on the roof: the city's windows answer it. */
   roofMusic: boolean;
   dt: number;
+  /** You, dressed. */
+  look: Look;
+  weapon: Weapon;
+  /** Your fight state, while there's a fight. */
+  me: Me | null;
+  /** Knocked out. */
+  down: boolean;
+  hp: number;
+  maxHp: number;
+  /** Where the visible picture starts (a phone held upright shows only part of it). */
+  hudX?: number;
+  /** Your name on the alley wall. */
+  tag: { name: string; color: string } | null;
+  /** Camera shake, in pixels. */
+  shake: number;
+  /** What the place's own animation keeps track of. */
+  fx: Record<string, number>;
+  /** A lightning flash outside, 1 at the strike, fading to 0. */
+  lightning?: number;
 }
 
 const painted = new Map<Place, HTMLCanvasElement>();
@@ -147,13 +136,26 @@ export function draw(g: G, v: View) {
     bg = paintPlace(s);
     painted.set(v.place, bg);
   }
-  const { cx, cy } = camera(s, v.x, v.y);
+  const cam = camera(s, v.x, v.y);
+  const sh = v.shake > 0 && !v.reduced ? v.shake : 0;
+  const cx = cam.cx + Math.round((Math.random() - 0.5) * 2 * sh);
+  const cy = cam.cy + Math.round((Math.random() - 0.5) * 2 * sh);
+  const fx: Fx = { t: v.t, reduced: v.reduced, beat: v.beat, state: v.fx };
   g.imageSmoothingEnabled = false;
   g.fillStyle = "#050507";
   g.fillRect(0, 0, VIEW_W, VIEW_H);
   g.save();
   g.translate(-cx, -cy);
   g.drawImage(bg, 0, 0);
+  s.fx?.(g, fx);
+  if (v.place === "alley" && v.tag) {
+    // your name, sprayed, with a drip or two
+    const x = 14 * TILE + 6;
+    sign(g, v.tag.name.toUpperCase().slice(0, 10), x, 10, v.tag.color, "rgba(0,0,0,0.6)", 9);
+    g.fillStyle = v.tag.color;
+    g.fillRect(x + 6, 19, 1, 4);
+    g.fillRect(x + 22, 19, 1, 6);
+  }
 
   // --- things that change
   if (v.place === "bedroom") {
@@ -219,6 +221,12 @@ export function draw(g: G, v: View) {
       bench: ["street", 9, 2.2],
       hoop: ["park", 26, 0.3],
       chimes: ["rooftop", 9.4, 1],
+      wall: ["alley", 16, 1.2],
+      dice: ["alley", 19.6, 6.2],
+      crates: ["records", 5, 4.2],
+      edge: ["subway", 16, 5.4],
+      booth: ["club", 12, 2.2],
+      speaker: ["underpass", 17.5, 5],
     };
     for (const id of v.hints) {
       const at = glintAt[id];
@@ -260,20 +268,16 @@ export function draw(g: G, v: View) {
       drawActor(g, a, v.t, v.beat, v.reduced);
       continue;
     }
-    if (me && sitting) {
-      const img = v.sitting ? sitting : me[v.dir][v.walk ? 1 + (Math.floor(v.walk * 8) % 2) : 0];
-      g.fillStyle = "rgba(0,0,0,0.35)";
-      g.fillRect(Math.round(v.x) - 4, Math.round(v.y) - 1, 8, 2);
-      g.drawImage(img, Math.round(v.x) - 6, Math.round(v.y) - img.height + (v.sitting ? -4 : 0));
-    }
+    drawMe(g, { x: v.x, y: v.y, dir: v.dir, walk: v.walk, sitting: v.sitting, look: v.look, weapon: v.weapon, me: v.me, down: v.down }, v.t, v.reduced);
   }
   drawSmoke(g, v.dt);
 
   paintForeground(g, s);
+  s.front?.(g, fx);
   g.restore();
 
   // --- rain outside
-  if ((v.place === "street" || v.place === "park" || v.place === "rooftop") && !v.reduced) {
+  if (s.outdoors && !v.reduced) {
     g.strokeStyle = "rgba(160,180,220,0.28)";
     g.lineWidth = 1;
     g.beginPath();
@@ -298,7 +302,7 @@ export function draw(g: G, v: View) {
   d.fillStyle = `rgba(6,7,16,${s.darkness})`;
   d.fillRect(0, 0, VIEW_W, VIEW_H);
   d.globalCompositeOperation = "destination-out";
-  const lights = [...s.lights, ...actorLights(v.actors, v.place)];
+  const lights = [...s.lights, ...actorLights(v.actors, v.place, v.t, v.reduced), ...(s.liveLights?.(fx) ?? [])];
   for (const L of lights) {
     const lv = lampLevel(L.kind, v.t, v.reduced);
     const x = L.x - cx;
@@ -325,9 +329,49 @@ export function draw(g: G, v: View) {
   g.globalAlpha = 1;
   g.globalCompositeOperation = "source-over";
 
+  // lightning: the whole sky goes white, flickers once, and drains away
+  if (v.lightning && v.lightning > 0) {
+    const k = v.lightning;
+    const flick = k > 0.75 ? 1 : k > 0.62 ? 0.25 : k > 0.5 ? 0.8 : k * 1.1;
+    g.fillStyle = `rgba(215,225,255,${(flick * 0.5).toFixed(3)})`;
+    g.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
+
   // a little haze after the bench
   if (v.haze > 0) {
     g.fillStyle = `rgba(190,200,210,${(v.haze * 0.12).toFixed(3)})`;
     g.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
+
+  // hurt: the edges go red, more as it gets worse
+  const hurt = 1 - v.hp / v.maxHp;
+  if (v.me && (v.me.flash > 0 || hurt > 0.6)) {
+    const a = v.me.flash > 0 ? 0.35 : (hurt - 0.6) * 0.5 * (v.reduced ? 1 : 0.75 + Math.sin(v.t * 6) * 0.25);
+    const grad = g.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.35, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.6);
+    grad.addColorStop(0, "rgba(160,0,0,0)");
+    grad.addColorStop(1, `rgba(160,0,0,${a.toFixed(3)})`);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
+  // your health, top left, whenever it matters
+  if (v.me || v.hp < v.maxHp) {
+    const f = Math.max(0, v.hp / v.maxHp);
+    g.save();
+    g.translate(v.hudX ?? 0, 0);
+    g.fillStyle = "rgba(0,0,0,0.6)";
+    g.fillRect(4, 4, 66, 9);
+    g.fillStyle = "#ff5a7a";
+    g.fillRect(6, 6, 2, 1);
+    g.fillRect(9, 6, 2, 1);
+    g.fillRect(5, 7, 7, 2);
+    g.fillRect(6, 9, 5, 1);
+    g.fillRect(7, 10, 3, 1);
+    g.fillStyle = "#2a2a30";
+    g.fillRect(14, 6, 54, 5);
+    g.fillStyle = f > 0.5 ? "#7ddc3a" : f > 0.25 ? "#ffd23a" : "#ff5a3a";
+    g.fillRect(14, 6, Math.max(1, Math.round(54 * f)), 5);
+    g.fillStyle = "rgba(255,255,255,0.3)";
+    g.fillRect(14, 6, Math.round(54 * f), 1);
+    g.restore();
   }
 }

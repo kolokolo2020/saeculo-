@@ -171,10 +171,10 @@ export default function PianoRoll({
             </option>
           ))}
         </select>
-        <button className={chip} onClick={() => setLows({ ...lows, [ch.id]: Math.max(12, low - 12) })} aria-label="Octave down">
+        <button className={chip} onClick={() => setLows({ ...lows, [ch.id]: Math.max(12, low - 12) })} aria-label="oct − (octave down)">
           oct −
         </button>
-        <button className={chip} onClick={() => setLows({ ...lows, [ch.id]: Math.min(96, low + 12) })} aria-label="Octave up">
+        <button className={chip} onClick={() => setLows({ ...lows, [ch.id]: Math.min(96, low + 12) })} aria-label="oct + (octave up)">
           oct +
         </button>
         <label className="flex items-center gap-1 text-[#b9b09e]">

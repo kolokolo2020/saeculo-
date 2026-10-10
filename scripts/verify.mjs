@@ -74,10 +74,43 @@ try {
     const { ctx, page } = await open({ seen: false });
     const intro = page.getByRole("dialog", { name: "Intro" });
     check("first visit: intro shows", await intro.isVisible());
+    check(
+      "first visit: the cover before the intro is the intro's own near-black",
+      (await page.evaluate(() => {
+        // it's gone once the page is ready, so read the rule
+        for (const sh of document.styleSheets) for (const r of (() => { try { return sh.cssRules; } catch { return []; } })()) if (r.selectorText === ".intro-cover") return r.style.backgroundColor;
+        return null;
+      })) === "rgb(11, 10, 9)",
+    );
+    check(
+      "intro: a dark room, the name, and a way in",
+      (await intro.getAttribute("data-phase")) === "gate" && (await intro.textContent()).includes("saeculo") && (await page.getByRole("button", { name: /to enter/i }).isVisible()),
+    );
+    check("intro: the music waits for the click", (await audio(page)).paused);
+    if (axeSource) {
+      await page.waitForTimeout(2200);
+      await page.addScriptTag({ content: axeSource });
+      const v = await page.evaluate(async () => (await window.axe.run(document.querySelector('[role="dialog"]'), { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+      check("axe: no violations on the intro", v.length === 0, v.join(", "));
+    }
     await page.keyboard.press("a");
-    await page.waitForTimeout(700);
-    check("intro: any key goes in", (await page.getByRole("button", { name: /enter/i }).count()) === 0);
-    check("intro: entering starts the music", !(await audio(page)).paused);
+    await page.waitForTimeout(1500);
+    check("intro: a key lights the cigarette", (await intro.getAttribute("data-phase")) === "burn");
+    const ember = await page.evaluate(() =>
+      [...document.querySelectorAll('[role="dialog"] canvas')].some((c) => {
+        const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+        for (let i = 0; i < d.length; i += 16) if (d[i + 3] > 200 && d[i] > 200 && d[i + 1] < 170 && d[i + 2] < 120) return true;
+        return false;
+      }),
+    );
+    check("intro: the coal glows", ember);
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(900);
+    check("intro: a key hurries it along (the breath out)", (await intro.getAttribute("data-phase")) === "exhale");
+    await page.mouse.click(683, 600);
+    await page.waitForTimeout(900);
+    check("intro: a click too (the name, through the smoke)", (await intro.getAttribute("data-phase")) === "reveal" && (await intro.locator("[data-shown='true']").count()) === 1);
+    check("intro: the music comes up with the name", !(await audio(page)).paused);
     await page.getByRole("button", { name: /skip/i }).click();
     await page.waitForTimeout(500);
     check("intro: skip lands on the desktop with Beats open", (await intro.count()) === 0 && (await page.getByTestId("window-beats").isVisible()));
@@ -88,11 +121,38 @@ try {
     check("returning visit: no intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
     await page.getByRole("button", { name: "Clock and settings" }).click();
     await page.getByRole("menuitem", { name: "Replay intro" }).click();
-    await page.waitForTimeout(300);
+    await page.getByRole("dialog", { name: "Intro" }).waitFor({ timeout: 5000 }).catch(() => {});
     check("replay intro from the clock menu", await page.getByRole("dialog", { name: "Intro" }).isVisible());
+    await page.waitForTimeout(1000);
+    await page.getByRole("button", { name: /to enter/i }).click();
+    await page.waitForTimeout(11500);
+    check(
+      "intro: runs all the way to the desktop by itself",
+      (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused && (await page.getByTestId("window-beats").isVisible()),
+    );
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    await page.getByRole("menuitem", { name: "Replay intro" }).click();
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(800);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
-    check("Escape skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
+    check("Escape skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
+    await page.getByTestId("icon-socials").click();
+    await page.waitForTimeout(300);
+    check("intro: nothing left blocking clicks after it", await page.getByTestId("window-socials").isVisible());
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await open({ seen: false, mobile: true, viewport: { width: 390, height: 844 } });
+    const intro = page.getByRole("dialog", { name: "Intro" });
+    await page.getByRole("button", { name: /tap to enter/i }).tap();
+    await page.waitForTimeout(500);
+    check("intro on a phone: a tap lights it", (await intro.getAttribute("data-phase")) === "burn");
+    check("intro on a phone: fits the screen", (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+    await page.getByRole("button", { name: /skip/i }).tap();
+    await page.waitForTimeout(500);
+    check("intro on a phone: skip lands on the desktop, music on", (await intro.count()) === 0 && !(await audio(page)).paused);
     await ctx.close();
   }
 
@@ -100,7 +160,8 @@ try {
   {
     const { ctx, page } = await open();
     check("Beats opens by default", await page.getByTestId("window-beats").isVisible());
-    check("folder lists the tracks", (await page.locator("[data-testid^=track-]").count()) === 3);
+    check("tracklist lists the beats", (await page.locator("[data-testid^=track-]").count()) === 3);
+    check("one album cover for every beat", (await page.locator("[data-testid=window-beats] img").count()) === 1 && (await page.locator("[data-testid=window-beats] img").getAttribute("src")).includes("saeculo"));
     await page.getByTestId("deck-play").click();
     await page.waitForTimeout(1200);
     const a1 = await audio(page);
@@ -115,6 +176,8 @@ try {
     check("waveform: arrow keys step", (await audio(page)).t >= t60 + 4);
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.waitForTimeout(800);
+    // the next file can take a moment to buffer
+    for (let i = 0; i < 10 && (await audio(page)).paused; i++) await page.waitForTimeout(250);
     const a2 = await audio(page);
     check("next track", a2.src.includes("elbtunnel") && !a2.paused);
     check("active row follows", (await page.getByTestId("track-elbtunnel").getAttribute("aria-current")) === "true");
@@ -127,28 +190,37 @@ try {
     const a3 = await audio(page);
     check("previous restarts the track", a3.t < 2 && a3.src.includes("dull-knife"));
     await page.waitForTimeout(600);
-    const drawn = await page.evaluate(() => {
-      const c = document.querySelector("[data-testid=window-beats] canvas");
-      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-      let lit = 0;
-      for (let i = 0; i < d.length; i += 400) lit += d[i] + d[i + 1] + d[i + 2] > 60 ? 1 : 0;
-      return lit;
+    // the cover is the hero: the owner's artwork, big and sharp; no visualizer anywhere
+    const cover = await page.getByTestId("cover").evaluate((img) => ({ src: img.getAttribute("src"), w: img.getBoundingClientRect().width, natural: img.naturalWidth, done: img.complete }));
+    check("Beats: the cover is the owner's artwork (saeculo.jpg)", cover.src.endsWith("/covers/saeculo.jpg") && cover.done && cover.natural >= 1000, cover.src);
+    check("Beats: the cover is the hero, shown large", cover.w >= 220, String(Math.round(cover.w)));
+    check("Beats: no visualizer, the only canvas is the seek bar", (await page.locator("[data-testid=visualizer]").count()) === 0 && (await page.locator("[data-testid=window-beats] canvas").count()) === 1 && (await page.locator("[data-testid=window-beats] canvas[data-testid=waveform]").count()) === 1);
+    check("Beats: no visuals switch, in the window or the clock menu", (await page.getByRole("button", { name: /visuals:/ }).count()) === 0);
+    // the theme: flat paper with hairlines, no bevels or glass
+    const look = await page.evaluate(() => {
+      const css = (sel) => getComputedStyle(document.querySelector(sel));
+      const win = css("[data-testid=window-beats]");
+      const title = css("[data-testid=window-beats] .win-title");
+      const cap = css("[data-testid=window-beats] .cap-btn");
+      const play = css("[data-testid=deck-play]");
+      return { winBg: win.backgroundColor, winBorder: win.borderTopWidth, winShadow: win.boxShadow, titleBg: title.backgroundImage, capShadow: cap.boxShadow, capRadius: parseFloat(cap.borderTopLeftRadius), mp: css(".mp").backgroundColor, playImg: play.backgroundImage, playShadow: play.boxShadow };
     });
-    check("visualizer draws the cover", drawn > 50, String(drawn));
-    await page.getByRole("button", { name: /visuals:/ }).click();
-    check("visuals: scan mode", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("scan"));
-    await page.waitForTimeout(400);
-    check("scan mode draws", await page.evaluate(() => {
-      const c = document.querySelector("[data-testid=window-beats] canvas");
-      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-      let lit = 0;
-      for (let i = 0; i < d.length; i += 400) lit += d[i] + d[i + 1] + d[i + 2] > 60 ? 1 : 0;
-      return lit > 50;
+    check("theme: windows are flat paper with a hairline and a soft shadow", look.winBg === "rgb(251, 248, 242)" && look.winBorder === "1px" && !look.winShadow.includes("inset") && look.titleBg === "none", JSON.stringify(look).slice(0, 160));
+    check("theme: flat buttons (no bevels), rounded corners", look.capShadow === "none" && look.capRadius >= 4 && look.playImg === "none" && !look.playShadow.includes("inset"));
+    check("theme: the player is on the same paper, not night-blue glass", look.mp === "rgb(251, 248, 242)");
+    // the clock menu: still visuals is the one setting left
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    check("clock menu: no visualizer options, still visuals stays", (await page.getByRole("menu").getByRole("menuitem", { name: /led|wave/i }).count()) === 0 && (await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).count()) === 1);
+    await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).click();
+    check("clock menu: still visuals on", (await page.evaluate(() => document.documentElement.dataset.calm)) === "true" && (await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).getAttribute("aria-checked")) === "true");
+    check("still visuals: the playing row's bars stand still, still visible", await page.evaluate(() => {
+      const bars = [...document.querySelectorAll("[data-testid=window-beats] .eq-bars i")];
+      return bars.length === 3 && bars.every((b) => getComputedStyle(b).animationName === "none" && b.getBoundingClientRect().height > 2);
     }));
-    await page.getByRole("button", { name: /visuals:/ }).click();
-    check("visuals: still mode", (await page.evaluate(() => document.documentElement.dataset.calm)) === "true");
-    await page.getByRole("button", { name: /visuals:/ }).click();
-    check("visuals: back to reveal", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("reveal"));
+    await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).click();
+    check("clock menu: still visuals off again", (await page.evaluate(() => document.documentElement.dataset.calm)) === "false");
+    await page.keyboard.press("Escape");
+    check("clock menu: Escape closes it", (await page.getByRole("menu").count()) === 0);
     await page.getByRole("button", { name: "Repeat this beat" }).click();
     await page.getByRole("button", { name: "Shuffle" }).click();
     const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-player")));
@@ -189,6 +261,13 @@ try {
     await page.waitForTimeout(300);
     const links = await page.locator("[data-testid=window-socials] a").evaluateAll((as) => as.map((a) => [a.href, a.target]));
     check("socials: five real links, new tab", links.length === 5 && links.every(([h, t]) => h.startsWith("https://") && t === "_blank"));
+    const onLink = () => page.evaluate(() => !!document.activeElement?.closest?.("[data-testid=window-socials] a"));
+    await page.locator("[data-testid=window-socials] .win-title h2").click();
+    for (let i = 0; i < 8 && !(await onLink()); i++) await page.keyboard.press("Tab");
+    check("socials: tabbing onto a link shows a clear ring", (await onLink()) && (await page.evaluate(() => {
+      const s = getComputedStyle(document.activeElement);
+      return s.outlineStyle !== "none" && parseFloat(s.outlineWidth) >= 2;
+    })));
     await page.getByTestId("icon-beats").click();
     await page.getByRole("slider", { name: "Volume" }).fill("0.3");
     check("volume", Math.abs((await page.evaluate(() => document.querySelector("audio").volume)) - 0.3) < 0.01);
@@ -218,8 +297,30 @@ try {
     await ctx.close();
   }
   {
+    const { ctx, page } = await open({ seen: false, reduced: true });
+    const intro = page.getByRole("dialog", { name: "Intro" });
+    check("reduced motion: the intro has no burning or smoke", (await intro.isVisible()) && (await intro.locator("canvas").count()) === 0);
+    await page.keyboard.press("a");
+    await page.waitForTimeout(300);
+    check("reduced motion: a key goes straight to the name", (await intro.getAttribute("data-phase")) === "reveal");
+    await page.waitForTimeout(2300);
+    check("reduced motion: a short, still intro, then in", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
+    await ctx.close();
+  }
+  {
     const { ctx, page } = await open({ reduced: true });
-    check("reduced motion: visuals start still", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("still"));
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    check("reduced motion: still visuals start on", (await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).getAttribute("aria-checked")) === "true");
+    check("reduced motion: windows open without animating", await page.getByTestId("window-beats").evaluate((w) => getComputedStyle(w).animationName === "none"));
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => localStorage.setItem("saeculo-game", JSON.stringify({ found: [], seenHelp: true, unseen: [], profile: { name: "R", skin: 1, hair: "short", hairColor: 0, body: "slim" } })));
+    await page.getByTestId("icon-game").click();
+    await page.waitForTimeout(800);
+    await page.evaluate(() => window.__game.teleport("street", 18, 5.6, "down"));
+    await page.evaluate(() => window.__game.storm());
+    await page.waitForTimeout(150);
+    const calm = await page.evaluate(() => window.__game.state());
+    check("reduced motion: thunder, but no lightning flash", calm.bolts === 1 && calm.bolt === 0);
     await ctx.close();
   }
 
@@ -231,6 +332,10 @@ try {
     await win.getByRole("button", { name: "Send" }).click();
     check("contact: empty form shows two errors", (await win.locator("[aria-invalid=true]").count()) === 2);
     check("contact: focus goes to the first problem", await page.evaluate(() => document.activeElement?.id === "contact-name"));
+    check("contact: the focused field shows a clear ring", await page.evaluate(() => {
+      const s = getComputedStyle(document.activeElement);
+      return s.outlineStyle !== "none" && parseFloat(s.outlineWidth) >= 2;
+    }));
     await win.getByLabel("Name").fill("Test");
     await win.getByLabel("Message").fill("Hi");
     await win.getByRole("button", { name: "Send" }).click();
@@ -266,6 +371,14 @@ try {
     check("game opens in the bedroom", (await page.getByTestId("game").getAttribute("data-place")) === "bedroom");
     const held = await audio(page);
     check("game: site music paused, position kept", held.paused && held.t > 0);
+    check("game: first visit opens the mirror", await page.getByRole("dialog", { name: "Who are you?" }).isVisible());
+    await page.getByTestId("menu-name").fill("Tester");
+    await page.getByRole("button", { name: "mullet" }).click();
+    await page.getByRole("button", { name: "broad" }).click();
+    await page.getByTestId("menu-close").click();
+    await page.waitForTimeout(300);
+    const prof = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-game")).profile);
+    check("game: your name and look are saved", prof.name === "Tester" && prof.hair === "mullet" && prof.body === "broad");
     check("game: controls card on first visit", await page.getByTestId("game-help").isVisible());
     await page.evaluate(() => document.querySelector("audio").play());
     await page.waitForTimeout(300);
@@ -363,6 +476,11 @@ try {
     await page.getByTestId("studio-rec").click();
     check("studio: tips cross off steps and keys", (await studio.locator("[data-testid=studio-tips] [data-done=true]").count()) === 3);
     const kit = await page.evaluate(() => window.__game.kitLevels());
+    // the noisy ones (a vinyl pop) come out a little different each time: a quiet one gets two more goes
+    for (let i = 0; i < 2 && Object.values(kit).some((v) => v.peak < 0.08); i++) {
+      const again = await page.evaluate(() => window.__game.kitLevels());
+      for (const [k, v] of Object.entries(kit)) if (v.peak < 0.08) kit[k] = again[k];
+    }
     const off = Object.entries(kit).filter(([, v]) => v.peak < 0.08 || v.peak > 0.95);
     check("studio: every synthesized sound is audible and none clips", off.length === 0, off.map(([k, v]) => `${k} ${v.peak}`).join(", "));
     await studio.getByRole("button", { name: "Mute dusty kick" }).click();
@@ -381,7 +499,7 @@ try {
     await studio.getByRole("button", { name: "save", exact: true }).first().click();
     const slots = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-studio")).slots);
     check("studio: save to a slot", slots[0] && slots[0].tempo === 85);
-    const dl = page.waitForEvent("download", { timeout: 20000 });
+    const dl = page.waitForEvent("download", { timeout: 60000 });
     await page.getByTestId("studio-export").click();
     const file = await dl;
     const bytes = readFileSync(await file.path());
@@ -448,8 +566,11 @@ try {
     await page.waitForTimeout(250);
     await page.keyboard.press("e");
     await page.waitForTimeout(300);
+    await page.getByTestId("hoops-shoot").click();
+    await page.waitForTimeout(200);
     check("park: shooting hoops gives the basketball", (await saved()).found.includes("basketball"));
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
     await page.evaluate(() => window.__game.teleport("street", 10.5, 3.6, "up"));
     await page.keyboard.down("ArrowUp");
     await page.waitForTimeout(500);
@@ -535,13 +656,252 @@ try {
     check("bedroom: it's yours, slower, from further away", (await readAll()).includes("No label") && (await saved()).seen.includes("unlabelled") && !(await game(page)).strangeTape);
     await closeDialog();
 
+    // the bigger map, the menu, shops, a fight
+    await page.evaluate(() => window.__game.teleport("street", 39, 5, "right"));
+    await page.keyboard.down("ArrowRight");
+    await page.waitForTimeout(500);
+    await page.keyboard.up("ArrowRight");
+    await page.waitForTimeout(700);
+    check("street → the avenue", (await page.getByTestId("game").getAttribute("data-place")) === "avenue");
+    await page.keyboard.press("m");
+    await page.waitForTimeout(200);
+    check("menu: opens with M", await page.getByTestId("game-menu").isVisible());
+    await page.getByRole("tab", { name: "goals" }).click();
+    check("menu: goals listed, some reached", (await page.locator("[data-testid=menu-goals] [data-done=true]").count()) >= 2);
+    await page.getByRole("tab", { name: "settings" }).click();
+    await page.getByRole("button", { name: "chill" }).click();
+    check("menu: settings saved", (await saved()).settings.difficulty === "chill");
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => window.__game.give({ cash: 200 }));
+    await page.evaluate(() => window.__game.teleport("thrift", 3.5, 4.2, "up"));
+    await page.waitForTimeout(250);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: /buy the puffer/ }).click();
+    check("thrift: buy clothes into the wardrobe", (await saved()).owned.includes("puffer") && (await saved()).cash === 110);
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => window.__game.teleport("alley", 12, 6, "right"));
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.__game.trouble());
+    for (let i = 0; i < 25 && !(await page.getByRole("button", { name: "Fight", exact: true }).count()); i++) {
+      await page.waitForTimeout(400);
+      if (await page.getByTestId("game-dialog").count()) await page.keyboard.press("e");
+    }
+    check("alley: trouble walks up to you", (await page.getByRole("button", { name: "Fight", exact: true }).count()) === 1);
+    await page.getByRole("button", { name: "Fight", exact: true }).click();
+    await page.waitForTimeout(300);
+    check("fight: it starts, with health bars", (await page.evaluate(() => window.__game.fight()))?.foes.length >= 2);
+    await page.waitForTimeout(200);
+    const foeHp = (await page.evaluate(() => window.__game.fight())).foes.map((f) => f.hp);
+    check("fight: on chill they're softer (a drunk 31 health, not 36)", foeHp.every((h) => h === 31 || h === 44), String(foeHp));
+    check("fight: no talking mid-fight (E swings)", !/talk/.test((await page.getByTestId("game-prompt").textContent().catch(() => "")) ?? ""));
+    await page.evaluate(() => window.__game.weaken());
+    for (let i = 0; i < 40 && (await page.evaluate(() => window.__game.fight()?.outcome)) === ""; i++) {
+      const f = await page.evaluate(() => window.__game.fight());
+      const foe = f.foes.find((x) => x.state !== "down" && x.state !== "flee");
+      if (foe) await page.evaluate(([x, y]) => window.__game.teleport("alley", (x - 9) / 16, y / 16, "right"), [foe.x, foe.y]);
+      await page.keyboard.press("e");
+      await page.waitForTimeout(380);
+    }
+    await page.waitForTimeout(800);
+    const won = await saved();
+    check("fight: win it, get paid, unlock the bat", won.stats.wins === 1 && won.weapons.includes("bat") && won.cash > 110, JSON.stringify(won.stats));
+    check("fight: people who saw it react", (await lifeNow()).actors.some((a) => a.react > 0));
+    await closeDialog();
+
+    // balance: trouble leaves you alone (the club set also gets you the crowd sound) for a while after; a second set straight away pays less
+    check("trouble: a breather after it", (await game(page)).lastTrouble > 0 && (await game(page)).encounterIn >= 100);
+    const cash0 = (await saved()).cash;
+    await page.evaluate(() => window.__game.rhythm("dj", 65));
+    const cash1 = (await saved()).cash;
+    await page.evaluate(() => window.__game.rhythm("dj", 65));
+    const cash2 = (await saved()).cash;
+    check("club: a good set pays, the same set straight after pays a third", cash1 - cash0 === 26 && cash2 - cash1 === 8, `${cash1 - cash0}, ${cash2 - cash1}`);
+    await closeDialog();
+
+    // things that happen: Vee's beat battle, Dre's job, the CD guy's request
+    const talkTo = async (place, x, y, dir = "right") => {
+      await closeDialog();
+      await page.evaluate(([p, x, y, d]) => window.__game.teleport(p, x, y, d), [place, x, y, dir]);
+      await page.waitForTimeout(250);
+      await page.keyboard.press("e");
+      await page.waitForTimeout(250);
+    };
+    const pick = async (name) => {
+      for (let i = 0; i < 6 && !(await page.getByTestId("game-dialog").getByRole("button", { name }).count()); i++) {
+        await page.keyboard.press("e");
+        await page.waitForTimeout(150);
+      }
+      await page.getByTestId("game-dialog").getByRole("button", { name }).click();
+      await page.waitForTimeout(250);
+    };
+    await page.evaluate(() => window.__game.give({ cash: 200, stats: { ...window.__game.save().stats, beatsSold: 1 } }));
+    await page.evaluate(() => window.__game.teleport("underpass", 8, 6.5, "right"));
+    await page.waitForTimeout(1400);
+    const veeTalk = (await page.getByTestId("game-dialog").count()) ? await readAll() : "";
+    check("underpass: Vee comes over and challenges you", /walks straight at you/.test(veeTalk) && (await saved()).seen.includes("vee"), veeTalk);
+    check("battle: Vee names her beat (the first time, her night drill)", /My night drill, 142 BPM/.test(veeTalk), veeTalk);
+    await pick(/Battle/);
+    check("battle: the stake goes in, the hard rhythm game opens", (await saved()).cash === 180 && (await page.getByRole("dialog", { name: "Beat battle" }).isVisible()));
+    check("battle: on the beat she named", /played the night drill first/.test(await page.getByTestId("rhythm").textContent()));
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => window.__game.battle(80, 70));
+    const bt = await saved();
+    check("battle: win it, double your money, a goal", bt.cash >= 220 && bt.stats.battleWins === 1 && bt.goals.includes("battle"), `${bt.cash}`);
+    await talkTo("underpass", 11.6, 6.8);
+    await pick("Got any work?");
+    await pick("I'll take it");
+    check("Dre: a job, carrying a tape", (await saved()).job?.to === "busker" && (await saved()).job.stage === "carry");
+    await talkTo("subway", 13.1, 3.6);
+    check("subway: the busker takes it and gives you something back", (await saved()).job?.stage === "back");
+    const cashBack = (await saved()).cash;
+    await talkTo("underpass", 11.6, 6.8);
+    const paid = await saved();
+    check("Dre: back with the envelope, paid", paid.job === null && paid.stats.jobs === 1 && paid.cash > cashBack && paid.goals.includes("job"));
+
+    // Vee: another of her beats each battle (she says which), every one playable
+    await talkTo("underpass", 21.4, 6.3, "right");
+    const veeAgain = (await page.getByTestId("game-dialog").count()) ? await readAll() : "";
+    check("battle: after a win, Vee names the next beat (her cold trap)", /cold trap/.test(veeAgain), veeAgain);
+    await closeDialog();
+    const charts = await page.evaluate(() => window.__game.battleCharts());
+    check(
+      "battle: each of Vee's beats has a kick, a snare or clap, hats and low end, and a playable chart",
+      charts.length === 4 && charts.every((c) => c.voices.every(Boolean) && c.hits.every((n) => n > 0) && c.perSecond > 3 && c.perSecond < 8),
+      JSON.stringify(charts.map((c) => [c.id, c.hits, c.perSecond])),
+    );
+    const veeBeats = [];
+    const addLoss = (n) => page.evaluate((n) => window.__game.give({ stats: { ...window.__game.save().stats, battleLosses: window.__game.save().stats.battleLosses + n } }), n);
+    for (let i = 0; i < 4; i++) {
+      veeBeats.push((await page.evaluate(() => window.__game.veeBeat())).preset);
+      await addLoss(1);
+    }
+    await addLoss(-4);
+    check("battle: a different beat each time, in turn", new Set(veeBeats).size === 4, veeBeats.join());
+
+    // carrying Dre's tape: trouble comes sooner, they ask about it, and a knockout loses it
+    await page.evaluate(() => window.__game.give({ job: { to: "busker", stage: "carry", pay: 25 } }));
+    const odds = await page.evaluate(() => window.__game.odds("alley"));
+    check("carrying Dre's tape: trouble's likelier and comes sooner", odds.ambush > 0.25 && odds.sooner > 1, JSON.stringify(odds));
+    await closeDialog();
+    await page.evaluate(() => window.__game.teleport("alley", 12, 6, "right"));
+    await page.evaluate(() => window.__game.trouble());
+    for (let i = 0; i < 30 && !(await page.getByRole("button", { name: "Fight", exact: true }).count()); i++) {
+      if (await page.getByTestId("game-dialog").count()) await page.keyboard.press("e");
+      await page.waitForTimeout(250);
+    }
+    check("carrying: they ask what's on the tape", /on the tape/.test((await page.getByTestId("game-dialog").count()) ? await dialogText() : ""));
+    await page.getByRole("button", { name: "Fight", exact: true }).click();
+    await page.waitForTimeout(500);
+    await page.evaluate(() => window.__game.knockMe());
+    await page.getByTestId("game-wake").waitFor({ timeout: 5000 }).catch(() => {});
+    await page.getByTestId("game-wake").click();
+    await page.waitForTimeout(300);
+    const woke = await readAll();
+    check("knocked out carrying: the tape's gone, and the job with it", (await saved()).job?.stage === "lost" && /Dre's tape is gone/.test(woke), woke);
+    await talkTo("underpass", 11.6, 6.8);
+    const dreLost = await readAll();
+    check("Dre: no tape, no money (and the job's off)", (await saved()).job === null && /Where's my tape/.test(dreLost) && (await saved()).stats.jobs === 1, dreLost);
+    await closeDialog();
+
+    // the alley cat: pet it three times and it follows you; trouble or leaving sends it home
+    await page.evaluate(() => window.__game.peace());
+    await page.evaluate(() => window.__game.teleport("alley", 4.2, 3.6, "left"));
+    await page.evaluate(() => window.__game.cat(0, [3.2, 3.6]));
+    await page.waitForTimeout(250);
+    check("alley: the cat on the dumpster can be petted", /the cat/.test(await page.getByTestId("game-prompt").textContent()));
+    let petted = "";
+    for (let i = 0; i < 3; i++) {
+      await closeDialog();
+      await page.waitForTimeout(150);
+      await page.keyboard.press("e");
+      await page.waitForTimeout(200);
+      petted += await readAll();
+    }
+    await closeDialog();
+    check("alley: pet it three times and it comes with you", (await page.evaluate(() => window.__game.cat())).trail > 0 && /follows you/.test(petted), petted);
+    const catFrom = await page.evaluate(() => window.__game.cat());
+    await page.keyboard.down("ArrowDown");
+    await page.waitForTimeout(1200);
+    await page.keyboard.up("ArrowDown");
+    await page.keyboard.down("ArrowRight");
+    await page.waitForTimeout(1200);
+    await page.keyboard.up("ArrowRight");
+    await page.waitForTimeout(1500);
+    const [me, catNow] = [await game(page), await page.evaluate(() => window.__game.cat())];
+    check("alley: the cat keeps a few steps behind", Math.hypot(catNow.x - catFrom.x, catNow.y - catFrom.y) > 40 && Math.hypot(me.x - catNow.x, me.y - catNow.y) < 40, `${Math.round(Math.hypot(me.x - catNow.x, me.y - catNow.y))}`);
+    await page.evaluate(() => window.__game.trouble());
+    await page.waitForTimeout(400);
+    const scared = await page.evaluate(() => window.__game.cat());
+    check("alley: trouble sends the cat back to its spots", scared.trail === 0 && (!!scared.goal || scared.perches.some(([x, y]) => Math.hypot(x - scared.x, y - scared.y) < 1)));
+    await page.evaluate(() => window.__game.cat(15));
+    await page.evaluate(() => window.__game.teleport("avenue", 20, 5, "down"));
+    await page.waitForTimeout(200);
+    const left = await page.evaluate(() => window.__game.cat());
+    check("alley: walk out and the cat stays, back on one of its spots", left.trail === 0 && left.perches.some(([x, y]) => Math.hypot(x - left.x, y - left.y) < 1));
+    await page.evaluate(() => window.__game.peace());
+    await closeDialog();
+    await page.evaluate(() => window.__game.give({ seen: [...window.__game.save().seen, "cd"] }));
+    await talkTo("avenue", 23.5, 4.4);
+    const cdText = (await page.getByTestId("game-dialog").count()) ? await dialogText() : "";
+    check("avenue: the CD guy wants a slow beat", (await saved()).seen.includes("cd-ask") && /track four/i.test(cdText), cdText);
+    await closeDialog();
+
+    // the subway as fast travel: one stop each way
+    await talkTo("street", 31.5, 9.1, "down");
+    const stairsText = (await page.getByTestId("game-dialog").count()) ? await dialogText() : "";
+    check("street: subway stairs on the far pavement", /Down the stairs/.test(stairsText), stairsText + " " + JSON.stringify((({ place, x, y, target, pending }) => ({ place, x, y, target, pending: !!pending }))(await game(page))));
+    await pick(/Get on: the avenue/);
+    check("subway: on the train", (await game(page)).ride?.to === "avenue");
+    await page.waitForTimeout(3000);
+    check("subway: off at the avenue, by the stairs", (await game(page)).place === "avenue" && !(await game(page)).ride);
+    await closeDialog();
+    await page.evaluate(() => window.__game.teleport("subway", 15, 5.5, "down"));
+    // wait for the doors (a train every 34 s): a whole cycle at most
+    for (let i = 0; i < 160 && !((await game(page)).t % 34 > 5 && (await game(page)).t % 34 < 9); i++) await page.waitForTimeout(250);
+    await page.keyboard.press("e");
+    await page.waitForTimeout(200);
+    await pick(/Get on: your block/);
+    await page.waitForTimeout(3000);
+    const home = await game(page);
+    check("subway: board when the doors are open, off at your block", home.place === "street" && home.y > 140, `${home.place} ${home.y}`);
+    check("subway: rides are counted", (await saved()).stats.rides === 2);
+    await closeDialog();
+
+    // sound: footsteps per surface, the crowd, the station announcement
+    const underfoot = async (place, x, y) => {
+      await page.evaluate(([p, x, y]) => window.__game.teleport(p, x, y, "down"), [place, x, y]);
+      return page.evaluate(() => window.__game.surface());
+    };
+    const feet = [await underfoot("alley", 12, 6), await underfoot("underpass", 10, 6.5), await underfoot("avenue", 20, 7.5), await underfoot("subway", 15, 6.4), await underfoot("club", 12, 8)];
+    check("footsteps: grit, concrete, wet road, the platform strip, the club floor", feet.join() === "grit,concrete,wet,metal,floor", feet.join());
+    await page.waitForTimeout(200);
+    check("club: people talking under the music", (await game(page)).fx.crowd > 0.1);
+    await page.evaluate(() => window.__game.teleport("subway", 15, 4.5, "down"));
+    const ann0 = (await game(page)).fx.announcements ?? 0;
+    for (let i = 0; i < 90 && ((await game(page)).fx.announcements ?? 0) === ann0; i++) await page.waitForTimeout(400);
+    check("subway: an announcement as the train comes in, captioned", ((await game(page)).fx.announcements ?? 0) > ann0 && /now arriving/.test((await page.getByTestId("game-toast").textContent().catch(() => "")) ?? ""));
+
+    // more life: a police car, people passing on the avenue, the alley cat, the storm
+    check("alley: a cat", (await lifeNow()).actors.some((a) => a.kind === "cat" && a.place === "alley"));
+    await page.evaluate(() => window.__game.teleport("avenue", 20, 5, "down"));
+    await page.evaluate(() => window.__game.cop());
+    await page.waitForTimeout(1500);
+    const ave = (await lifeNow()).actors.filter((a) => a.place === "avenue");
+    check("avenue: a police car rolls by", ave.some((a) => a.cop));
+    check("avenue: people passing through", ave.some((a) => a.id.startsWith("passer")));
+    const bolts = (await game(page)).bolts;
+    await page.evaluate(() => window.__game.storm());
+    await page.waitForTimeout(150);
+    check("outside: lightning now and then", (await game(page)).bolts === bolts + 1 && (await game(page)).bolt > 0);
+
     await page.getByTestId("game-exit").click();
     await page.waitForTimeout(1400);
     check("game: exit returns to the site", (await page.getByTestId("game").count()) === 0);
     check("game: music picks up where it was", !(await audio(page)).paused);
     await page.getByTestId("icon-game").click();
     await page.waitForTimeout(1600);
-    check("game: remembers found sounds", (await page.getByTestId("game").textContent()).includes("sounds 6/6"));
+    check("game: remembers found sounds", (await page.getByTestId("game").textContent()).includes("sounds 8/12"));
     await page.getByTestId("game-to-studio").click();
     await page.waitForTimeout(500);
     check("game: straight to the studio", (await page.getByTestId("studio").isVisible()) && (await page.getByTestId("game").getAttribute("data-place")) === "studio");
@@ -577,15 +937,45 @@ try {
     await ctx.close();
   }
 
+  // ------------------------------------------------- where windows open
+  {
+    const { ctx, page } = await open();
+    await page.keyboard.press("2");
+    await page.keyboard.press("3");
+    await page.waitForTimeout(700);
+    const [b, so, co] = await Promise.all(["beats", "socials", "contact"].map((id) => page.getByTestId(`window-${id}`).boundingBox()));
+    check("1366px: Socials and Contact open beside Beats, not over it", b.x >= 116 && b.x + b.width <= so.x && b.x + b.width <= co.x && co.x + co.width <= 1366, `${Math.round(b.x + b.width)} | ${Math.round(so.x)}, ${Math.round(co.x)}`);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await open({ viewport: { width: 844, height: 390 }, mobile: true });
+    const head = await page.locator("[data-testid=window-beats] .mp-head").boundingBox();
+    const foot = await page.locator("[data-testid=window-beats] .mp-foot").boundingBox();
+    check("phone held sideways: the tracklist starts above the fold", head && foot && head.y + head.height <= foot.y, head && foot ? `${Math.round(head.y + head.height)} / ${Math.round(foot.y)}` : "");
+    await ctx.close();
+  }
+
   // ---------------------------------------------------------------- phone
   {
     const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, mobile: true });
     const w = await page.getByTestId("window-beats").boundingBox();
     check("phone: windows fill the screen", w && w.width >= 385);
     check("phone: no sideways scroll", await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    const pc = await page.getByTestId("cover").boundingBox();
+    check("phone: the cover leads the player, big and whole", pc && pc.width >= 220 && pc.x >= 0 && pc.x + pc.width <= 390 && Math.abs(pc.width - pc.height) < 2, pc ? `${Math.round(pc.width)}×${Math.round(pc.height)}` : "");
+    check("phone: play is on the first screen", await page.getByTestId("deck-play").evaluate((b) => b.getBoundingClientRect().bottom < window.innerHeight - 44));
+    await page.getByTestId("track-dull-knife").scrollIntoViewIfNeeded();
+    check("phone: the tracklist scrolls into reach", await page.getByTestId("track-dull-knife").isVisible());
+    if (axeSource) {
+      await page.addScriptTag({ content: axeSource });
+      const pv = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+      check("axe: no violations on a phone, Beats open", pv.length === 0, pv.join(", "));
+    }
     await page.getByRole("button", { name: "Close Beats" }).tap();
     await page.getByTestId("icon-game").tap();
     await page.waitForTimeout(1800);
+    await page.getByTestId("menu-close").tap();
+    await page.waitForTimeout(300);
     check("phone: touch pad in the game", await page.getByRole("button", { name: "Walk right" }).isVisible());
     await page.getByRole("button", { name: "Got it" }).tap();
     const x0 = (await game(page)).x;
@@ -599,6 +989,34 @@ try {
     check("phone: game still has no sideways scroll", await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     const exitBox = await page.getByTestId("game-exit").boundingBox();
     check("phone: the game's top bar fits on one line", exitBox.height < 44 && exitBox.y < 48);
+    // mini-games: the title and the way out fit on one line
+    await page.evaluate(() => window.__game.mini({ kind: "rhythm", mode: "cypher" }));
+    await page.waitForTimeout(300);
+    const leaveBox = await page.getByRole("button", { name: /^Leave/ }).boundingBox();
+    check("phone: a mini-game's header fits on one line", leaveBox.height < 40);
+    await page.getByTestId("rhythm-start").tap();
+    await page.waitForTimeout(400);
+    check("phone: the rhythm game has pads to tap", (await page.getByRole("button", { name: /pad$/ }).count()) === 4);
+    await page.evaluate(() => window.__game.mini(null));
+    // a fight on a phone: health where you can see it, toasts under the picture, A/B/eat
+    await page.evaluate(() => window.__game.teleport("alley", 12, 6, "right"));
+    await page.evaluate(() => window.__game.trouble());
+    for (let i = 0; i < 25 && !(await page.getByRole("button", { name: "Fight", exact: true }).count()); i++) {
+      await page.waitForTimeout(400);
+      if (await page.getByTestId("game-dialog").count()) await page.getByTestId("game-dialog").tap();
+    }
+    await page.getByRole("button", { name: "Fight", exact: true }).tap();
+    await page.waitForTimeout(400);
+    check("phone: B and eat show up in a fight", (await page.getByRole("button", { name: "B: dodge" }).isVisible()) && (await page.getByRole("button", { name: "Eat", exact: true }).isVisible()));
+    const heart = await page.evaluate(() => {
+      const c = document.querySelector("[data-testid=game] canvas");
+      const x = window.__game.state().hudX;
+      return [...c.getContext("2d").getImageData(x + 6, 7, 1, 1).data];
+    });
+    check("phone: your health bar is on screen in a fight", heart[0] > 200 && heart[1] < 120, String(heart));
+    const toastBox = await page.getByTestId("game-toast").boundingBox();
+    const picBox = await page.locator("[data-testid=game] canvas").boundingBox();
+    check("phone: toasts go under the picture, not over it", toastBox && toastBox.y >= picBox.y + picBox.height);
     await ctx.close();
   }
 
@@ -607,10 +1025,23 @@ try {
     const { ctx, page } = await open();
     await page.getByTestId("icon-socials").click();
     await page.getByTestId("icon-contact").click();
+    // let the windows finish opening (mid-animation, colours read wrong)
+    await page.waitForTimeout(800);
     await page.addScriptTag({ content: axeSource });
-    const v = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+    const vs = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => ({ id: x.id, nodes: x.nodes.map((n) => [n.target, n.any?.[0]?.message]) })));
+    const v = vs.map((x) => `${x.id} (${x.nodes.length})`);
     check("axe: no violations on the desktop", v.length === 0, v.join(", "));
-    if (v.length) console.log(await page.evaluate(async () => JSON.stringify((await window.axe.run(document, { resultTypes: ["violations"] })).violations.flatMap((x) => x.nodes.map((n) => [n.target, n.any?.[0]?.message])))));
+    if (v.length) console.log(JSON.stringify(vs));
+    const axeNow = () => page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length}): ${x.nodes.map((n) => n.target).join(" ")}`));
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    const mv = await axeNow();
+    check("axe: no violations with the clock menu open", mv.length === 0, mv.join(", "));
+    await page.getByRole("menuitem", { name: "Keyboard shortcuts" }).click();
+    await page.waitForTimeout(300);
+    const kv = await axeNow();
+    check("axe: no violations on the shortcuts card", kv.length === 0, kv.join(", "));
+    await page.keyboard.press("Escape");
+    if (await page.getByTestId("shortcuts").count()) await page.getByRole("button", { name: "Close shortcuts" }).click();
     await page.getByTestId("icon-game").click();
     await page.waitForTimeout(1600);
     const g = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));

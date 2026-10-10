@@ -530,7 +530,7 @@ export default function Studio({
             </option>
           ))}
         </select>
-        <button className={chip} onClick={() => edit((p) => void (p.length = p.length === 16 ? 32 : 16))} aria-label={`Pattern length: ${project.length} steps`}>
+        <button className={chip} onClick={() => edit((p) => void (p.length = p.length === 16 ? 32 : 16))} aria-label={`${project.length / 16} bar${project.length === 32 ? "s" : ""}: pattern length, ${project.length} steps`}>
           {project.length / 16} bar{project.length === 32 ? "s" : ""}
         </button>
         <div className="h-2 w-16 overflow-hidden rounded-full bg-[#2a2724]" role="meter" aria-label="Output level" aria-valuemin={0} aria-valuemax={1} aria-valuenow={Math.round(level * 100) / 100}>
@@ -587,7 +587,7 @@ export default function Studio({
             </div>
           </div>
         </details>
-        <button className="ml-auto flex items-center gap-1.5 rounded-[3px] border border-[#3a3733] px-2.5 py-1.5 text-[13px] text-[#cfc6b3] hover:text-white" onClick={onClose} aria-label="Back to the room" title="Back to the room (Esc)">
+        <button className="ml-auto flex items-center gap-1.5 rounded-[3px] border border-[#3a3733] px-2.5 py-1.5 text-[13px] text-[#cfc6b3] hover:text-white" onClick={onClose} aria-label="Back to the room Esc" title="Back to the room (Esc)">
           <CloseGlyph size={11} /> room <span className="text-[#948b7a]">Esc</span>
         </button>
       </div>

@@ -10,7 +10,7 @@ function Video({ id, title }: { id: string; title: string }) {
   if (on) {
     return (
       <iframe
-        className="aspect-video w-full bg-black"
+        className="aspect-video w-full rounded-[8px] border border-line bg-black"
         src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1`}
         title={title}
         allow="autoplay; encrypted-media; picture-in-picture"
@@ -20,7 +20,7 @@ function Video({ id, title }: { id: string; title: string }) {
   }
   return (
     <button
-      className="group relative block aspect-video w-full overflow-hidden bg-black text-left"
+      className="group relative block aspect-video w-full overflow-hidden rounded-[8px] border border-line bg-black text-left"
       onClick={() => setOn(true)}
       aria-label={`Play video: ${title} (loads YouTube)`}
     >
@@ -37,18 +37,18 @@ function Video({ id, title }: { id: string; title: string }) {
 export default function SocialsWindow() {
   const video = PROFILE.featuredVideo;
   return (
-    <div className="bevel-field flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <ul className="divide-y divide-[#ddd5c5] px-2 py-2">
-        {PROFILE.socials.map((s) => (
-          <li key={s.label}>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-cream">
+      <ul className="px-2 py-2">
+        {PROFILE.socials.map((s, i) => (
+          <li key={s.label} className={i ? "border-t border-rule" : ""}>
             <a
               href={s.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-baseline justify-between gap-4 px-3 py-3.5 hover:bg-[#e8e1d2] focus-visible:bg-[#e8e1d2]"
+              className="group my-0.5 flex items-baseline justify-between gap-4 rounded-[8px] px-3 py-3 hover:bg-cream-2 focus-visible:bg-cream-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-dusk"
             >
-              <span className="text-[16px] text-ink group-hover:underline">{s.label}</span>
-              <span className="truncate font-mono text-[12.5px] text-mute">
+              <span className="text-[16px] text-ink group-hover:underline group-hover:decoration-1 group-hover:underline-offset-4">{s.label}</span>
+              <span className="truncate font-mono text-[12.5px] text-ink-2">
                 {s.handle} <span aria-hidden>↗</span>
               </span>
             </a>

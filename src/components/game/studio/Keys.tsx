@@ -68,11 +68,11 @@ export default function Keys({
           play <span className="text-[#e8e0cf]">{target ?? "—"}</span>
         </span>
         <div className="flex items-center gap-1">
-          <button className={chip} onClick={() => onOctave(-1)} aria-label="Octave down (Z)" title="Octave down (Z)">
+          <button className={chip} onClick={() => onOctave(-1)} aria-label="Z − octave down" title="Octave down (Z)">
             Z −
           </button>
           <span className="w-8 text-center font-mono text-[11px]">{melodic ? noteName(base) : `${base - 60 >= 0 ? "+" : ""}${base - 60}`}</span>
-          <button className={chip} onClick={() => onOctave(1)} aria-label="Octave up (X)" title="Octave up (X)">
+          <button className={chip} onClick={() => onOctave(1)} aria-label="+ X octave up" title="Octave up (X)">
             + X
           </button>
           <button

@@ -2,16 +2,23 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { CloseGlyph, MaxGlyph, MinGlyph, RestoreGlyph } from "./Icons";
+import { MaxGlyph, MinGlyph, RestoreGlyph, XGlyph } from "./Icons";
 import { activeWindow, useSiteStore, WINDOW_TITLES, type WindowId } from "./siteStore";
 
 export const TASKBAR_H = 44;
 
-// Where each window opens on a wide screen, as a fraction of the free space.
+/** The column of desktop icons down the left. */
+const ICONS_W = 116;
+
+/** The right-hand column Socials and Contact open in (the wider of the two, plus a gap). */
+const RIGHT_COL_W = 440 + 24;
+
+// Where each window opens on a wide screen, as a fraction of the free space:
+// Beats a little left of centre, Socials and Contact stacked down the right.
 const HOME: Record<WindowId, [number, number]> = {
-  beats: [0.5, 0.32],
-  socials: [0.72, 0.2],
-  contact: [0.62, 0.45],
+  beats: [0.42, 0.3],
+  socials: [0.985, 0.04],
+  contact: [0.985, 0.985],
 };
 
 export default function Window({
@@ -44,7 +51,12 @@ export default function Window({
     const h = Math.min(height, vh - 16);
     if (state.x < 0) {
       const [fx, fy] = HOME[id];
-      moveWindow(id, Math.round((vw - w) * fx), Math.round(Math.max(8, (vh - h) * fy)));
+      // clear of the desktop icons when there's room for it
+      let x = Math.round((vw - w) * fx);
+      if (vw - w >= 2 * ICONS_W) x = Math.max(ICONS_W, x);
+      // Beats keeps clear of the right-hand column when the screen has room for both
+      if (id === "beats" && vw - RIGHT_COL_W - w >= ICONS_W) x = Math.min(x, vw - RIGHT_COL_W - w);
+      moveWindow(id, x, Math.round(Math.max(8, (vh - h) * fy)));
     } else {
       const x = Math.min(Math.max(state.x, 8 - w + 120), vw - 120);
       const y = Math.min(Math.max(state.y, 0), vh - 30);
@@ -81,7 +93,7 @@ export default function Window({
   const style: React.CSSProperties = mobile
     ? { inset: `0 0 ${TASKBAR_H}px 0`, zIndex: 10 + z }
     : maximized
-      ? { inset: `6px 6px ${TASKBAR_H + 6}px 6px`, zIndex: 10 + z }
+      ? { inset: `8px 8px ${TASKBAR_H + 8}px 8px`, zIndex: 10 + z }
       : {
         left: state.x,
         top: state.y,
@@ -98,7 +110,8 @@ export default function Window({
       aria-labelledby={`win-${id}-title`}
       data-testid={`window-${id}`}
       data-active={active}
-      className="win outline-none"
+      data-fill={mobile ? "screen" : maximized ? "max" : undefined}
+      className="panel win outline-none"
       hidden={state.minimized}
       style={style}
       onPointerDownCapture={() => focus(id)}
@@ -112,8 +125,9 @@ export default function Window({
         onPointerCancel={endDrag}
         onDoubleClick={(e) => !mobile && !(e.target as HTMLElement).closest("button") && toggleMaximize(id)}
       >
-        <span className="grid h-4 w-4 place-items-center">{icon}</span>
+        <span className="grid h-4 w-4 shrink-0 place-items-center">{icon}</span>
         <h2 id={`win-${id}-title`}>{WINDOW_TITLES[id]}</h2>
+        <span className="win-stripes" aria-hidden />
         <button className="cap-btn" aria-label={`Minimize ${WINDOW_TITLES[id]}`} onClick={() => minimize(id)}>
           <MinGlyph size={12} />
         </button>
@@ -122,11 +136,11 @@ export default function Window({
             {maximized ? <RestoreGlyph size={12} /> : <MaxGlyph size={12} />}
           </button>
         )}
-        <button className="cap-btn ml-0.5" aria-label={`Close ${WINDOW_TITLES[id]}`} onClick={() => closeWindow(id)}>
-          <CloseGlyph size={11} />
+        <button className="cap-btn" aria-label={`Close ${WINDOW_TITLES[id]}`} onClick={() => closeWindow(id)}>
+          <XGlyph size={13} />
         </button>
       </div>
-      <div className="mt-[3px] flex min-h-0 flex-1 flex-col">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </section>
   );
 }

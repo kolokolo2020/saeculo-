@@ -51,13 +51,13 @@ export default function ContactWindow() {
   };
 
   const field = (k: keyof ContactInput, label: string, input: React.ReactNode) => (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={`contact-${k}`} className="text-[12.5px] font-bold">
+    <div className={`flex flex-col gap-1.5 ${k === "message" ? "sm:min-h-0 sm:flex-1" : ""}`}>
+      <label htmlFor={`contact-${k}`} className="text-[13px] font-semibold">
         {label}
       </label>
       {input}
       {errors[k] && (
-        <p id={`contact-${k}-error`} className="text-[12.5px] text-alert">
+        <p id={`contact-${k}-error`} className="text-[12.5px] text-rust">
           {errors[k]}
         </p>
       )}
@@ -65,7 +65,7 @@ export default function ContactWindow() {
   );
 
   return (
-    <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+    <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto bg-cream p-4">
       {field(
         "name",
         "Name",
@@ -88,7 +88,7 @@ export default function ContactWindow() {
           ref={messageRef}
           id="contact-message"
           className="field min-h-[120px] flex-1 resize-none"
-          rows={6}
+          rows={8}
           maxLength={LIMITS.message}
           value={form.message}
           onChange={set("message")}
@@ -98,14 +98,14 @@ export default function ContactWindow() {
       )}
 
       {opened && (
-        <div role="status" className="border border-[#b9ad95] bg-[#f4eee2] p-2.5 text-[12.5px]" data-testid="contact-opened">
-          <p className="font-bold">Your email app should have opened with the message. Press send there.</p>
+        <div role="status" className="rounded-[8px] border border-rule bg-cream-2 p-3 text-[12.5px]" data-testid="contact-opened">
+          <p className="font-semibold">Your email app should have opened with the message. Press send there.</p>
           <p className="mt-1">
             Nothing happened? Write to{" "}
-            <a className="underline" href={mailtoFor(PROFILE.bookingEmail, form)}>
+            <a className="underline underline-offset-2" href={mailtoFor(PROFILE.bookingEmail, form)}>
               {PROFILE.bookingEmail}
             </a>{" "}
-            <button type="button" className="underline decoration-dotted" onClick={copy}>
+            <button type="button" className="rounded-[3px] underline decoration-dotted underline-offset-2" onClick={copy}>
               {copied ? "(copied)" : "(copy)"}
             </button>
           </p>
@@ -113,10 +113,10 @@ export default function ContactWindow() {
       )}
 
       <div className="flex items-center justify-between gap-3">
-        <span className="truncate text-[12px] text-mute">
+        <span className="truncate text-[12.5px] text-ink-2">
           or write to <span className="select-all">{PROFILE.bookingEmail}</span>
         </span>
-        <button type="submit" className="btn min-w-[96px] font-bold" data-testid="contact-send">
+        <button type="submit" className="btn btn-primary min-w-[96px]" data-testid="contact-send">
           Send
         </button>
       </div>
