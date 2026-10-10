@@ -554,6 +554,26 @@
     width: 150px;
   }
 }
+/* a phone held sideways: a tighter hero, so the tracklist starts above the fold */
+@media (max-height: 560px) and (min-width: 640px) {
+  .mp-hero {
+    gap: 16px;
+    padding: 12px 16px;
+  }
+  .mp-cover {
+    width: 120px;
+  }
+  .mp-hero .mp-title {
+    font-size: 24px;
+  }
+  .mp-hero .mp-wave {
+    height: 32px;
+  }
+  .mp-hero .mp-play {
+    width: 44px;
+    height: 44px;
+  }
+}
 /* the time, on a small flat display */
 .mp-time {
   font-family: var(--font-lcd);

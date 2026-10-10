@@ -743,6 +743,89 @@ try {
     await talkTo("underpass", 11.6, 6.8);
     const paid = await saved();
     check("Dre: back with the envelope, paid", paid.job === null && paid.stats.jobs === 1 && paid.cash > cashBack && paid.goals.includes("job"));
+
+    // Vee: another of her beats each battle (she says which), every one playable
+    await talkTo("underpass", 21.4, 6.3, "right");
+    const veeAgain = (await page.getByTestId("game-dialog").count()) ? await readAll() : "";
+    check("battle: after a win, Vee names the next beat (her cold trap)", /cold trap/.test(veeAgain), veeAgain);
+    await closeDialog();
+    const charts = await page.evaluate(() => window.__game.battleCharts());
+    check(
+      "battle: each of Vee's beats has a kick, a snare or clap, hats and low end, and a playable chart",
+      charts.length === 4 && charts.every((c) => c.voices.every(Boolean) && c.hits.every((n) => n > 0) && c.perSecond > 3 && c.perSecond < 8),
+      JSON.stringify(charts.map((c) => [c.id, c.hits, c.perSecond])),
+    );
+    const veeBeats = [];
+    const addLoss = (n) => page.evaluate((n) => window.__game.give({ stats: { ...window.__game.save().stats, battleLosses: window.__game.save().stats.battleLosses + n } }), n);
+    for (let i = 0; i < 4; i++) {
+      veeBeats.push((await page.evaluate(() => window.__game.veeBeat())).preset);
+      await addLoss(1);
+    }
+    await addLoss(-4);
+    check("battle: a different beat each time, in turn", new Set(veeBeats).size === 4, veeBeats.join());
+
+    // carrying Dre's tape: trouble comes sooner, they ask about it, and a knockout loses it
+    await page.evaluate(() => window.__game.give({ job: { to: "busker", stage: "carry", pay: 25 } }));
+    const odds = await page.evaluate(() => window.__game.odds("alley"));
+    check("carrying Dre's tape: trouble's likelier and comes sooner", odds.ambush > 0.25 && odds.sooner > 1, JSON.stringify(odds));
+    await closeDialog();
+    await page.evaluate(() => window.__game.teleport("alley", 12, 6, "right"));
+    await page.evaluate(() => window.__game.trouble());
+    for (let i = 0; i < 30 && !(await page.getByRole("button", { name: "Fight", exact: true }).count()); i++) {
+      if (await page.getByTestId("game-dialog").count()) await page.keyboard.press("e");
+      await page.waitForTimeout(250);
+    }
+    check("carrying: they ask what's on the tape", /on the tape/.test((await page.getByTestId("game-dialog").count()) ? await dialogText() : ""));
+    await page.getByRole("button", { name: "Fight", exact: true }).click();
+    await page.waitForTimeout(500);
+    await page.evaluate(() => window.__game.knockMe());
+    await page.getByTestId("game-wake").waitFor({ timeout: 5000 }).catch(() => {});
+    await page.getByTestId("game-wake").click();
+    await page.waitForTimeout(300);
+    const woke = await readAll();
+    check("knocked out carrying: the tape's gone, and the job with it", (await saved()).job?.stage === "lost" && /Dre's tape is gone/.test(woke), woke);
+    await talkTo("underpass", 11.6, 6.8);
+    const dreLost = await readAll();
+    check("Dre: no tape, no money (and the job's off)", (await saved()).job === null && /Where's my tape/.test(dreLost) && (await saved()).stats.jobs === 1, dreLost);
+    await closeDialog();
+
+    // the alley cat: pet it three times and it follows you; trouble or leaving sends it home
+    await page.evaluate(() => window.__game.peace());
+    await page.evaluate(() => window.__game.teleport("alley", 4.2, 3.6, "left"));
+    await page.evaluate(() => window.__game.cat(0, [3.2, 3.6]));
+    await page.waitForTimeout(250);
+    check("alley: the cat on the dumpster can be petted", /the cat/.test(await page.getByTestId("game-prompt").textContent()));
+    let petted = "";
+    for (let i = 0; i < 3; i++) {
+      await closeDialog();
+      await page.waitForTimeout(150);
+      await page.keyboard.press("e");
+      await page.waitForTimeout(200);
+      petted += await readAll();
+    }
+    await closeDialog();
+    check("alley: pet it three times and it comes with you", (await page.evaluate(() => window.__game.cat())).trail > 0 && /follows you/.test(petted), petted);
+    const catFrom = await page.evaluate(() => window.__game.cat());
+    await page.keyboard.down("ArrowDown");
+    await page.waitForTimeout(1200);
+    await page.keyboard.up("ArrowDown");
+    await page.keyboard.down("ArrowRight");
+    await page.waitForTimeout(1200);
+    await page.keyboard.up("ArrowRight");
+    await page.waitForTimeout(1500);
+    const [me, catNow] = [await game(page), await page.evaluate(() => window.__game.cat())];
+    check("alley: the cat keeps a few steps behind", Math.hypot(catNow.x - catFrom.x, catNow.y - catFrom.y) > 40 && Math.hypot(me.x - catNow.x, me.y - catNow.y) < 40, `${Math.round(Math.hypot(me.x - catNow.x, me.y - catNow.y))}`);
+    await page.evaluate(() => window.__game.trouble());
+    await page.waitForTimeout(400);
+    const scared = await page.evaluate(() => window.__game.cat());
+    check("alley: trouble sends the cat back to its spots", scared.trail === 0 && (!!scared.goal || scared.perches.some(([x, y]) => Math.hypot(x - scared.x, y - scared.y) < 1)));
+    await page.evaluate(() => window.__game.cat(15));
+    await page.evaluate(() => window.__game.teleport("avenue", 20, 5, "down"));
+    await page.waitForTimeout(200);
+    const left = await page.evaluate(() => window.__game.cat());
+    check("alley: walk out and the cat stays, back on one of its spots", left.trail === 0 && left.perches.some(([x, y]) => Math.hypot(x - left.x, y - left.y) < 1));
+    await page.evaluate(() => window.__game.peace());
+    await closeDialog();
     await page.evaluate(() => window.__game.give({ seen: [...window.__game.save().seen, "cd"] }));
     await talkTo("avenue", 23.5, 4.4);
     const cdText = (await page.getByTestId("game-dialog").count()) ? await dialogText() : "";
@@ -759,7 +842,8 @@ try {
     check("subway: off at the avenue, by the stairs", (await game(page)).place === "avenue" && !(await game(page)).ride);
     await closeDialog();
     await page.evaluate(() => window.__game.teleport("subway", 15, 5.5, "down"));
-    for (let i = 0; i < 80 && !((await game(page)).t % 34 > 5 && (await game(page)).t % 34 < 9); i++) await page.waitForTimeout(250);
+    // wait for the doors (a train every 34 s): a whole cycle at most
+    for (let i = 0; i < 160 && !((await game(page)).t % 34 > 5 && (await game(page)).t % 34 < 9); i++) await page.waitForTimeout(250);
     await page.keyboard.press("e");
     await page.waitForTimeout(200);
     await pick(/Get on: your block/);
@@ -835,6 +919,24 @@ try {
     await page.getByTestId("game-exit").click();
     await page.waitForTimeout(1500);
     check("sample this: back on the site, the music picks up", !(await audio(page)).paused);
+    await ctx.close();
+  }
+
+  // ------------------------------------------------- where windows open
+  {
+    const { ctx, page } = await open();
+    await page.keyboard.press("2");
+    await page.keyboard.press("3");
+    await page.waitForTimeout(700);
+    const [b, so, co] = await Promise.all(["beats", "socials", "contact"].map((id) => page.getByTestId(`window-${id}`).boundingBox()));
+    check("1366px: Socials and Contact open beside Beats, not over it", b.x >= 116 && b.x + b.width <= so.x && b.x + b.width <= co.x && co.x + co.width <= 1366, `${Math.round(b.x + b.width)} | ${Math.round(so.x)}, ${Math.round(co.x)}`);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await open({ viewport: { width: 844, height: 390 }, mobile: true });
+    const head = await page.locator("[data-testid=window-beats] .mp-head").boundingBox();
+    const foot = await page.locator("[data-testid=window-beats] .mp-foot").boundingBox();
+    check("phone held sideways: the tracklist starts above the fold", head && foot && head.y + head.height <= foot.y, head && foot ? `${Math.round(head.y + head.height)} / ${Math.round(foot.y)}` : "");
     await ctx.close();
   }
 

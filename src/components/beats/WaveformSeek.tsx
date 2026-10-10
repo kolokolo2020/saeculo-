@@ -105,7 +105,7 @@ export default function WaveformSeek({
     <div className="relative">
       <canvas
         ref={canvas}
-        className="block h-11 w-full cursor-pointer touch-none rounded-[4px]"
+        className="mp-wave block h-11 w-full cursor-pointer touch-none rounded-[4px]"
         role="slider"
         tabIndex={0}
         aria-label="Seek"

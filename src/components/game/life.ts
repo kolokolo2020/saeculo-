@@ -64,6 +64,8 @@ export interface Actor {
   bolt?: boolean;
   /** The cat, petted enough: seconds left of following you about. */
   trail?: number;
+  /** The cat, just petted: seconds it stays put however close you are. */
+  settled?: number;
 }
 
 const T = TILE;
@@ -393,6 +395,7 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
 
     if (a.kind === "cat") {
       const near = Math.hypot(a.x - px, a.y - py);
+      if (a.settled) a.settled = Math.max(0, a.settled - dt);
       // petted enough, it comes along for a bit: a few steps behind, never underfoot
       if (a.trail) {
         a.trail = Math.max(0, a.trail - dt);
@@ -421,7 +424,7 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
         continue;
       }
       // sits a while, then pads off to somewhere else; runs if you rush it
-      if (!a.goal && a.perches && (Math.random() < dt / 30 || (near < 14 && Math.random() < dt * 0.6))) {
+      if (!a.goal && a.perches && !a.settled && (Math.random() < dt / 30 || (near < 14 && Math.random() < dt * 0.6))) {
         const others = a.perches.filter(([x, y]) => Math.hypot(x - a.x, y - a.y) > 8);
         a.goal = others[Math.floor(Math.random() * others.length)];
         a.bolt = near < 30;

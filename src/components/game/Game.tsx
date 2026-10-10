@@ -918,6 +918,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
         // pet it enough and it comes along for a bit
         const pets = (s.visit.pets ?? 0) + 1;
         s.visit.pets = pets;
+        // it stays for a bit once it's been petted, so you can carry on
+        a.settled = 8;
         if (pets < CAT_PETS) {
           say(next);
           return;
@@ -1545,7 +1547,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       /** Keep trouble away for the rest of the test. */
       peace: () => {
         st.current.encounterIn = 1e6;
-        st.current.lastTrouble = st.current.t;
+        st.current.lastTrouble = 1e9;
       },
       /** How likely trouble is to be waiting in a place, and how much sooner it comes, as things stand. */
       odds: (place: Place) => ({ ambush: ambushOdds(place, saveRef.current), sooner: carrying(saveRef.current) ? CARRY_SOONER : 1 }),
@@ -1554,10 +1556,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
         const f = st.current.fight;
         if (f) f.me.hp = 0;
       },
-      /** The alley cat: how long it'll keep following (set it to cut that short). */
-      cat: (trail?: number) => {
+      /** The alley cat: how long it'll keep following (set it to cut that short), or sat at a spot (in tiles). */
+      cat: (trail?: number, at?: [number, number]) => {
         const c = life.current.find((a) => a.id === "alley-cat");
         if (c && trail !== undefined) c.trail = trail;
+        if (c && at) Object.assign(c, { x: at[0] * TILE, y: at[1] * TILE, goal: undefined, walking: false, bolt: false });
         return c ? { x: c.x, y: c.y, trail: c.trail ?? 0, walking: !!c.walking, goal: c.goal ?? null, perches: c.perches ?? [] } : null;
       },
       /** Vee's next beat, and what a battle on each of her beats asks of you. */
@@ -1739,8 +1742,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
       const fy = s.y - 3 + (s.dir === "up" ? -9 : s.dir === "down" ? 7 : 0);
       const cur = SCENES[s.place];
       const hit = cur.things.find((t) => t.zone && (inside(s.x, s.y - 2, t.zone) || inside(fx, fy, t.zone)));
-      const who = hit ? null : lifeTarget(life.current, s.place, s.x, s.y, fx, fy);
-      s.target = hit && promptFor(hit.id) ? hit.id : who ? `npc:${who.id}` : null;
+      const who = lifeTarget(life.current, s.place, s.x, s.y, fx, fy);
+      // the cat, right in front of you, comes before whatever it's sitting on (its first spot is on the dumpster)
+      const pet = who?.kind === "cat" && Math.hypot(who.x - fx, who.y - 3 - fy) < 12 ? who : null;
+      s.target = pet ? `npc:${pet.id}` : hit ? (promptFor(hit.id) ? hit.id : null) : who ? `npc:${who.id}` : null;
       const near = cur.doors.find((d) => Math.abs(s.x - (d.zone.x + d.zone.w / 2)) < d.zone.w / 2 + 14 && Math.abs(s.y - (d.zone.y + d.zone.h / 2)) < d.zone.h / 2 + 18);
       const inFight = !!fight && !fight.outcome;
       const p = frozen || (inFight && !near) ? null : s.target && !inFight ? promptFor(s.target) : near ? `@${near.label}` : null;

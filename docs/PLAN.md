@@ -66,7 +66,7 @@ commit + push after each step, extend scripts/verify.mjs).
    one when you board.
 
 10. README and verify.mjs kept up to date with each step (verify.mjs:
-    181 checks; `scripts/playtest.mjs` for screenshots). README: stale
+    181 checks then, 221 now; `scripts/playtest.mjs` for screenshots). README: stale
     studio controls/code paragraph and the old `room/` folder removed,
     `sharp` added to the dev install line.
 
@@ -92,6 +92,33 @@ commit + push after each step, extend scripts/verify.mjs).
       ~15 s.
     - Checks at handoff: tsc, lint, build clean; verify.mjs 207/207.
 
+12. Review of item 11 (session 3), with screenshots at 1366x800 and
+    390x844 and the diffs read:
+    - theme: at 1366px Beats now opens clear of the right-hand column
+      (x 122, Socials and Contact right-aligned at 952 / 912), so the three
+      windows no longer overlap; a phone held sideways gets a tighter hero
+      (120px cover, smaller title, waveform and play button) so the
+      tracklist's header and first row show above the fold. Clock menu,
+      focus rings on Socials and Contact, phone Beats: fine.
+    - intro: every phase checked on desktop, phone and reduced motion, and
+      the replay; it ends on Beats on both. Reveal frame time ~30 ms in
+      headless software rendering: no single cause (the name's filter ~5
+      ms, the smoke ~4 ms, mask and grain nothing measurable), so left as
+      is; worth a look on a real slow phone.
+    - game: Vee's four beats all have four lanes and playable charts
+      (4.5–6.1 hits/s), and she names the next one; carrying, the group asks
+      about the tape, a knockout loses it, Dre says so and the job is off.
+      Fixed: the cat's first spot is on the dumpster, so the dumpster
+      always took the E prompt and it couldn't be petted there; a cat right
+      in front of you now comes first. It also ran off after one pet, so
+      three meant chasing it: it now stays put for 8 s after each pet.
+      `__game.peace()` now holds for the whole test (walking into a rough
+      place could re-arm an ambush), the subway test waits a whole train
+      cycle, and `__game.cat(trail, [x, y])` can sit the cat at a spot.
+    - verify.mjs: 221 checks (Vee's beats, the tape, the cat, window
+      placement, sideways phone). playtest.mjs adds Vee's battle, the tape
+      lost in a knockout and Dre's line, the cat following and scared off.
+
 ## Handoff: what's next (in order)
 
 The work in item 11 was done by parallel agents. The theme and intro tracks
@@ -99,7 +126,7 @@ finished their build step; the game track was stopped near the end of its
 build; none of the three got their planned independent review or fix
 round. So:
 
-1. **Review the three tracks with fresh eyes** (desktop 1366x800 and
+1. ~~**Review the three tracks with fresh eyes**~~ (done, item 12) (desktop 1366x800 and
    phone 390x844 screenshots, read the diffs):
    - theme: desktop with all windows open, clock menu, Socials and Contact
      focus rings, phone Beats, phone held sideways (the tracklist is below

@@ -72,7 +72,7 @@ function NowPlaying() {
           {state}
         </span>
       </p>
-      <p className="truncate text-[30px] leading-[1.15] font-light tracking-[-0.01em] sm:text-[34px]" title={track?.title}>
+      <p className="mp-title truncate text-[30px] leading-[1.15] font-light tracking-[-0.01em] sm:text-[34px]" title={track?.title}>
         {track?.title ?? "—"}
       </p>
       <p className="truncate text-[14px] text-ink-2">{track ? meta(track) || " " : " "}</p>
@@ -215,7 +215,7 @@ export default function BeatsWindow() {
 
   return (
     <div className="mp flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ ["--accent" as string]: ACCENT }}>
-      <div className="flex shrink-0 flex-col items-center gap-4 px-4 pt-5 pb-4 sm:flex-row sm:items-stretch sm:gap-6 sm:p-5">
+      <div className="mp-hero flex shrink-0 flex-col items-center gap-4 px-4 pt-5 pb-4 sm:flex-row sm:items-stretch sm:gap-6 sm:p-5">
         <div className="mp-cover">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={ALBUM.cover} alt={`${ALBUM.title}: the album cover`} width={464} height={464} className="block h-full w-full object-cover" data-testid="cover" />

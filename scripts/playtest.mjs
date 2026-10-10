@@ -1,5 +1,6 @@
 // Screenshots of every place, the menu, the mini-games and a fight, on a
-// desktop and a phone, for looking at by eye. Run against a dev server:
+// desktop and a phone, for looking at by eye (and Vee's battle, Dre's tape
+// lost in a knockout, the alley cat following you). Run against a dev server:
 //   node scripts/playtest.mjs [outdir]
 import { chromium } from "playwright-core";
 import { mkdirSync } from "fs";
@@ -89,6 +90,76 @@ for (const [dev, opts] of [["desk", { viewport: { width: 1366, height: 800 } }],
   }
   await page.waitForTimeout(900);
   await snap("fight-3-won");
+
+  // Vee's battle, on the beat she names
+  const dialog = page.getByTestId("game-dialog");
+  const clear = async () => {
+    for (let i = 0; i < 8 && (await dialog.count()); i++) {
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(120);
+    }
+  };
+  const fightBtn = page.getByRole("button", { name: "Fight", exact: true });
+  // out of the alley and the last fight's over
+  await g("teleport", "street", 18, 5, "down");
+  await page.waitForTimeout(400);
+  await clear();
+  await g("peace");
+  await g("mini", { kind: "rhythm", mode: "battle", rival: { name: "Vee", score: 72, stake: 20, beat: "trap" } });
+  await page.waitForTimeout(600);
+  await snap("vee-battle-trap");
+  await g("mini", null);
+  // carrying Dre's tape: they ask about it, a knockout loses it, Dre hears about it
+  await g("give", { job: { to: "busker", stage: "carry", pay: 25 } });
+  await g("teleport", "alley", 12, 6, "right");
+  await g("trouble");
+  for (let i = 0; i < 30 && !(await fightBtn.count()); i++) {
+    if (await dialog.count()) await dialog.click();
+    await page.waitForTimeout(200);
+  }
+  await snap("tape-0-asked");
+  await fightBtn.click();
+  await page.waitForTimeout(500);
+  await g("knockMe");
+  await page.getByTestId("game-wake").waitFor({ timeout: 5000 });
+  await snap("tape-1-down");
+  await page.getByTestId("game-wake").click();
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 2 && (await dialog.count()); i++) {
+    await dialog.click();
+    await page.waitForTimeout(150);
+  }
+  await snap("tape-2-gone");
+  await clear();
+  await g("peace");
+  await g("teleport", "underpass", 11.6, 6.8, "right");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("e");
+  await page.waitForTimeout(250);
+  await dialog.click();
+  await page.waitForTimeout(150);
+  await snap("tape-3-dre");
+  await clear();
+  // the alley cat: three pets and it follows; trouble sends it home
+  await g("teleport", "alley", 4.2, 3.6, "left");
+  await g("cat", 0, [3.2, 3.6]);
+  await page.waitForTimeout(250);
+  for (let i = 0; i < 3; i++) {
+    await clear();
+    await page.keyboard.press("e");
+    await page.waitForTimeout(250);
+  }
+  await clear();
+  for (const [key, ms] of [["ArrowDown", 1200], ["ArrowRight", 1400]]) {
+    await page.keyboard.down(key);
+    await page.waitForTimeout(ms);
+    await page.keyboard.up(key);
+  }
+  await page.waitForTimeout(1200);
+  await snap("cat-following");
+  await g("trouble");
+  await page.waitForTimeout(700);
+  await snap("cat-scared");
   await ctx.close();
 }
 await browser.close();

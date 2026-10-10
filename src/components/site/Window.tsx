@@ -10,12 +10,15 @@ export const TASKBAR_H = 44;
 /** The column of desktop icons down the left. */
 const ICONS_W = 116;
 
+/** The right-hand column Socials and Contact open in (the wider of the two, plus a gap). */
+const RIGHT_COL_W = 440 + 24;
+
 // Where each window opens on a wide screen, as a fraction of the free space:
 // Beats a little left of centre, Socials and Contact stacked down the right.
 const HOME: Record<WindowId, [number, number]> = {
   beats: [0.42, 0.3],
   socials: [0.985, 0.04],
-  contact: [0.97, 0.985],
+  contact: [0.985, 0.985],
 };
 
 export default function Window({
@@ -49,8 +52,11 @@ export default function Window({
     if (state.x < 0) {
       const [fx, fy] = HOME[id];
       // clear of the desktop icons when there's room for it
-      const x = Math.round((vw - w) * fx);
-      moveWindow(id, vw - w >= 2 * ICONS_W ? Math.max(ICONS_W, x) : x, Math.round(Math.max(8, (vh - h) * fy)));
+      let x = Math.round((vw - w) * fx);
+      if (vw - w >= 2 * ICONS_W) x = Math.max(ICONS_W, x);
+      // Beats keeps clear of the right-hand column when the screen has room for both
+      if (id === "beats" && vw - RIGHT_COL_W - w >= ICONS_W) x = Math.min(x, vw - RIGHT_COL_W - w);
+      moveWindow(id, x, Math.round(Math.max(8, (vh - h) * fy)));
     } else {
       const x = Math.min(Math.max(state.x, 8 - w + 120), vw - 120);
       const y = Math.min(Math.max(state.y, 0), vh - 30);
