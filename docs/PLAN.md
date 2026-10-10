@@ -153,8 +153,11 @@ round. So:
    globals.css, the player's unread AnalyserNode. **`scripts/make-cover.mjs`
    would overwrite the owner's cover** if run: retire it or point it
    elsewhere.
-4. Small polish: `.intro-cover` in globals.css could use the intro's
-   near-black (#0b0a09) instead of #000.
+4. ~~Small polish: `.intro-cover` uses the intro's near-black (#0b0a09)
+   instead of #000~~ (done; verify checks the rule). Two old timing flakes
+   in verify.mjs fixed on the way: the vinyl pop (random noise, peak
+   0.07–0.18) gets two more measurements when quiet, and "next track"
+   waits up to 3 s for the file to buffer. 222 checks.
 5. Update PR #17's description for item 11, then wait for the owner to say
    "merge".
 

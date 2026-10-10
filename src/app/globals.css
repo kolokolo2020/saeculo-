@@ -763,7 +763,7 @@
   position: fixed;
   inset: 0;
   z-index: 10001;
-  background: #000;
+  background: #0b0a09; /* the intro's own near-black, so there's no step when it takes over */
 }
 html[data-intro="skip"] .intro-cover {
   display: none;
