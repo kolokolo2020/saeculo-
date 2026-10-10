@@ -1,7 +1,9 @@
 // "saeculo" spelled on a spectrum analyser: a 5 × 7 pixel face where every
-// pixel is two stacked LED segments. The album cover is this, frozen
-// (scripts/make-cover.mjs draws it from the same grid); the player's
-// visualizer is this, moving. No imports, so the cover script can load it.
+// pixel is two stacked LED segments. It was the old album cover (drawn by
+// scripts/make-cover.mjs) and the old visualizer (Visualizer.tsx); the site
+// now shows the owner's artwork and no visualizer, so nothing on the site
+// uses it any more (kept, not deleted). No imports, so the cover script can
+// load it.
 
 const GLYPHS: Record<string, string[]> = {
   s: [".....", ".....", ".####", "#....", ".###.", "....#", "####."],

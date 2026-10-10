@@ -1,15 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, VT323 } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Jersey_10, VT323 } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
 import { ALBUM, TRACKS } from "@/data/tracks";
 import "./globals.css";
 
-// Tahoma leads --font-ui (see globals.css) for the old-Windows feel where
-// it's installed; Plex Sans is the loaded stand-in everywhere else.
-const uiFont = IBM_Plex_Sans({ weight: ["300", "400", "500", "700"], subsets: ["latin"], variable: "--nf-ui" });
+// Plex Sans is the desktop's clean body face (and the game's stand-in for
+// Tahoma, see globals.css); a bold pixel face for window titles keeps the
+// old machine in it; VT323 for the clock, the player's time and the game's
+// text.
+const uiFont = IBM_Plex_Sans({ weight: ["300", "400", "500", "600", "700"], subsets: ["latin"], variable: "--nf-ui" });
 const monoFont = IBM_Plex_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "--nf-mono" });
-// the boot screen, the player's display and the game's text
+const titleFont = Jersey_10({ weight: "400", subsets: ["latin"], variable: "--nf-title" });
 const lcdFont = VT323({ weight: "400", subsets: ["latin"], variable: "--nf-lcd" });
 
 const title = "saeculo — instrumentals & beats";
@@ -49,7 +51,8 @@ const jsonLd = {
 const bootScript = `try{var s=localStorage;if(s.getItem("saeculo-intro-seen")==="1"||/track=/.test(location.hash))document.documentElement.dataset.intro="skip";if(s.getItem("saeculo-calm")==="1")document.documentElement.dataset.calm="true"}catch(e){}`;
 
 export const viewport: Viewport = {
-  themeColor: "#0c0d0d",
+  // the paper of the window title bars and the taskbar
+  themeColor: "#f3eee4",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -57,7 +60,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${uiFont.variable} ${monoFont.variable} ${lcdFont.variable} h-full`}
+      className={`${uiFont.variable} ${monoFont.variable} ${titleFont.variable} ${lcdFont.variable} h-full`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: bootScript }} />

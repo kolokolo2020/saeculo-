@@ -2,17 +2,39 @@
 
 /* ------------------------------------------------------------------ */
 /* tokens                                                               */
-/* A late-night machine: a dark desktop lit by whatever is playing,    */
-/* old beige window chrome with the "Brick" title bars, one warm       */
-/* accent. next/font exposes the loaded faces as --nf-* variables.     */
+/* The desktop: an old machine's layout (icons, windows with title     */
+/* bars, a taskbar with a clock) drawn flat and clean: warm paper,     */
+/* 1px ink hairlines, soft shadows, one dusk-blue accent taken from    */
+/* the cover's rays. The game keeps its own dark look (amber, ink and  */
+/* the deck/step/pad classes below). next/font exposes the loaded      */
+/* faces as --nf-* variables.                                          */
 /* ------------------------------------------------------------------ */
 @theme inline {
+  /* the game, and anything outside the desktop */
   --font-ui: Tahoma, "Segoe UI", var(--nf-ui), sans-serif;
+  /* the desktop: clean body text, a pixel face for titles */
+  --font-sans: var(--nf-ui), "Helvetica Neue", system-ui, sans-serif;
+  --font-title: var(--nf-title), var(--nf-ui), sans-serif;
   --font-mono: var(--nf-mono), "Lucida Console", monospace;
   --font-lcd: var(--nf-lcd), var(--nf-mono), monospace;
-  /* 2007: Segoe where it exists, Plex Sans everywhere else */
+  /* 2007: Segoe where it exists, Plex Sans everywhere else (the intro) */
   --font-vista: "Segoe UI", var(--nf-ui), system-ui, sans-serif;
 
+  /* the desktop */
+  --color-cream: #fbf8f2; /* window paper */
+  --color-cream-2: #f3eee4; /* title bars, taskbar, hover */
+  --color-cream-3: #ebe5d8; /* pressed, displays */
+  --color-stone: #cfc8b9; /* the desk itself */
+  --color-line: #2a2622; /* hairlines round windows and buttons */
+  --color-rule: #ddd6c8; /* quiet dividers inside windows */
+  --color-edge: #8c8375; /* field borders (3:1 on paper) */
+  --color-ink-2: #6b6357; /* secondary text (5:1 on paper) */
+  --color-dusk: #3d5a8a; /* the accent */
+  --color-dusk-dk: #2f476e;
+  --color-dusk-wash: #e6e5f1; /* selected rows */
+  --color-rust: #a3321f; /* errors */
+
+  /* the game (and the old chrome, kept for anything still using it) */
   --color-desk: #0c0d0d;
   --color-face: #c9c2b3;
   --color-face-hi: #efe9dc;
@@ -35,13 +57,13 @@
     -webkit-text-size-adjust: 100%;
   }
   body {
-    background: var(--color-desk);
+    background: var(--color-stone);
     color: var(--color-ink);
     font-family: var(--font-ui);
     font-size: 13px;
   }
   ::selection {
-    background: var(--color-brick);
+    background: var(--color-dusk);
     color: #fff;
   }
   :focus-visible {
@@ -57,26 +79,19 @@
 /* the desktop                                                          */
 /* ------------------------------------------------------------------ */
 
-/* The wallpaper is the playing track's cover, pushed far back: blurred,
-   darkened and scanned. --cover is set by Wallpaper.tsx. */
+/* Warm stone with a fine dot screen, like an old desktop pattern. */
+.desktop {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background-color: var(--color-stone);
+}
 .wallpaper {
   position: absolute;
-  inset: -40px;
-  background-color: var(--color-desk);
-  background-image: var(--cover, none);
-  background-size: cover;
-  background-position: center;
-  filter: blur(28px) saturate(0.7) brightness(0.32);
-  transform: scale(1.08);
-  transition: background-image 1.2s;
-}
-.wallpaper-scan {
-  position: absolute;
   inset: 0;
-  background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
-    radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(0, 0, 0, 0.75) 100%);
-  pointer-events: none;
+  background-image:
+    radial-gradient(rgba(42, 38, 34, 0.13) 0.7px, transparent 0.9px),
+    radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.28), transparent 70%);
+  background-size: 4px 4px, 100% 100%;
 }
 
 /* Film grain over everything: one static tile, drifting in steps. */
@@ -101,98 +116,149 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  width: 88px;
-  padding: 6px 4px;
-  color: #f1ece2;
+  gap: 5px;
+  width: 92px;
+  padding: 8px 4px 6px;
+  color: var(--color-ink);
   text-align: center;
-  border: 1px dotted transparent;
+  border-radius: 10px;
 }
 .desk-icon span {
-  padding: 1px 4px;
+  padding: 1px 7px;
   font-size: 13px;
-  text-shadow: 0 1px 2px #000;
+  font-weight: 500;
+  border-radius: 5px;
 }
-.desk-icon:hover span {
-  background: rgba(110, 31, 24, 0.55);
+.desk-icon:hover {
+  background: rgba(251, 248, 242, 0.45);
+}
+.desk-icon[aria-pressed="true"] span {
+  background: var(--color-line);
+  color: var(--color-cream);
 }
 .desk-icon:focus-visible {
-  outline: none;
-  border-color: #f1ece2;
-}
-.desk-icon:focus-visible span,
-.desk-icon[aria-pressed="true"] span {
-  background: var(--color-brick);
+  outline: 2px solid var(--color-dusk);
+  outline-offset: 0;
 }
 
 /* ------------------------------------------------------------------ */
-/* classic chrome                                                       */
+/* windows                                                              */
 /* ------------------------------------------------------------------ */
 
-.bevel-out {
-  background: var(--color-face);
+/* A sheet of paper: hairline edge, soft shadow, small radius. Shared by
+   the windows, the clock menu and the shortcuts card. */
+.panel {
+  color: var(--color-ink);
+  background: var(--color-cream);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
   box-shadow:
-    inset -1px -1px 0 var(--color-face-dk),
-    inset 1px 1px 0 var(--color-face-hi),
-    inset -2px -2px 0 var(--color-face-lo),
-    inset 2px 2px 0 #ddd6c8;
-}
-.bevel-in {
-  box-shadow:
-    inset 1px 1px 0 var(--color-face-lo),
-    inset -1px -1px 0 var(--color-face-hi),
-    inset 2px 2px 0 var(--color-face-dk),
-    inset -2px -2px 0 #ddd6c8;
-}
-.bevel-field {
-  background: var(--color-paper);
-  box-shadow:
-    inset 1px 1px 0 var(--color-face-lo),
-    inset -1px -1px 0 var(--color-face-hi),
-    inset 2px 2px 0 var(--color-face-dk),
-    inset -2px -2px 0 #ddd6c8;
+    0 1px 2px rgba(42, 32, 18, 0.08),
+    0 14px 36px -10px rgba(42, 32, 18, 0.32);
 }
 
 .win {
   position: absolute;
   display: flex;
   flex-direction: column;
-  padding: 3px;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  animation: win-open 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.win[data-active="false"] {
   box-shadow:
-    inset -1px -1px 0 var(--color-face-dk),
-    inset 1px 1px 0 var(--color-face-hi),
-    inset -2px -2px 0 var(--color-face-lo),
-    inset 2px 2px 0 #ddd6c8,
-    0 18px 50px rgba(0, 0, 0, 0.6);
-  background: var(--color-face);
-  animation: win-open 160ms ease-out;
+    0 1px 2px rgba(42, 32, 18, 0.06),
+    0 8px 22px -12px rgba(42, 32, 18, 0.24);
+}
+/* phones: the window is the screen */
+.win[data-fill="screen"] {
+  border-width: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 @keyframes win-open {
-  from { opacity: 0; transform: scale(0.97); }
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
 }
+
 .win-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 3px 0 6px;
-  color: #fff;
-  font-weight: 700;
-  font-size: 12.5px;
-  letter-spacing: 0.01em;
-  background: linear-gradient(90deg, #7b8078, #aeb0a4);
+  gap: 8px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 7px 0 10px;
+  color: var(--color-ink);
+  font-family: var(--font-title);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: 0.015em;
+  background: var(--color-cream-2);
+  border-bottom: 1px solid var(--color-line);
   user-select: none;
   touch-action: none;
 }
-.win[data-active="true"] .win-title {
-  background: linear-gradient(90deg, #4a120d, var(--color-brick) 45%, #a4452f);
-}
 .win-title h2 {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* the old pinstripes, only on the window in front */
+.win-stripes {
+  flex: 1;
+  min-width: 8px;
+  height: 11px;
+  background: repeating-linear-gradient(to bottom, var(--color-line) 0 1px, transparent 1px 3px);
+  opacity: 0.4;
+}
+.win[data-active="false"] .win-title {
+  color: var(--color-ink-2);
+  background: var(--color-cream);
+  border-bottom-color: var(--color-rule);
+}
+.win[data-active="false"] .win-stripes {
+  opacity: 0;
+}
+.win[data-active="false"] .win-title .cap-btn {
+  border-color: var(--color-edge);
+  color: var(--color-ink-2);
+}
+
+.cap-btn {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  padding: 0;
+  color: var(--color-ink);
+  background: var(--color-cream);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+}
+.cap-btn:hover {
+  background: var(--color-cream-3);
+}
+.cap-btn:active {
+  color: var(--color-cream);
+  background: var(--color-line);
+}
+.cap-btn:focus-visible {
+  outline: 2px solid var(--color-dusk);
+  outline-offset: 1px;
+}
+/* fingers: a taller title bar, bigger buttons */
+@media (pointer: coarse) {
+  .win-title {
+    height: 42px;
+    gap: 10px;
+  }
+  .cap-btn {
+    width: 34px;
+    height: 30px;
+    border-radius: 8px;
+  }
 }
 
 .btn {
@@ -200,73 +266,76 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 28px;
-  padding: 3px 14px;
+  min-height: 34px;
+  padding: 5px 16px;
+  font-weight: 500;
   color: var(--color-ink);
-  background: var(--color-face);
-  box-shadow:
-    inset -1px -1px 0 var(--color-face-dk),
-    inset 1px 1px 0 var(--color-face-hi),
-    inset -2px -2px 0 var(--color-face-lo),
-    inset 2px 2px 0 #ddd6c8;
+  background: var(--color-cream);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+}
+.btn:hover {
+  background: var(--color-cream-3);
 }
 .btn:active:not(:disabled),
 .btn[aria-pressed="true"] {
-  box-shadow:
-    inset 1px 1px 0 var(--color-face-dk),
-    inset -1px -1px 0 var(--color-face-hi),
-    inset 2px 2px 0 var(--color-face-lo);
-  padding-top: 4px;
-  padding-bottom: 2px;
+  background: var(--color-dusk-wash);
 }
 .btn:disabled {
-  color: var(--color-face-lo);
-  text-shadow: 1px 1px 0 var(--color-face-hi);
+  color: var(--color-ink-2);
+  border-color: var(--color-edge);
 }
 .btn:focus-visible {
-  outline: 1px dotted var(--color-ink);
-  outline-offset: -5px;
+  outline: 2px solid var(--color-dusk);
+  outline-offset: 2px;
 }
-.cap-btn {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 18px;
-  padding: 0;
-  color: var(--color-ink);
-  background: var(--color-face);
-  box-shadow:
-    inset -1px -1px 0 var(--color-face-dk),
-    inset 1px 1px 0 var(--color-face-hi),
-    inset -2px -2px 0 var(--color-face-lo);
+.btn-primary {
+  color: var(--color-cream);
+  background: var(--color-line);
 }
-.cap-btn:active {
-  box-shadow: inset 1px 1px 0 var(--color-face-dk), inset -1px -1px 0 var(--color-face-hi);
+.btn-primary:hover {
+  background: var(--color-dusk);
+  border-color: var(--color-dusk);
 }
-.cap-btn:focus-visible {
-  outline: 1px dotted #fff;
-  outline-offset: 1px;
+.btn-primary:active:not(:disabled) {
+  background: var(--color-dusk-dk);
+  border-color: var(--color-dusk-dk);
 }
 
 .field {
   width: 100%;
-  padding: 6px 8px;
+  padding: 8px 10px;
   font-size: 14px;
   color: var(--color-ink);
-  background: var(--color-paper);
-  box-shadow:
-    inset 1px 1px 0 var(--color-face-lo),
-    inset -1px -1px 0 var(--color-face-hi),
-    inset 2px 2px 0 var(--color-face-dk),
-    inset -2px -2px 0 #ddd6c8;
+  background: #fffdf9;
+  border: 1px solid var(--color-edge);
+  border-radius: 8px;
+}
+.field:hover {
+  border-color: var(--color-ink-2);
 }
 .field:focus-visible {
-  outline: 2px solid var(--color-brick);
+  border-color: var(--color-dusk);
+  outline: 2px solid var(--color-dusk);
   outline-offset: 0;
 }
 .field[aria-invalid="true"] {
-  background: #fbeeea;
-  outline: 1px solid var(--color-alert);
+  background: #fdf1ed;
+  border-color: var(--color-rust);
+}
+
+/* a key on the shortcuts card */
+.kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  color: var(--color-ink);
+  background: var(--color-cream-2);
+  border: 1px solid var(--color-edge);
+  border-radius: 5px;
 }
 
 /* ------------------------------------------------------------------ */
@@ -274,40 +343,114 @@
 /* ------------------------------------------------------------------ */
 
 .taskbar {
-  box-shadow: inset 0 1px 0 var(--color-face-hi), inset 0 2px 0 #ddd6c8;
-  background: var(--color-face);
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-cream-2);
+  border-top: 1px solid var(--color-line);
 }
 .task-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
-  height: 30px;
-  padding: 0 10px;
-  font-size: 12.5px;
+  height: 32px;
+  padding: 0 11px 0 8px;
+  font-size: 13px;
   color: var(--color-ink);
-  background: var(--color-face);
-  box-shadow:
-    inset -1px -1px 0 var(--color-face-dk),
-    inset 1px 1px 0 var(--color-face-hi),
-    inset -2px -2px 0 var(--color-face-lo);
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+.task-btn:hover {
+  background: var(--color-cream-3);
 }
 .task-btn[aria-pressed="true"] {
-  font-weight: 700;
-  background:
-    repeating-conic-gradient(#d9d2c3 0 25%, var(--color-face) 0 50%) 0 0 / 2px 2px;
-  box-shadow:
-    inset 1px 1px 0 var(--color-face-dk),
-    inset -1px -1px 0 var(--color-face-hi),
-    inset 2px 2px 0 var(--color-face-lo);
+  font-weight: 600;
+  background: var(--color-cream);
+  border-color: var(--color-line);
 }
 .task-btn:focus-visible {
-  outline: 1px dotted var(--color-ink);
-  outline-offset: -4px;
+  outline: 2px solid var(--color-dusk);
+  outline-offset: 1px;
+}
+/* the tray: the compact player and the clock */
+.tray {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  background: var(--color-cream);
+  border: 1px solid var(--color-rule);
+  border-radius: 9px;
+}
+.tray-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: var(--color-ink);
+  border-radius: 7px;
+}
+.tray-btn:hover {
+  background: var(--color-cream-3);
+}
+.tray-btn:active {
+  background: var(--color-rule);
+}
+.clock-btn:hover {
+  background: var(--color-cream-3);
+}
+.clock-btn[aria-expanded="true"] {
+  border-color: var(--color-line);
+}
+.tray-btn:focus-visible,
+.tray-link:focus-visible,
+.clock-btn:focus-visible {
+  outline: 2px solid var(--color-dusk);
+  outline-offset: 0;
+}
+.tray-link {
+  border-radius: 7px;
+}
+.tray-link:hover {
+  background: var(--color-cream-2);
+}
+
+/* the clock's menu */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13.5px;
+  text-align: left;
+  color: var(--color-ink);
+  border-radius: 6px;
+}
+.menu-item:hover,
+.menu-item:focus-visible {
+  color: #fff;
+  background: var(--color-dusk);
+  outline: none;
+}
+.menu-check {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.menu-hint {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-2);
+}
+.menu-item:hover .menu-hint,
+.menu-item:focus-visible .menu-hint {
+  color: #fff;
 }
 
 /* ------------------------------------------------------------------ */
-/* the player (Beats)                                                   */
+/* the studio deck (the game): dark, untouched by the desktop theme     */
 /* ------------------------------------------------------------------ */
 
 .deck {
@@ -318,16 +461,6 @@
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 3px),
     #171615;
   color: #ddd5c4;
-}
-.lcd {
-  background:
-    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.25) 0 1px, transparent 1px 2px),
-    radial-gradient(ellipse at 30% 20%, rgba(255, 190, 90, 0.08), transparent 70%),
-    var(--color-lcd);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.07);
-  color: var(--color-amber);
-  font-family: var(--font-lcd);
-  text-shadow: 0 0 6px rgba(242, 180, 90, 0.45);
 }
 .deck-btn {
   display: grid;
@@ -387,251 +520,131 @@
   outline-offset: 2px;
 }
 
-.eq-bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 10px;
-}
-.eq-bars i {
-  width: 2px;
-  background: currentColor;
-  animation: eq 0.9s ease-in-out infinite alternate;
-}
-.eq-bars i:nth-child(2) { animation-delay: -0.3s; }
-.eq-bars i:nth-child(3) { animation-delay: -0.6s; }
-@keyframes eq {
-  from { height: 25%; }
-  to { height: 100%; }
-}
-
 /* ------------------------------------------------------------------ */
-/* the Beats window: a 2007 media player in night-blue glass            */
+/* the Beats player: the cover, what's playing, the waveform, the       */
+/* transport and the tracklist, on paper                                */
 /* ------------------------------------------------------------------ */
-
-.win.win-glass {
-  padding: 0;
-  overflow: hidden;
-  border-radius: 7px 7px 4px 4px;
-  background: #070b16;
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.85),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-    0 18px 50px rgba(0, 0, 0, 0.65),
-    0 0 50px rgba(79, 227, 255, 0.08);
-}
-.win.win-glass .win-title {
-  height: 30px;
-  padding: 0 6px 0 10px;
-  font-family: var(--font-vista);
-  font-weight: 400;
-  font-size: 13px;
-  text-shadow: 0 0 8px rgba(120, 220, 255, 0.55);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04) 50%, transparent 51%),
-    linear-gradient(90deg, #0f2b45, #172349 60%, #251c4a);
-  filter: saturate(0.35) brightness(0.85);
-}
-.win.win-glass[data-active="true"] .win-title {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05) 50%, transparent 51%),
-    linear-gradient(90deg, #0f3554, #1b2b5e 60%, #30225e);
-  filter: none;
-}
-.win.win-glass .win-title + div {
-  margin-top: 0;
-}
-.win-glass .cap-btn {
-  width: 26px;
-  height: 19px;
-  color: #eaf8ff;
-  border-radius: 3px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.02) 51%, rgba(255, 255, 255, 0.1));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.5);
-}
-.win-glass .cap-btn:hover {
-  background: linear-gradient(180deg, rgba(150, 240, 255, 0.55), rgba(79, 227, 255, 0.25) 50%, rgba(40, 140, 200, 0.3) 51%, rgba(79, 227, 255, 0.4));
-}
-.win-glass .cap-btn:focus-visible {
-  outline: 1px solid var(--accent, #4fe3ff);
-}
 
 .mp {
-  color: #e6f3ff;
-  background: #070b16;
+  color: var(--color-ink);
+  background: var(--color-cream);
 }
 .mp :focus-visible {
-  outline: 2px solid #4fe3ff;
+  outline: 2px solid var(--color-dusk);
   outline-offset: 1px;
 }
-.mp-stage {
-  background:
-    radial-gradient(ellipse at 15% 0%, rgba(79, 227, 255, 0.16), transparent 60%),
-    radial-gradient(ellipse at 95% 100%, rgba(169, 139, 255, 0.16), transparent 60%),
-    linear-gradient(180deg, #0c162c, #070b16);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
 .mp-cover {
-  width: 92px;
-  height: 92px;
-  align-self: center;
-  border-radius: 3px;
+  flex-shrink: 0;
+  width: min(62vw, 248px);
+  aspect-ratio: 1;
   overflow: hidden;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28), 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 30px rgba(79, 227, 255, 0.12);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: #e9e9e7;
+  box-shadow: 0 10px 24px -14px rgba(42, 32, 18, 0.55);
 }
 @media (min-width: 640px) {
   .mp-cover {
-    width: 184px;
-    height: 184px;
+    align-self: flex-start;
+    width: 248px;
   }
 }
-.mp-screen {
-  position: relative;
-  min-height: 64px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: linear-gradient(180deg, #02040a, #060a16);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 2px 10px #000;
+@media (max-height: 560px) {
+  .mp-cover {
+    width: 150px;
+  }
 }
-.mp-screen::after {
-  /* glass over the screen */
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 45%);
-}
-.mp-deck {
-  background: linear-gradient(180deg, #0e1628, #080c18);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+/* the time, on a small flat display */
+.mp-time {
+  font-family: var(--font-lcd);
+  font-size: 19px;
+  line-height: 1;
+  color: var(--color-ink);
 }
 .mp-play {
-  position: relative;
-  z-index: 1;
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
-  margin: 0 -7px;
-  color: #fff;
+  width: 52px;
+  height: 52px;
+  color: var(--color-cream);
+  background: var(--color-line);
   border-radius: 999px;
-  background: radial-gradient(circle at 50% 30%, #c8f7ff 0%, #2fb9ee 36%, #0b5a9a 70%, #062a55 100%);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.7),
-    0 0 0 3px rgba(255, 255, 255, 0.07),
-    0 0 20px rgba(79, 227, 255, 0.45),
-    inset 0 1px 1px rgba(255, 255, 255, 0.85);
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
-}
-.mp-play::before {
-  content: "";
-  position: absolute;
-  inset: 3px 9px 50% 9px;
-  border-radius: 999px 999px 40% 40%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.05));
-  pointer-events: none;
-}
-.mp-play svg {
-  position: relative;
-  filter: drop-shadow(0 0 3px rgba(0, 40, 80, 0.8));
 }
 .mp-play:hover {
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.7),
-    0 0 0 3px rgba(255, 255, 255, 0.1),
-    0 0 30px rgba(79, 227, 255, 0.7),
-    inset 0 1px 1px rgba(255, 255, 255, 0.85);
+  background: var(--color-dusk);
 }
 .mp-play:active {
-  transform: scale(0.96);
+  background: var(--color-dusk-dk);
+  transform: scale(0.97);
+}
+.mp :focus-visible.mp-play {
+  outline-offset: 3px;
 }
 .mp-skip {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 32px;
-  color: #dff6ff;
-  background: linear-gradient(180deg, #3d4a66, #182035 52%, #0e1424 53%, #172036);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.75);
+  width: 42px;
+  height: 42px;
+  color: var(--color-ink);
+  border-radius: 999px;
 }
 .mp-skip:hover {
-  background: linear-gradient(180deg, #4b5e84, #1e2a48 52%, #121b33 53%, #1e2c4a);
-  color: #fff;
+  background: var(--color-cream-3);
 }
-.mp-skip-l {
-  border-radius: 16px 0 0 16px;
-  padding-right: 6px;
-}
-.mp-skip-r {
-  border-radius: 0 16px 16px 0;
-  padding-left: 6px;
+.mp-skip:active {
+  background: var(--color-rule);
 }
 .mp-icon {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
-  color: rgba(230, 243, 255, 0.6);
-  border-radius: 4px;
+  color: var(--color-ink-2);
+  border-radius: 8px;
 }
 .mp-icon:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-ink);
+  background: var(--color-cream-3);
 }
 .mp-icon[aria-pressed="true"] {
-  color: #4fe3ff;
-  filter: drop-shadow(0 0 4px rgba(79, 227, 255, 0.8));
-}
-.mp-chip {
-  align-items: center;
-  padding: 2px 9px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  color: rgba(230, 243, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-}
-.mp-chip:hover {
-  color: #fff;
-  border-color: rgba(79, 227, 255, 0.6);
+  color: var(--color-dusk);
+  background: var(--color-dusk-wash);
 }
 .mp-range {
   -webkit-appearance: none;
   appearance: none;
-  height: 16px;
+  height: 18px;
   background: transparent;
 }
 .mp-range::-webkit-slider-runnable-track {
-  height: 4px;
+  height: 3px;
   border-radius: 2px;
-  background: linear-gradient(90deg, #4fe3ff, #a98bff var(--fill, 0%), #222c44 var(--fill, 0%));
+  background: linear-gradient(90deg, var(--color-dusk) var(--fill, 0%), var(--color-rule) var(--fill, 0%));
 }
 .mp-range::-moz-range-track {
-  height: 4px;
+  height: 3px;
   border-radius: 2px;
-  background: linear-gradient(90deg, #4fe3ff, #a98bff var(--fill, 0%), #222c44 var(--fill, 0%));
+  background: linear-gradient(90deg, var(--color-dusk) var(--fill, 0%), var(--color-rule) var(--fill, 0%));
 }
 .mp-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 13px;
   height: 13px;
-  margin-top: -4.5px;
+  margin-top: -5px;
   border-radius: 999px;
-  background: radial-gradient(circle at 50% 35%, #fff, #9fe9ff 45%, #2a8fc4);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 8px rgba(79, 227, 255, 0.6);
+  background: var(--color-cream);
+  border: 1px solid var(--color-line);
 }
 .mp-range::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
-  border: 0;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
-  background: radial-gradient(circle at 50% 35%, #fff, #9fe9ff 45%, #2a8fc4);
+  background: var(--color-cream);
+  border: 1px solid var(--color-line);
 }
 .mp-list {
-  background: linear-gradient(180deg, #080d1a, #060912);
+  border-top: 1px solid var(--color-line);
 }
 .mp-row {
   display: grid;
@@ -639,41 +652,87 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 7px 14px 7px 10px;
+  min-height: 42px;
+  padding: 6px 16px 6px 12px;
   text-align: left;
-  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--color-rule);
 }
 @media (min-width: 640px) {
   .mp-row {
-    grid-template-columns: 22px minmax(0, 1fr) 96px 40px 48px;
+    grid-template-columns: 22px minmax(0, 1fr) 100px 40px 48px;
+    padding-left: 14px;
+    padding-right: 20px;
   }
 }
 .mp-row:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-cream-2);
 }
 .mp-row[aria-current="true"] {
-  background: linear-gradient(90deg, rgba(79, 227, 255, 0.2), rgba(169, 139, 255, 0.1) 70%, transparent);
-  border-left-color: #4fe3ff;
+  background: var(--color-dusk-wash);
+  box-shadow: inset 3px 0 0 var(--color-dusk);
 }
-.mp-row:focus-visible {
-  outline: 1px solid #4fe3ff;
-  outline-offset: -1px;
+.mp .mp-row:focus-visible {
+  outline-offset: -2px;
 }
 .mp-head {
-  padding-top: 6px;
-  padding-bottom: 5px;
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  min-height: 0;
+  padding-top: 7px;
+  padding-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(230, 243, 255, 0.38);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--color-ink-2);
+  background: var(--color-cream-2);
+  border-bottom-color: var(--color-line);
 }
 .mp-head:hover {
-  background: none;
+  background: var(--color-cream-2);
 }
 .mp-foot {
-  background: #0a1020;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--color-ink-2);
+  background: var(--color-cream-2);
+  border-top: 1px solid var(--color-line);
+}
+.mp-link {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  border-radius: 3px;
+}
+.mp-link:hover {
+  color: var(--color-ink);
+  text-decoration-style: solid;
+}
+.mp-new {
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-dusk);
+  border: 1px solid var(--color-dusk);
+  border-radius: 4px;
+}
+
+.eq-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 10px;
+}
+/* standing still (reduced motion, still visuals) they rest at three heights */
+.eq-bars i {
+  width: 2px;
+  height: 45%;
+  background: currentColor;
+  animation: eq 0.9s ease-in-out infinite alternate;
+}
+.eq-bars i:nth-child(2) { height: 100%; animation-delay: -0.3s; }
+.eq-bars i:nth-child(3) { height: 70%; animation-delay: -0.6s; }
+@keyframes eq {
+  from { height: 25%; }
+  to { height: 100%; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -749,7 +808,8 @@ html[data-intro="skip"] .intro-cover {
   }
 }
 html[data-calm="true"] .grain,
-html[data-calm="true"] .eq-bars i {
+html[data-calm="true"] .eq-bars i,
+html[data-calm="true"] .win {
   animation: none;
 }
 

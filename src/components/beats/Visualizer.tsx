@@ -2,8 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { readFrequencies, readWaveform } from "@/components/player/spectrum";
-import type { VisMode } from "@/components/site/siteStore";
 import { restLevel, segColor, wordGrid } from "./wordmark";
+
+// No longer used: the player shows the cover instead (kept, not deleted).
+type VisMode = "led" | "wave";
 
 // The album's wordmark, live. "led": a spectrum analyser whose columns are
 // the real spectrum (log-spaced, so the kick and the hats both register),

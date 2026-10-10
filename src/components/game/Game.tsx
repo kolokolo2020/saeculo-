@@ -11,13 +11,13 @@ import Menu, { type MenuTab } from "./Menu";
 import Crates, { type DigResult } from "./minigames/Crates";
 import Dice from "./minigames/Dice";
 import Hoops from "./minigames/Hoops";
-import Rhythm from "./minigames/Rhythm";
+import Rhythm, { battleCharts } from "./minigames/Rhythm";
 import Shop from "./minigames/Shop";
 import Tag from "./minigames/Tag";
 import { drawRide, overhead, trainAt } from "./places/underground";
 import { camera, draw, VIEW_H, VIEW_W } from "./render";
 import { loadSave, MAX_HP, migrateOldTapes, resetSave, writeSave, type SaveData, type Settings } from "./save";
-import { battle, clubOk, operate, promptFor as promptMore, talk as talkMore, type Api, type Mini } from "./scripts";
+import { battle, clubOk, operate, promptFor as promptMore, talk as talkMore, veeBeat, type Api, type Mini } from "./scripts";
 import { duck, setCrowd, setPlace, setRing, setRumble, setSfxVolume, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
 import { CONSUMABLES, consumableById, unlockedByWins, weaponById } from "./weapons";
 import { Engine } from "./studio/engine";
@@ -26,7 +26,7 @@ import { loadStore } from "./studio/project";
 import Studio from "./studio/Studio";
 import { FINDABLE, playVoice, voiceById, VOICES } from "./studio/voices";
 import { clearSmoke } from "./actors";
-import { cheerFor, lifeBlocks, lifeTarget, makeLife, sendCop, updateLife, type Actor } from "./life";
+import { catFollows, catHome, cheerFor, lifeBlocks, lifeTarget, makeLife, sendCop, updateLife, type Actor } from "./life";
 import { clone, type Project } from "./studio/project";
 import { sampleProject } from "./studio/sample";
 import { TRACKS } from "@/data/tracks";
@@ -81,6 +81,25 @@ const HINT_AT: Record<string, string> = { rain: "window", phone: "phone", bottle
 const ROUGH: Partial<Record<Place, number>> = { street: 0, park: 0, avenue: 0.05, alley: 0.25, subway: 0.1, underpass: 0.2 };
 /** Seconds of peace after trouble, whichever way it went. */
 const BREATHER = 60;
+/**
+ * Carrying Dre's tape you're worth stopping: trouble comes this much sooner,
+ * and is this much likelier to be waiting when you walk into a rough place
+ * (never more than 45%, and never inside the breather).
+ */
+const CARRY_SOONER = 1.6;
+const CARRY_ODDS = 1.8;
+const carrying = (v: SaveData) => v.job?.stage === "carry";
+/** How likely trouble is to be waiting when you walk in. */
+const ambushOdds = (place: Place, v: SaveData) => Math.min(0.45, (ROUGH[place] ?? 0) * (carrying(v) ? CARRY_ODDS : 1));
+/** What they say when they've seen the tape on you. */
+const TAPE_LINES = [
+  ["One of them nods at your pocket.", "\u201cWhat's on the tape?\u201d"],
+  ["\u201cOi. That a tape?\u201d", "\u201cWhat's on the tape? Give us a listen.\u201d"],
+  ["\u201cYou're carrying. Anyone can see you're carrying.\u201d", "\u201cSo what's on the tape?\u201d"],
+];
+const tapeLines = () => TAPE_LINES[Math.floor(Math.random() * TAPE_LINES.length)];
+/** Pet the alley cat this many times in one visit and it comes with you for a bit. */
+const CAT_PETS = 3;
 const BOOMBOX = { x: 17.6 * TILE, y: 4.4 * TILE };
 
 /** Lines people say, cycled one set per conversation. */
@@ -464,6 +483,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
     }
     life.current.push(...foes);
     s.pending = foes;
+    // the cat wants no part of it
+    const cat = life.current.find((a) => a.kind === "cat" && a.place === s.place && a.trail);
+    if (cat) catHome(cat, true);
   };
 
   /** They've reached you: what now? */
@@ -476,7 +498,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
     keys.current = [];
     const toll = Math.min(15, Math.max(5, Math.floor(v.cash * 0.3)));
     const mine = latestTape();
-    say(foeLines(), [
+    // they can tell when you're carrying Dre's tape (lose the fight and it goes with them)
+    say(carrying(v) ? tapeLines() : foeLines(), [
       { label: "Fight", run: () => startFight(foes) },
       ...(mine
         ? [
@@ -619,7 +642,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const s = st.current;
     const v = saveRef.current;
     const lost = Math.floor(v.cash * 0.25);
-    updateSave((x) => ({ ...x, hp: 60, cash: x.cash - lost, stats: { ...x.stats, losses: x.stats.losses + 1 } }));
+    // Dre's tape went with whoever went through your pockets: the job's off (he'll want to hear about it)
+    const tapeGone = carrying(v);
+    updateSave((x) => ({ ...x, hp: 60, cash: x.cash - lost, stats: { ...x.stats, losses: x.stats.losses + 1 }, job: tapeGone && x.job ? { ...x.job, stage: "lost" } : x.job }));
     dropFoes();
     s.fight = null;
     s.pending = null;
@@ -628,7 +653,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     setPlace("bedroom", s.windowOpen);
     setPlaceName("bedroom");
     setKo(0);
-    say(["You wake up on your bedroom floor. No idea how you got home.", lost ? `Your pockets are $${lost} lighter.` : "Your pockets were empty anyway.", "Your head's pounding. (health 60)"]);
+    say(["You wake up on your bedroom floor. No idea how you got home.", lost ? `Your pockets are $${lost} lighter.` : "Your pockets were empty anyway.", ...(tapeGone ? ["Dre's tape is gone too. He's not going to like that."] : []), "Your head's pounding. (health 60)"]);
     root.current?.focus();
   };
 
@@ -739,10 +764,17 @@ export default function Game({ onExit }: { onExit: () => void }) {
       dropFoes(s.pending);
       s.pending = null;
     }
+    // the cat doesn't leave the alley: once you're gone it's back on one of its spots
+    const cat = life.current.find((a) => a.kind === "cat" && a.place === from && a.trail);
+    if (cat) {
+      catHome(cat);
+      if (cat.goal) [cat.x, cat.y] = cat.goal;
+      Object.assign(cat, { goal: undefined, walking: false });
+    }
     s.visit = {};
     if (!v.places.includes(to)) updateSave((x) => ({ ...x, places: [...x.places, to] }));
-    // the rough places: sometimes they're waiting
-    const rough = ROUGH[to];
+    // the rough places: sometimes they're waiting (more often while you carry Dre's tape)
+    const rough = ambushOdds(to, v);
     if (rough && v.profile?.name && s.t - s.lastTrouble > BREATHER && Math.random() < rough && s.encounterIn > 4) s.encounterIn = 2.5 + Math.random() * 3;
     // Vee shows up at the underpass once you've sold a beat or played the cypher; the first time, she comes to you
     const vee = life.current.find((a) => a.id === "vee");
@@ -882,6 +914,20 @@ export default function Game({ onExit }: { onExit: () => void }) {
       case "dog":
         say(["The dog leans on your leg for a second, then remembers the walk."]);
         return;
+      case "alley-cat": {
+        // pet it enough and it comes along for a bit
+        const pets = (s.visit.pets ?? 0) + 1;
+        s.visit.pets = pets;
+        if (pets < CAT_PETS) {
+          say(next);
+          return;
+        }
+        const again = !!s.visit.catFollowed;
+        s.visit.catFollowed = 1;
+        catFollows(a);
+        say([...next, again ? "When you move off, it comes too. Again." : "When you step away, it gets up and follows you. A few steps behind, like it was going that way anyway."]);
+        return;
+      }
       case "crew-smoke":
         if (heard.crew && n % 2 === 0) {
           say([`\u201cMilo won't stop playing \u2018${heard.crew}\u2019. Whole block knows it now.\u201d`], [
@@ -1491,10 +1537,32 @@ export default function Game({ onExit }: { onExit: () => void }) {
         const e = engine.current;
         return e ? { playing: e.playing, position: e.position(), project: e.project } : null;
       },
-      /** Bring trouble now (in a place where it happens). */
+      /** Bring trouble now (in a place where it happens), breather or not. */
       trouble: () => {
         st.current.encounterIn = 0;
+        st.current.lastTrouble = -1e9;
       },
+      /** Keep trouble away for the rest of the test. */
+      peace: () => {
+        st.current.encounterIn = 1e6;
+        st.current.lastTrouble = st.current.t;
+      },
+      /** How likely trouble is to be waiting in a place, and how much sooner it comes, as things stand. */
+      odds: (place: Place) => ({ ambush: ambushOdds(place, saveRef.current), sooner: carrying(saveRef.current) ? CARRY_SOONER : 1 }),
+      /** Go down in the fight you're in. */
+      knockMe: () => {
+        const f = st.current.fight;
+        if (f) f.me.hp = 0;
+      },
+      /** The alley cat: how long it'll keep following (set it to cut that short). */
+      cat: (trail?: number) => {
+        const c = life.current.find((a) => a.id === "alley-cat");
+        if (c && trail !== undefined) c.trail = trail;
+        return c ? { x: c.x, y: c.y, trail: c.trail ?? 0, walking: !!c.walking, goal: c.goal ?? null, perches: c.perches ?? [] } : null;
+      },
+      /** Vee's next beat, and what a battle on each of her beats asks of you. */
+      veeBeat: () => veeBeat(saveRef.current),
+      battleCharts,
       pending: () => st.current.pending?.length ?? 0,
       fight: () => {
         const f = st.current.fight;
@@ -1624,8 +1692,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
         if (life.current.some((a) => a.fighter && a.hidden && !s.fight?.foes.includes(a))) life.current = life.current.filter((a) => !(a.fighter && a.hidden && !s.fight?.foes.includes(a)));
         // trouble, now and then, where it lives
         if (ROUGH[s.place] !== undefined && !s.fight && !s.pending && saveRef.current.profile?.name) {
-          s.encounterIn -= dt;
-          if (s.encounterIn <= 0) {
+          s.encounterIn -= dt * (carrying(saveRef.current) ? CARRY_SOONER : 1);
+          if (s.encounterIn <= 0 && s.t - s.lastTrouble > BREATHER) {
             spawnTrouble();
             s.lastTrouble = s.t;
             s.encounterIn = 100 + Math.random() * 100;

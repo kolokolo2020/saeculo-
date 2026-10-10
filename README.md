@@ -1,7 +1,8 @@
 # saeculo
 
-The site for saeculo's instrumentals: an old Windows desktop found late at
-night, with four things on it.
+The site for saeculo's instrumentals: an old desktop drawn flat and clean
+(warm paper and hairlines, classic-Mac pinstripes on the title bars,
+Windows-style buttons and taskbar), with four things on it.
 
 - **Beats**: the MP3s, as a folder wired to one player.
 - **Socials**: the real links.
@@ -9,28 +10,30 @@ night, with four things on it.
 - **Game**: a small top-down neighbourhood where you find sounds and make a
   beat with them.
 
-A first visit opens with a short intro: an old machine booting up. A BIOS
-check of the studio waits for a key (that click is what lets sound start),
-then a 2007-style loading bar, four streaks of light meeting in a spinning
-record with a startup chord in the key of the beat about to play, and a
-blue welcome screen while the beat comes up out of the machine. It's
-skippable (Skip or Esc; any key hurries it along), plays once per browser,
-and the clock menu in the taskbar replays it. Share links (`/#track=<id>`)
-skip it. Code: `src/components/intro/`.
+A first visit opens with a short intro in a dark, archival room: just
+"saeculo", quietly, waiting for a click or key (that click is what lets
+sound start). Then a cigarette is smoked down to the filter in a couple of
+seconds: the coal creeps, the ash builds up and drops off, you hear the
+crackle. The breath goes out, the smoke blows in from the side, and
+"saeculo" shows through it, bright. Then the dark is blown away to the
+desktop and the beat comes up. About 9 seconds after the click. It's
+skippable (Skip or Esc; a click or key hurries it along), plays once per
+browser, and the clock menu in the taskbar replays it. Share links
+(`/#track=<id>`) skip it. With reduced motion or still visuals it's just the
+name on the dark screen and a quick fade. Everything is drawn on canvas and
+every sound is synthesized. Code: `src/components/intro/` (`BootIntro.tsx`
+runs the sequence, input and the music hand-off; `scene.ts` draws it;
+`sounds.ts` makes the sounds; `intro.module.css` the styles).
 
 ## Beats
 
-One album, one cover: "saeculo" lit up on a spectrum analyser, drawn by
-`scripts/make-cover.mjs` (from `src/components/beats/wordmark.ts`) into
-`public/covers/saeculo.svg` and `.jpg`. The window is a 2007 media player
-in night-blue glass: the cover, what's playing, a visualizer screen, the
-waveform seek bar, the transport (shuffle, repeat, previous, a big round
+One album, one cover: the owner's artwork (`public/covers/saeculo.jpg`). The
+window is a flat media player on the desktop's paper: the cover large on
+the left (on top on phones), what's playing, the waveform seek bar with the
+time in a small LCD face, the transport (shuffle, repeat, previous, a round
 play button, next, volume) and the tracklist with key, bpm and length.
-The visualizer is never on the cover: it's the wordmark on its own screen,
-with the real spectrum moving through and around the letters (**led**), or
-a mirrored trace of the waveform over the dimmed wordmark (**wave**), or
-**still** (also in the clock menu; the default with reduced motion). On
-iPhones it follows the measured tempo instead of the audio.
+There's no visualizer. The playing row has three small bars, which stand
+still with reduced motion or still visuals.
 
 **sample this** (in the status bar) takes the two bars playing right now
 into the game's studio: cut into four two-beat pieces at the track's own
@@ -120,7 +123,11 @@ get $40 back, and she gets better each time you win. The CD guy, once
 you've bought his CD, wants a slow beat (under 90 BPM) for track four.
 Dre, once you've sold him something, has **jobs**: take a tape to the
 busker, the record shop or the bar, bring back what they give you, get
-paid. The current job is in the menu under goals.
+paid. The current job is in the menu under goals. Carrying the tape makes
+trouble come sooner and likelier, and they ask what's on it; get knocked out
+and the tape's gone and the job with it. Vee plays a different beat each
+battle and names it. Pet the alley cat three times in a visit and it
+follows you about for a while.
 
 **Trouble**: now and then, in the rougher places, a group of drunks walks up
 to you. Fight, pay them off, play them your beat, or walk away. Fights are
@@ -214,8 +221,11 @@ starters, and the panels).
 - `src/app/`: layout (fonts, and a tiny script that decides before the
   first paint whether to show the intro), page, share image.
 - `src/components/site/`: the desktop, windows, taskbar, icons, Socials,
-  Contact, and the site store.
-- `src/components/beats/`: the Beats window, the visualizer, the palette.
+  Contact, and the site store. Theme tokens are in the `@theme` block of
+  `src/app/globals.css` (cream, stone, line, dusk…); fonts: IBM Plex Sans,
+  Jersey 10 for window titles, VT323 for the clock and the player's time.
+- `src/components/beats/`: the Beats window and the waveform seek bar
+  (`Visualizer.tsx` and `wordmark.ts` are no longer used).
 - `src/components/player/`: the global player store and `<audio>` element.
 - `src/components/intro/`: the intro.
 - `src/components/game/`: the game.

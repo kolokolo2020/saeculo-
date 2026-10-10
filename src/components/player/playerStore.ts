@@ -119,7 +119,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     }
     // iOS suspends Web Audio when the screen locks, which would silence a
     // player routed through it; a plain <audio> keeps playing. The
-    // visualizer falls back to a tempo-synced spectrum there.
+    // analyser (kept, though nothing reads it now) stays null there.
     if (!audio || isIOS()) return;
     const context = getAudioContext();
     const analyser = context.createAnalyser();

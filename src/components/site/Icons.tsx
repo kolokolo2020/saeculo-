@@ -1,6 +1,7 @@
-// Desktop icons drawn on a 32 × 32 pixel grid (crisp at 2×), and the
-// monochrome control glyphs. Glyphs are SVG because unicode ▶ ⏭ render as
-// colour emoji on some platforms.
+// Desktop icons drawn on a 32 × 32 pixel grid (crisp at 2×) in the
+// desktop's warm palette, and the monochrome control glyphs: filled for
+// the transport, thin lines for the window buttons and toggles. Glyphs are
+// SVG because unicode ▶ ⏭ render as colour emoji on some platforms.
 
 type P = { size?: number; className?: string };
 
@@ -54,7 +55,7 @@ const FOLDER = [
   "................................",
 ];
 export function BeatsIcon({ size }: P) {
-  return <Pix rows={FOLDER} size={size} pal={{ k: "#1a140c", y: "#a8812e", Y: "#e4b95a", w: "#f7dc98" }} />;
+  return <Pix rows={FOLDER} size={size} pal={{ k: "#2a2622", y: "#c99a3c", Y: "#ecc66a", w: "#f8e3a6" }} />;
 }
 
 const GLOBE = [
@@ -87,7 +88,7 @@ const GLOBE = [
   "................................",
 ];
 export function SocialsIcon({ size }: P) {
-  return <Pix rows={GLOBE} size={size} pal={{ k: "#10151a", b: "#4f7d99", g: "#8fb37a", s: "#c9c2b3" }} />;
+  return <Pix rows={GLOBE} size={size} pal={{ k: "#2a2622", b: "#7fa7c9", g: "#a5cf98", s: "#b9b09f" }} />;
 }
 
 const MAIL = [
@@ -118,7 +119,7 @@ const MAIL = [
   "................................",
 ];
 export function ContactIcon({ size }: P) {
-  return <Pix rows={MAIL} size={size} pal={{ k: "#1c1a17", w: "#efe7d6", s: "#b9b0a0", r: "#a4452f" }} />;
+  return <Pix rows={MAIL} size={size} pal={{ k: "#2a2622", w: "#fbf8f2", s: "#d6cfc1", r: "#c0573f" }} />;
 }
 
 const HOUSE = [
@@ -150,7 +151,7 @@ const HOUSE = [
   "................................",
 ];
 export function GameIcon({ size }: P) {
-  return <Pix rows={HOUSE} size={size} pal={{ k: "#16120e", r: "#6e1f18", s: "#8d8676", y: "#f2b45a", b: "#26303a", d: "#3b2a1c", g: "#2f3a2a" }} />;
+  return <Pix rows={HOUSE} size={size} pal={{ k: "#2a2622", r: "#5d79a6", s: "#efe7d6", y: "#f2c66a", b: "#7fa7c9", d: "#8a6a4a", g: "#9db48a" }} />;
 }
 
 // ---------------------------------------------------------------- glyphs
@@ -162,6 +163,26 @@ function G({ size = 14, className, children }: P & { children: React.ReactNode }
     </svg>
   );
 }
+/** Line glyphs: window buttons, toggles, the volume. */
+function L({ size = 14, className, children }: P & { children: React.ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width={size}
+      height={size}
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
+
 export const PlayGlyph = (p: P) => (
   <G {...p}>
     <path d="M4 2.5v11l9.5-5.5z" />
@@ -169,64 +190,74 @@ export const PlayGlyph = (p: P) => (
 );
 export const PauseGlyph = (p: P) => (
   <G {...p}>
-    <rect x="3.5" y="2.5" width="3.2" height="11" />
-    <rect x="9.3" y="2.5" width="3.2" height="11" />
+    <rect x="3.5" y="2.5" width="3.2" height="11" rx="0.8" />
+    <rect x="9.3" y="2.5" width="3.2" height="11" rx="0.8" />
   </G>
 );
 export const PrevGlyph = (p: P) => (
   <G {...p}>
-    <rect x="2.5" y="3" width="2" height="10" />
-    <path d="M13.5 3v10L5 8z" />
+    <rect x="2.5" y="3" width="2" height="10" rx="0.6" />
+    <path d="M13.5 3.6v8.8a.6.6 0 0 1-.92.5L5.6 8.5a.6.6 0 0 1 0-1l6.98-4.4a.6.6 0 0 1 .92.5z" />
   </G>
 );
 export const NextGlyph = (p: P) => (
   <G {...p}>
-    <rect x="11.5" y="3" width="2" height="10" />
-    <path d="M2.5 3v10L11 8z" />
+    <rect x="11.5" y="3" width="2" height="10" rx="0.6" />
+    <path d="M2.5 3.6v8.8a.6.6 0 0 0 .92.5L10.4 8.5a.6.6 0 0 0 0-1L3.42 3.1a.6.6 0 0 0-.92.5z" />
   </G>
 );
 export const VolumeGlyph = ({ muted, ...p }: P & { muted?: boolean }) => (
-  <G {...p}>
-    <path d="M2 6h3l4-3.5v11L5 10H2z" />
-    {muted ? (
-      <path d="M11 5.5l4 5M15 5.5l-4 5" stroke="currentColor" strokeWidth="1.6" />
-    ) : (
-      <path d="M11 5.5c1.2 1.4 1.2 3.6 0 5M13 4c2 2.3 2 5.7 0 8" stroke="currentColor" strokeWidth="1.4" fill="none" />
-    )}
-  </G>
+  <L {...p}>
+    <path d="M2.5 6.2h2.3L8 3.4v9.2L4.8 9.8H2.5z" fill="currentColor" />
+    {muted ? <path d="M10.8 6l3.5 4M14.3 6l-3.5 4" /> : <path d="M10.6 5.8c.9 1.2.9 3.2 0 4.4M12.6 4.2c1.8 2.1 1.8 5.5 0 7.6" />}
+  </L>
 );
+/** The game's close button (studio): heavy. */
 export const CloseGlyph = (p: P) => (
   <G {...p}>
     <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" strokeWidth="2" />
   </G>
 );
+/** The desktop's close button: a thin ×. */
+export const XGlyph = (p: P) => (
+  <L {...p}>
+    <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
+  </L>
+);
 export const MinGlyph = (p: P) => (
-  <G {...p}>
-    <rect x="3" y="11" width="8" height="2" />
-  </G>
+  <L {...p}>
+    <path d="M4 11.5h8" />
+  </L>
 );
 export const MaxGlyph = (p: P) => (
-  <G {...p}>
-    <path d="M3 3h10v10H3z M4.5 6h7v5.5h-7z" fillRule="evenodd" />
-  </G>
+  <L {...p}>
+    <rect x="3.5" y="3.5" width="9" height="9" rx="1.2" />
+    <path d="M3.5 6h9" />
+  </L>
 );
 export const RestoreGlyph = (p: P) => (
-  <G {...p}>
-    <path d="M5 2.5h8.5V10H12V4H5z M2.5 5.5H11V13H2.5z M4 8h5.5v3.5H4z" fillRule="evenodd" />
-  </G>
+  <L {...p}>
+    <rect x="2.75" y="5.75" width="7.5" height="7.5" rx="1.2" />
+    <path d="M5.75 3.5c0-.5.3-.75.75-.75h6c.45 0 .75.3.75.75v6c0 .45-.3.75-.75.75h-1" />
+  </L>
 );
 export const RepeatGlyph = (p: P) => (
-  <G {...p}>
-    <path d="M3 6.5V5a1.5 1.5 0 0 1 1.5-1.5H11V1.5L14 4.5 11 7.5V5.5H5V6.5z M13 9.5V11a1.5 1.5 0 0 1-1.5 1.5H5v2L2 11.5 5 8.5v2h6V9.5z" />
-  </G>
+  <L {...p}>
+    <path d="M2.75 7.5V6.25A2 2 0 0 1 4.75 4.25h8M10.75 2.25l2 2-2 2M13.25 8.5v1.25a2 2 0 0 1-2 2h-8M5.25 13.75l-2-2 2-2" />
+  </L>
 );
 export const ShuffleGlyph = (p: P) => (
-  <G {...p}>
-    <path d="M1.5 4h3l6 8h2v-2l2.5 3-2.5 3v-2h-2.8l-6-8H1.5z M1.5 12h3l1.6-2.1 1.2 1.6L5.3 14H1.5z M10.5 4h2V2l2.5 3-2.5 3V6h-1.8L9.3 7.8 8.1 6.2z" />
-  </G>
+  <L {...p}>
+    <path d="M2.25 4.75h2.2c1 0 1.9.5 2.45 1.3l2.2 3.9c.55.8 1.45 1.3 2.45 1.3h2.2M12 9.5l1.75 1.75L12 13M2.25 11.25h2.2c.8 0 1.5-.3 2-.85M9.55 5.6c.5-.55 1.2-.85 2-.85h2.2M12 3l1.75 1.75L12 6.5" />
+  </L>
 );
 export const StopGlyph = (p: P) => (
   <G {...p}>
     <rect x="3.5" y="3.5" width="9" height="9" />
   </G>
+);
+export const ChevronUpGlyph = (p: P) => (
+  <L {...p}>
+    <path d="M4.5 10l3.5-3.5 3.5 3.5" />
+  </L>
 );

@@ -8,16 +8,16 @@ import { ALBUM, TRACKS, isNew } from "@/data/tracks";
 import analysis from "@/data/trackAnalysis.json";
 import { formatTime } from "@/lib/audio";
 import { trackUrl } from "@/lib/trackLink";
-import Visualizer from "./Visualizer";
 import WaveformSeek from "./WaveformSeek";
 
-// The Beats window: a 2007 media player in night-blue glass. The album
-// cover (one for every beat) with its reflection, what's playing, the
-// wordmark visualizer, the waveform seek bar, the transport with its big
-// round play button, and the tracklist.
+// The Beats window: the album's cover (one for every beat) as the hero,
+// what's playing, the waveform seek bar, the transport and the tracklist,
+// on the desktop's paper. Nothing animates but the playing row's bars.
 
-const ACCENT = "#4fe3ff";
-const ACCENT_2 = "#a98bff";
+// the dusk blue of the theme, easing into the lilac of the cover's rays
+const ACCENT = "#3d5a8a";
+const ACCENT_2 = "#6c5fa6";
+const REST = "#c9c0ae";
 const measured = analysis as Record<string, { duration?: number } | undefined>;
 
 // Lengths for the tracklist: measured ones first, the rest read from each
@@ -47,7 +47,6 @@ function NowPlaying() {
   const playing = usePlayerStore((s) => s.playing);
   const status = usePlayerStore((s) => s.status);
   const currentTime = usePlayerStore((s) => s.currentTime);
-  const duration = usePlayerStore((s) => s.duration);
   const heldBy = usePlayerStore((s) => s.heldBy);
   const state =
     status === "error"
@@ -61,26 +60,34 @@ function NowPlaying() {
             : currentTime > 0
               ? "PAUSED"
               : "READY";
+  const tone = status === "error" ? "text-rust" : playing ? "text-dusk" : "text-ink-2";
   return (
-    <div className="flex min-w-0 flex-col gap-0.5" data-testid="lcd">
-      <p className="flex items-center justify-between gap-3 text-[11px] tracking-[0.18em] uppercase">
-        <span className="truncate text-[#7fdcff]">
+    <div className="flex min-w-0 flex-col gap-1" data-testid="lcd">
+      <p className="flex items-center justify-between gap-3 text-[11px] font-medium tracking-[0.16em] text-ink-2 uppercase">
+        <span className="truncate">
           {ALBUM.title} · {String(index + 1).padStart(2, "0")}/{String(TRACKS.length).padStart(2, "0")}
         </span>
-        <span aria-live="polite" className={`shrink-0 ${status === "error" ? "text-[#ffb36b]" : "text-white/55"}`}>
+        <span aria-live="polite" className={`flex shrink-0 items-center gap-1.5 ${tone}`}>
+          {playing && status !== "error" && <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />}
           {state}
         </span>
       </p>
-      <p className="truncate text-[26px] leading-tight font-light text-white sm:text-[30px]" title={track?.title}>
+      <p className="truncate text-[30px] leading-[1.15] font-light tracking-[-0.01em] sm:text-[34px]" title={track?.title}>
         {track?.title ?? "—"}
       </p>
-      <p className="flex items-baseline justify-between gap-3 text-[13px] text-white/60">
-        <span className="truncate">{track ? meta(track) : ""}</span>
-        <span className="shrink-0 font-mono text-[12px] text-white/80 tabular-nums">
-          {formatTime(currentTime)} / {duration ? formatTime(duration) : "–:––"}
-        </span>
-      </p>
+      <p className="truncate text-[14px] text-ink-2">{track ? meta(track) || " " : " "}</p>
     </div>
+  );
+}
+
+function Times() {
+  const currentTime = usePlayerStore((s) => s.currentTime);
+  const duration = usePlayerStore((s) => s.duration);
+  return (
+    <p className="mp-time flex justify-between tabular-nums" aria-hidden>
+      <span>{formatTime(currentTime)}</span>
+      <span className="text-ink-2">{duration ? formatTime(duration) : "–:––"}</span>
+    </p>
   );
 }
 
@@ -91,42 +98,36 @@ function Transport() {
   const repeatOne = usePlayerStore((s) => s.repeatOne);
   const shuffle = usePlayerStore((s) => s.shuffle);
   const { toggle, prev, next, setVolume, toggleMute, toggleRepeat, toggleShuffle } = usePlayerStore.getState();
-  const calm = useSiteStore((s) => s.calm);
-  const vis = useSiteStore((s) => s.vis);
-  const cycleVisuals = useSiteStore((s) => s.cycleVisuals);
   const vol = muted ? 0 : volume;
   const empty = TRACKS.length === 0;
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1">
         <button className="mp-icon" aria-label="Shuffle" aria-pressed={shuffle} onClick={toggleShuffle} title="Shuffle">
-          <ShuffleGlyph size={15} />
+          <ShuffleGlyph size={16} />
         </button>
         <button className="mp-icon" aria-label="Repeat this beat" aria-pressed={repeatOne} onClick={toggleRepeat} title="Repeat this beat">
-          <RepeatGlyph size={15} />
-        </button>
-        <button className="mp-chip ml-1 hidden sm:inline-flex" onClick={cycleVisuals} title="Change the visuals: led, wave or still">
-          visuals: {calm ? "still" : vis}
+          <RepeatGlyph size={16} />
         </button>
       </div>
-      <div className="flex items-center">
-        <button className="mp-skip mp-skip-l" aria-label="Previous" onClick={prev} disabled={empty}>
-          <PrevGlyph size={14} />
+      <div className="flex items-center gap-2">
+        <button className="mp-skip" aria-label="Previous" onClick={prev} disabled={empty}>
+          <PrevGlyph size={16} />
         </button>
         <button className="mp-play" aria-label={playing ? "Pause" : "Play"} onClick={toggle} disabled={empty} data-testid="deck-play">
-          {playing ? <PauseGlyph size={20} /> : <PlayGlyph size={20} />}
+          {playing ? <PauseGlyph size={20} /> : <PlayGlyph size={20} className="translate-x-[1px]" />}
         </button>
-        <button className="mp-skip mp-skip-r" aria-label="Next" onClick={next} disabled={empty}>
-          <NextGlyph size={14} />
+        <button className="mp-skip" aria-label="Next" onClick={next} disabled={empty}>
+          <NextGlyph size={16} />
         </button>
       </div>
-      <div className="flex min-w-0 items-center justify-end gap-1.5">
+      <div className="flex min-w-0 items-center justify-end gap-1">
         <button className="mp-icon" aria-label={muted ? "Unmute" : "Mute"} onClick={toggleMute}>
-          <VolumeGlyph muted={muted || volume === 0} />
+          <VolumeGlyph muted={muted || volume === 0} size={16} />
         </button>
         <input
           type="range"
-          className="mp-range hidden w-full max-w-[110px] min-w-0 sm:block"
+          className="mp-range hidden w-full max-w-[104px] min-w-0 sm:block"
           aria-label="Volume"
           min={0}
           max={1}
@@ -136,9 +137,6 @@ function Transport() {
           style={{ ["--fill" as string]: `${vol * 100}%` }}
         />
       </div>
-      <button className="mp-chip col-span-3 inline-flex justify-self-center sm:hidden" onClick={cycleVisuals} title="Change the visuals: led, wave or still">
-        visuals: {calm ? "still" : vis}
-      </button>
     </div>
   );
 }
@@ -152,9 +150,9 @@ function Tracklist({ lengthOf }: { lengthOf: (id: string) => number | undefined 
 
   if (!TRACKS.length) {
     return (
-      <div className="grid flex-1 place-items-center p-6 text-center text-white/60">
+      <div className="grid flex-1 place-items-center p-6 text-center text-ink-2">
         <div className="max-w-xs space-y-2">
-          <p className="text-[14px] text-white">This album is empty.</p>
+          <p className="text-[14px] text-ink">This album is empty.</p>
           <p>New beats go in public/audio/ and get listed in src/data/tracks.ts.</p>
         </div>
       </div>
@@ -162,7 +160,7 @@ function Tracklist({ lengthOf }: { lengthOf: (id: string) => number | undefined 
   }
 
   return (
-    <ol className="min-h-0 flex-1 overflow-y-auto py-1" aria-label="Beats">
+    <ol className="min-h-0 flex-1 overflow-y-auto" aria-label="Beats">
       {TRACKS.map((t, i) => {
         const current = i === index;
         const bad = failed.includes(t.id);
@@ -170,9 +168,9 @@ function Tracklist({ lengthOf }: { lengthOf: (id: string) => number | undefined 
         return (
           <li key={t.id}>
             <button className="mp-row" aria-current={current} data-testid={`track-${t.id}`} onClick={() => (current ? toggle() : selectTrack(i))}>
-              <span className="text-right font-mono text-[12px] text-white/45 tabular-nums">
+              <span className="text-right font-mono text-[12px] text-ink-2 tabular-nums">
                 {current && playing ? (
-                  <span className="eq-bars text-[#4fe3ff]" aria-hidden>
+                  <span className="eq-bars text-dusk" aria-hidden>
                     <i />
                     <i />
                     <i />
@@ -182,14 +180,14 @@ function Tracklist({ lengthOf }: { lengthOf: (id: string) => number | undefined 
                 )}
               </span>
               <span className="flex min-w-0 items-center gap-2">
-                <span className={`truncate text-[14px] ${current ? "text-white" : "text-white/85"}`}>{t.title}</span>
+                <span className={`truncate text-[14.5px] ${current ? "font-medium" : ""}`}>{t.title}</span>
                 {current && <span className="sr-only">{playing ? ", playing" : ", selected"}</span>}
-                {isNew(t) && <span className="rounded-[2px] bg-[#4fe3ff] px-1 text-[10px] font-bold text-[#04121c] uppercase">new</span>}
+                {isNew(t) && <span className="mp-new">new</span>}
               </span>
-              <span className={`hidden truncate text-[12px] sm:block ${bad ? "text-[#ffb36b]" : "text-white/50"}`}>{bad ? "file unavailable" : t.key ?? ""}</span>
-              <span className={`text-right text-[12px] sm:hidden ${bad ? "text-[#ffb36b]" : "text-white/50"}`}>{bad ? "unavailable" : t.bpm ? `${t.bpm} bpm` : ""}</span>
-              <span className="hidden text-right font-mono text-[12px] text-white/50 tabular-nums sm:block">{t.bpm ?? ""}</span>
-              <span className="text-right font-mono text-[12px] text-white/70 tabular-nums">{len ? formatTime(len) : "–:––"}</span>
+              <span className={`hidden truncate text-[12.5px] sm:block ${bad ? "text-rust" : "text-ink-2"}`}>{bad ? "file unavailable" : t.key ?? ""}</span>
+              <span className={`text-right text-[12.5px] sm:hidden ${bad ? "text-rust" : "text-ink-2"}`}>{bad ? "unavailable" : t.bpm ? `${t.bpm} bpm` : ""}</span>
+              <span className="hidden text-right font-mono text-[12px] text-ink-2 tabular-nums sm:block">{t.bpm ?? ""}</span>
+              <span className="text-right font-mono text-[12px] tabular-nums">{len ? formatTime(len) : "–:––"}</span>
             </button>
           </li>
         );
@@ -200,8 +198,6 @@ function Tracklist({ lengthOf }: { lengthOf: (id: string) => number | undefined 
 
 export default function BeatsWindow() {
   const track = useCurrentTrack();
-  const calm = useSiteStore((s) => s.calm);
-  const vis = useSiteStore((s) => s.vis);
   const lengthOf = useDurations();
   const [copied, setCopied] = useState(false);
   const total = TRACKS.reduce((sum, t) => sum + (lengthOf(t.id) ?? 0), 0);
@@ -218,26 +214,25 @@ export default function BeatsWindow() {
   };
 
   return (
-    <div className="mp flex min-h-0 flex-1 flex-col font-vista" style={{ ["--accent" as string]: ACCENT, ["--accent-2" as string]: ACCENT_2 }}>
-      <div className="mp-stage grid shrink-0 grid-cols-[92px_minmax(0,1fr)] gap-x-3 gap-y-2.5 p-3 sm:h-[208px] sm:grid-cols-[184px_minmax(0,1fr)] sm:grid-rows-[auto_minmax(0,1fr)] sm:gap-x-4">
-        <div className="mp-cover sm:row-span-2">
+    <div className="mp flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ ["--accent" as string]: ACCENT }}>
+      <div className="flex shrink-0 flex-col items-center gap-4 px-4 pt-5 pb-4 sm:flex-row sm:items-stretch sm:gap-6 sm:p-5">
+        <div className="mp-cover">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={ALBUM.cover} alt={`${ALBUM.title}: the album cover`} width={184} height={184} className="block h-full w-full object-cover" />
+          <img src={ALBUM.cover} alt={`${ALBUM.title}: the album cover`} width={464} height={464} className="block h-full w-full object-cover" data-testid="cover" />
         </div>
-        <div className="flex min-w-0 flex-col justify-center">
+        <div className="flex w-full min-w-0 flex-1 flex-col justify-between gap-4 sm:py-0.5">
           <NowPlaying />
-        </div>
-        <div className="mp-screen col-span-2 h-[88px] sm:col-span-1 sm:col-start-2 sm:h-auto">
-          <Visualizer mode={vis} still={calm} />
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
+              <WaveformSeek track={track} accent={ACCENT} accent2={ACCENT_2} rest={REST} />
+              <Times />
+            </div>
+            <Transport />
+          </div>
         </div>
       </div>
 
-      <div className="mp-deck flex shrink-0 flex-col gap-2 px-3 pt-2.5 pb-3">
-        <WaveformSeek track={track} accent={ACCENT} accent2={ACCENT_2} rest="#25304a" />
-        <Transport />
-      </div>
-
-      <div className="mp-list flex min-h-[120px] flex-1 flex-col">
+      <div className="mp-list flex min-h-[176px] flex-1 flex-col">
         <div className="mp-row mp-head" aria-hidden>
           <span className="text-right">#</span>
           <span>title</span>
@@ -248,22 +243,22 @@ export default function BeatsWindow() {
         </div>
         <Tracklist lengthOf={lengthOf} />
       </div>
-      <div className="mp-foot flex shrink-0 items-center justify-between gap-2 px-3 py-1.5 text-[12px] text-white/55">
+      <div className="mp-foot sticky bottom-0 flex shrink-0 items-center justify-between gap-2 px-4 py-2 text-[12.5px]">
         <span>
           {TRACKS.length} {TRACKS.length === 1 ? "beat" : "beats"}
           {total > 0 ? ` · ${formatTime(total)}` : ""}
         </span>
         {track && (
-          <span className="flex items-center gap-3">
+          <span className="flex items-center gap-4">
             <button
-              className="underline decoration-dotted underline-offset-2 hover:text-white"
+              className="mp-link"
               onClick={() => useSiteStore.getState().sampleInStudio(track.id, usePlayerStore.getState().currentTime)}
               title="Take the two bars playing now into the studio, in the game"
               data-testid="sample-this"
             >
               sample this
             </button>
-            <button className="underline decoration-dotted underline-offset-2 hover:text-white" onClick={copyLink}>
+            <button className="mp-link" onClick={copyLink}>
               {copied ? "link copied" : "copy link"}
             </button>
           </span>

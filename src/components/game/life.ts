@@ -1,7 +1,7 @@
 import type { Fighter } from "./combat";
 import type { Hair, Look, Pose } from "./people";
 import type { Place } from "./sfx";
-import { sceneSize, SCENES, TILE, type Dir, type Rect } from "./world";
+import { blocked, sceneSize, SCENES, TILE, type Dir, type Rect } from "./world";
 
 // The neighbourhood's inhabitants: people hanging out, a dog walker and
 // their dog, traffic, cyclists, pigeons. Each place keeps its own; only
@@ -62,6 +62,8 @@ export interface Actor {
   perches?: [number, number][];
   /** Running, not strolling. */
   bolt?: boolean;
+  /** The cat, petted enough: seconds left of following you about. */
+  trail?: number;
 }
 
 const T = TILE;
@@ -390,8 +392,35 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
     }
 
     if (a.kind === "cat") {
-      // sits a while, then pads off to somewhere else; runs if you rush it
       const near = Math.hypot(a.x - px, a.y - py);
+      // petted enough, it comes along for a bit: a few steps behind, never underfoot
+      if (a.trail) {
+        a.trail = Math.max(0, a.trail - dt);
+        if (!a.trail || near > CAT_LOSES) {
+          // had enough, or you got away from it: back to its spots
+          catHome(a);
+          continue;
+        }
+        // trot to catch up (quicker once it's fallen behind), sit when it's close enough, step aside if you walk at it
+        if (!a.walking && near > CAT_GAP + 8) a.walking = true;
+        else if (a.walking && near <= CAT_GAP) a.walking = false;
+        const underfoot = near < 10;
+        if (a.walking || underfoot) {
+          const ux = near > 0.5 ? (px - a.x) / near : 1;
+          const uy = near > 0.5 ? (py - a.y) / near : 0;
+          const step = underfoot ? -30 * dt : Math.min(near - CAT_GAP, (near > CAT_GAP + 24 ? 56 : 34) * dt);
+          const sc = SCENES[place];
+          const box = (x: number, y: number) => ({ x: x - 4, y: y - 3, w: 8, h: 4 });
+          // up on something (a perch), it just hops down
+          const perched = blocked(sc, box(a.x, a.y));
+          if (perched || !blocked(sc, box(a.x + ux * step, a.y))) a.x += ux * step;
+          if (perched || !blocked(sc, box(a.x, a.y + uy * step))) a.y += uy * step;
+          a.walking = true;
+        }
+        if (Math.abs(px - a.x) > 2) a.dir = (px > a.x) !== underfoot ? "right" : "left";
+        continue;
+      }
+      // sits a while, then pads off to somewhere else; runs if you rush it
       if (!a.goal && a.perches && (Math.random() < dt / 30 || (near < 14 && Math.random() < dt * 0.6))) {
         const others = a.perches.filter(([x, y]) => Math.hypot(x - a.x, y - a.y) > 8);
         a.goal = others[Math.floor(Math.random() * others.length)];
@@ -458,6 +487,26 @@ export function updateLife(actors: Actor[], dt: number, place: Place, px: number
       a.walking = !blocked && dist >= 1;
     }
   }
+}
+
+/** How close the cat keeps to you when it follows (it sits at this distance), and how far behind it gives up. */
+const CAT_GAP = 22;
+const CAT_LOSES = 110;
+
+/** The cat comes with you for a while. */
+export function catFollows(a: Actor, secs = 15) {
+  a.trail = secs;
+  a.goal = undefined;
+  a.bolt = false;
+}
+
+/** The cat stops following and goes back to the nearest of its spots (running, if something scared it). */
+export function catHome(a: Actor, bolt = false) {
+  a.trail = 0;
+  const spots = a.perches ?? [];
+  if (!spots.length) return;
+  a.goal = spots.reduce((b, p) => (Math.hypot(p[0] - a.x, p[1] - a.y) < Math.hypot(b[0] - a.x, b[1] - a.y) ? p : b));
+  a.bolt = bolt;
 }
 
 /** Everyone matching gets excited for a couple of seconds (a little hop, a raised arm). */

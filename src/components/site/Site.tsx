@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import AudioEngine from "@/components/player/AudioEngine";
 import { usePlayerStore } from "@/components/player/playerStore";
-import { ALBUM } from "@/data/tracks";
 import BeatsWindow from "@/components/beats/BeatsWindow";
 import { trackIndexFromHash } from "@/lib/trackLink";
 import ContactWindow from "./ContactWindow";
@@ -33,13 +32,9 @@ function GameLoading() {
   );
 }
 
+// The desk: warm stone with a fine dot screen (globals.css).
 function Wallpaper() {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      <div className="wallpaper" style={{ ["--cover" as string]: `url(${ALBUM.cover})` }} />
-      <div className="wallpaper-scan" />
-    </div>
-  );
+  return <div className="wallpaper pointer-events-none" aria-hidden />;
 }
 
 const ICONS: { id: WindowId | "game"; label: string; Icon: typeof BeatsIcon }[] = [
@@ -107,7 +102,7 @@ export default function Site() {
   return (
     <main className="fixed inset-0 overflow-clip select-none" data-ready={ready}>
       <AudioEngine />
-      <div className="absolute inset-0" inert={gameOpen || introOpen}>
+      <div className="desktop absolute inset-0" inert={gameOpen || introOpen}>
         <Wallpaper />
         <h1 className="sr-only">saeculo: instrumentals &amp; beats</h1>
 
@@ -129,10 +124,10 @@ export default function Site() {
           ))}
         </nav>
 
-        <Window id="beats" width={760} height={600} icon={<BeatsIcon size={16} />} glass>
+        <Window id="beats" width={780} height={568} icon={<BeatsIcon size={16} />}>
           <BeatsWindow />
         </Window>
-        <Window id="socials" width={400} height={344} icon={<SocialsIcon size={16} />}>
+        <Window id="socials" width={400} height={320} icon={<SocialsIcon size={16} />}>
           <SocialsWindow />
         </Window>
         <Window id="contact" width={440} height={430} icon={<ContactIcon size={16} />}>
@@ -143,7 +138,8 @@ export default function Site() {
         <ShortcutsCard />
       </div>
 
-      <div className="grain" aria-hidden />
+      {/* film grain for the intro and the game; the desktop stays clean paper */}
+      {(gameOpen || introOpen) && <div className="grain" aria-hidden />}
       {!ready && <div className="intro-cover" aria-hidden />}
       {introOpen && <BootIntro onDone={endIntro} />}
       {gameOpen && <Game onExit={() => useSiteStore.getState().setGameOpen(false)} />}

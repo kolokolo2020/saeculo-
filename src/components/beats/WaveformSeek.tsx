@@ -7,13 +7,27 @@ import { formatTime } from "@/lib/audio";
 import type { Track } from "@/lib/types";
 
 // The seek bar drawn as the track's own waveform (measured by
-// scripts/analyze-tracks.mjs). Played audio lights up in the player's
-// colours; hover shows the time; click or drag to seek; arrow keys step
-// five seconds. Tracks that haven't been analysed get a plain slider.
+// scripts/analyze-tracks.mjs), in thin rounded bars. Played audio fills in
+// the player's accent; hover shows the time; click or drag to seek; arrow
+// keys step five seconds. Tracks that haven't been analysed get a plain
+// slider.
 
 const peaksFor = (id: string) => (analysis as Record<string, { peaks?: number[] } | undefined>)[id]?.peaks;
 
-export default function WaveformSeek({ track, accent, accent2 = accent, rest = "#4a4540" }: { track: Track | undefined; accent: string; accent2?: string; rest?: string }) {
+export default function WaveformSeek({
+  track,
+  accent,
+  accent2 = accent,
+  rest = "#d3ccbe",
+  cursor = "#2a2622",
+}: {
+  track: Track | undefined;
+  accent: string;
+  accent2?: string;
+  rest?: string;
+  /** The hover line. */
+  cursor?: string;
+}) {
   const currentTime = usePlayerStore((s) => s.currentTime);
   const duration = usePlayerStore((s) => s.duration);
   const seek = usePlayerStore((s) => s.seek);
@@ -45,12 +59,16 @@ export default function WaveformSeek({ track, accent, accent2 = accent, rest = "
         const b = Math.max(a + 1, Math.floor(((i + 1) / bars) * peaks.length));
         let p = 0;
         for (let k = a; k < b; k++) p = Math.max(p, peaks[k] ?? 0);
-        const h = Math.max(1.5 * dpr, p * (c.height - 2 * dpr));
+        const h = Math.max(2 * dpr, p * (c.height - 2 * dpr));
+        const w = bw * 0.62;
         g.fillStyle = (i + 0.5) / bars <= frac ? played : rest;
-        g.fillRect(i * bw + bw * 0.15, mid - h / 2, bw * 0.7, h);
+        g.beginPath();
+        if (g.roundRect) g.roundRect(i * bw + (bw - w) / 2, mid - h / 2, w, h, w / 2);
+        else g.rect(i * bw + (bw - w) / 2, mid - h / 2, w, h);
+        g.fill();
       }
       if (hover !== null) {
-        g.fillStyle = "rgba(244,239,228,0.8)";
+        g.fillStyle = cursor;
         g.fillRect(hover * c.width - dpr / 2, 0, dpr, c.height);
       }
     };
@@ -58,13 +76,13 @@ export default function WaveformSeek({ track, accent, accent2 = accent, rest = "
     const ro = new ResizeObserver(draw);
     ro.observe(c);
     return () => ro.disconnect();
-  }, [peaks, frac, accent, accent2, rest, hover]);
+  }, [peaks, frac, accent, accent2, rest, cursor, hover]);
 
   if (!peaks) {
     return (
       <input
         type="range"
-        className="deck-range w-full"
+        className="mp-range w-full"
         aria-label="Seek"
         aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
         min={0}
@@ -87,7 +105,7 @@ export default function WaveformSeek({ track, accent, accent2 = accent, rest = "
     <div className="relative">
       <canvas
         ref={canvas}
-        className="block h-10 w-full cursor-pointer touch-none rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent,#f2b45a)]"
+        className="block h-11 w-full cursor-pointer touch-none rounded-[4px]"
         role="slider"
         tabIndex={0}
         aria-label="Seek"
@@ -124,7 +142,7 @@ export default function WaveformSeek({ track, accent, accent2 = accent, rest = "
       />
       {hover !== null && duration > 0 && (
         <span
-          className="pointer-events-none absolute -top-6 -translate-x-1/2 rounded-[2px] bg-black/85 px-1.5 py-0.5 font-lcd text-[15px] leading-none text-[var(--accent,#f2b45a)]"
+          className="pointer-events-none absolute -top-6 -translate-x-1/2 rounded-[4px] bg-line px-1.5 py-0.5 font-lcd text-[16px] leading-none text-cream"
           style={{ left: `${hover * 100}%` }}
         >
           {formatTime(hover * duration)}

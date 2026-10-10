@@ -41,11 +41,11 @@ export interface Stats {
   rides: number;
 }
 
-/** A job from Dre: a tape to take somewhere, then back to him for the money. */
+/** A job from Dre: a tape to take somewhere, then back to him for the money (or to tell him it's gone). */
 export interface Job {
   /** Who it goes to (an actor id). */
   to: string;
-  stage: "carry" | "back";
+  stage: "carry" | "back" | "lost";
   pay: number;
 }
 
@@ -152,7 +152,7 @@ export function loadSave(): SaveData {
       sold: strings(raw.sold),
       places: [...new Set(["bedroom", ...strings(raw.places)])],
       tag: raw.tag && typeof raw.tag.color === "string" ? { color: raw.tag.color } : null,
-      job: raw.job && typeof raw.job.to === "string" && (raw.job.stage === "carry" || raw.job.stage === "back") ? { to: raw.job.to, stage: raw.job.stage, pay: num(raw.job.pay, 0, 500, 25) } : null,
+      job: raw.job && typeof raw.job.to === "string" && (raw.job.stage === "carry" || raw.job.stage === "back" || raw.job.stage === "lost") ? { to: raw.job.to, stage: raw.job.stage, pay: num(raw.job.pay, 0, 500, 25) } : null,
       settings: {
         sfx: num(st.sfx, 0, 1, DEFAULT_SETTINGS.sfx),
         music: num(st.music, 0, 1, DEFAULT_SETTINGS.music),

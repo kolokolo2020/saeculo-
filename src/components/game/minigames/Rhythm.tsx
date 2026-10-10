@@ -12,13 +12,16 @@ import Frame, { miniBtn } from "./Frame";
 // kick, the snare and the keys (or the 808) drop out and it's on you: hit
 // each one as it reaches the line and it plays; miss and there's a hole.
 // The hats keep time either way. Keys: D F J K (or the arrows); on a
-// phone, the four pads. A beat battle is the hard one: the rival's drill
-// beat, the hats on you too, every eighth, and less room either side.
+// phone, the four pads. A beat battle is the hard one: the rival's beat
+// (a different one each time), the hats on you too, and less room either
+// side.
 
 export type RhythmMode = "cypher" | "dj" | "battle";
 
 interface Hit {
   t: number;
+  /** Which step of the pattern it's on. */
+  step: number;
   lane: number;
   channel: string;
   voice: string;
@@ -28,6 +31,21 @@ interface Hit {
   state: 0 | 1 | 2 | 3;
 }
 
+/**
+ * The beats a battle can be on, in the order the rival picks them: the
+ * studio's starters that have all four parts (a kick, a snare or clap,
+ * hats, an 808 or bass). `hats`: every how many steps the hats are yours
+ * (the ones in between keep playing; the trap's run every eighth, so you
+ * take the quarters). `ease`: how much kinder it plays than the drill
+ * (slower, fewer hits), so the rival scores that much more on it.
+ */
+export const BATTLE_BEATS: { preset: string; hats: number; ease: number }[] = [
+  { preset: "drill", hats: 2, ease: 0 },
+  { preset: "trap", hats: 4, ease: 0 },
+  { preset: "boombap", hats: 2, ease: 3 },
+  { preset: "lofi", hats: 2, ease: 6 },
+];
+
 const LANES = [
   { name: "kick", key: "D", color: "#4fe3ff" },
   { name: "snare", key: "F", color: "#a98bff" },
@@ -35,16 +53,36 @@ const LANES = [
   { name: "keys", key: "K", color: "#7ddc3a" },
 ];
 const KEYS: Record<string, number> = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3, ArrowLeft: 0, ArrowDown: 1, ArrowUp: 2, ArrowRight: 3 };
-/** How long a bar takes to fall, and how close counts, per mode. */
-const FEEL: Record<RhythmMode, { fall: number; perfect: number; late: number; gap: number; loops: number; preset: number }> = {
-  cypher: { fall: 1.5, perfect: 0.06, late: 0.17, gap: 0.2, loops: 4, preset: 0 },
-  dj: { fall: 1.5, perfect: 0.06, late: 0.17, gap: 0.17, loops: 5, preset: 2 },
-  battle: { fall: 1.2, perfect: 0.045, late: 0.13, gap: 0.13, loops: 4, preset: 3 },
+/** How long a bar takes to fall, and how close counts, per mode (and the beat, unless the rival picks one). */
+const FEEL: Record<RhythmMode, { fall: number; perfect: number; late: number; gap: number; loops: number; preset: string; hats: number }> = {
+  cypher: { fall: 1.5, perfect: 0.06, late: 0.17, gap: 0.2, loops: 4, preset: "boombap", hats: 4 },
+  dj: { fall: 1.5, perfect: 0.06, late: 0.17, gap: 0.17, loops: 5, preset: "trap", hats: 4 },
+  battle: { fall: 1.2, perfect: 0.045, late: 0.13, gap: 0.13, loops: 4, preset: "drill", hats: 2 },
 };
 
-function chart(p: Project, start: number, loops: number, mode: RhythmMode): { hits: Hit[]; lanes: (string | null)[]; end: number } {
+/** The beat a game is played on: the mode's own, or the one the rival picked. */
+function beatFor(mode: RhythmMode, pick?: string) {
+  const b = (mode === "battle" && BATTLE_BEATS.find((x) => x.preset === pick)) || { preset: FEEL[mode].preset, hats: FEEL[mode].hats };
+  const preset = PRESETS.find((p) => p.id === b.preset) ?? PRESETS[0];
+  return { preset, hats: b.hats, name: preset.name.split(" · ")[0] };
+}
+
+/** The channel each lane plays: kick, snare (or clap), hats, and the keys under the bridge or the 808 (or bass) anywhere else. */
+function lanesOf(p: Project, mode: RhythmMode) {
   const byCat = (cats: string[], melodic = false) => p.channels.find((c) => cats.includes(voiceById(c.voice)?.cat ?? "") && (!melodic || voiceById(c.voice)?.kind === "melodic"));
-  const lanes = [byCat(["Kicks"]), byCat(["Snares & claps"]), byCat(["Hats"]), mode !== "cypher" ? byCat(["808 & bass"], true) : (byCat(["Keys"], true) ?? byCat(["Synths"], true))];
+  return [byCat(["Kicks"]), byCat(["Snares & claps"]), byCat(["Hats"]), mode !== "cypher" ? byCat(["808 & bass"], true) : (byCat(["Keys"], true) ?? byCat(["Synths"], true))];
+}
+
+/** What a lane's called, from what's in it. */
+function laneLabel(lane: number, voice: string | undefined, mode: RhythmMode) {
+  if (lane === 1 && voice?.startsWith("clap")) return "clap";
+  if (lane === 2 && voice === "shaker") return "shaker";
+  if (lane === 3 && mode !== "cypher") return voice && !voice.startsWith("808") ? "bass" : "808";
+  return LANES[lane].name;
+}
+
+export function chart(p: Project, start: number, loops: number, mode: RhythmMode, hats = FEEL[mode].hats): { hits: Hit[]; lanes: (string | null)[]; end: number } {
+  const lanes = lanesOf(p, mode);
   const step = 60 / p.tempo / 4;
   const pat = p.patterns[0];
   const hits: Hit[] = [];
@@ -63,21 +101,38 @@ function chart(p: Project, start: number, loops: number, mode: RhythmMode): { hi
           len = n.len;
         } else {
           if (!(pat.steps[ch.id]?.[s] > 0)) return;
-          if (lane === 2 && s % (mode === "battle" ? 2 : 4) !== 0) return;
+          if (lane === 2 && s % hats !== 0) return;
         }
         // keep it playable: no two in a lane closer than this
         if (t - last[lane] < FEEL[mode].gap) return;
         last[lane] = t;
-        hits.push({ t, lane, channel: ch.id, voice: ch.voice, midi, len, state: 0 });
+        hits.push({ t, step: s, lane, channel: ch.id, voice: ch.voice, midi, len, state: 0 });
       });
     }
   return { hits, lanes: lanes.map((c) => c?.id ?? null), end: start + (loops + 1) * p.length * step };
 }
 
-export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }: { mode: RhythmMode; volume: number; touch: boolean; onFinish: (score: number) => void; onClose: () => void; rival?: { name: string; score: number } }) {
+/** For the browser tests: what a battle on each of the rival's beats asks of you. */
+export function battleCharts() {
+  return BATTLE_BEATS.map((b) => {
+    const { preset, name } = beatFor("battle", b.preset);
+    const p = preset.make();
+    const c = chart(p, 0, FEEL.battle.loops, "battle", b.hats);
+    const voices = c.lanes.map((id) => p.channels.find((ch) => ch.id === id)?.voice);
+    const secs = FEEL.battle.loops * p.length * (60 / p.tempo / 4);
+    return { id: b.preset, name, tempo: p.tempo, lanes: voices.map((v, i) => laneLabel(i, v, "battle")), voices, hits: [0, 1, 2, 3].map((l) => c.hits.filter((h) => h.lane === l).length), perSecond: Math.round((c.hits.length / secs) * 100) / 100 };
+  });
+}
+
+export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }: { mode: RhythmMode; volume: number; touch: boolean; onFinish: (score: number) => void; onClose: () => void; rival?: { name: string; score: number; beat?: string } }) {
   const { fall: FALL, perfect: PERFECT, late: LATE } = FEEL[mode];
-  // the fourth lane is the keys under the bridge, the 808 anywhere else
-  const laneName = (i: number) => (i === 3 && mode !== "cypher" ? "808" : LANES[i].name);
+  const beat = beatFor(mode, rival?.beat);
+  // the lanes are named for what's in them on this beat (a clap, a shaker, a bass)
+  const [laneVoices] = useState(() => {
+    const p = beat.preset.make();
+    return lanesOf(p, mode).map((c) => c?.voice);
+  });
+  const laneName = (i: number) => laneLabel(i, laneVoices[i], mode);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<"ready" | "play" | "done">("ready");
   const [result, setResult] = useState({ score: 0, perfect: 0, good: 0, missed: 0, combo: 0 });
@@ -87,12 +142,12 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }
   const begin = () => {
     run.current?.engine.dispose();
     run.current = null;
-    const base = clone(PRESETS[FEEL[mode].preset].make());
+    const base = clone(beat.preset.make());
     base.mode = "pattern";
     base.master = { ...base.master, vol: base.master.vol * Math.max(0.15, volume) };
     const engine = new Engine(base);
     void engine.start().then(() => {
-      const c = chart(base, engine.startTime, FEEL[mode].loops, mode);
+      const c = chart(base, engine.startTime, FEEL[mode].loops, mode, beat.hats);
       run.current = { engine, ...c, muted: false, start: engine.startTime, loopLen: base.length * (60 / base.tempo / 4), combo: 0, best: 0, hype: 0.5, flash: [] };
       setPhase("play");
     });
@@ -170,8 +225,15 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }
         r.muted = true;
         const p = clone(r.engine.project);
         p.channels.forEach((ch) => {
-          if ([r.lanes[0], r.lanes[1], r.lanes[3], ...(mode === "battle" ? [r.lanes[2]] : [])].includes(ch.id)) ch.mute = true;
+          if ([r.lanes[0], r.lanes[1], r.lanes[3]].includes(ch.id)) ch.mute = true;
         });
+        // in a battle the hats are yours too: the ones on your steps drop out, the rest keep playing
+        const hat = r.lanes[2];
+        const pat = p.patterns[0];
+        if (mode === "battle" && hat && pat.steps[hat]) {
+          const mine = new Set(r.hits.filter((h) => h.lane === 2).map((h) => h.step));
+          pat.steps[hat] = pat.steps[hat].map((v, s) => (mine.has(s) ? 0 : v));
+        }
         r.engine.setProject(p);
       }
       for (const h of r.hits)
@@ -284,7 +346,7 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }
             {mode === "cypher"
               ? "They'll rap over whatever you play. One loop of the beat, then the kick, the snare and the keys are yours."
               : mode === "battle"
-                ? `${rival?.name ?? "They"} played theirs: ${rival?.score ?? "?"}%. Now yours: one loop to hear it, then everything's on you, hats too. Faster, and less room for error.`
+                ? `${rival?.name ?? "They"} played the ${beat.name} first: ${rival?.score ?? "?"}%. Now you: one loop to hear it, then everything's on you, ${laneName(2)} too. Faster, and less room for error.`
                 : "Your set. One loop to get the feel, then the kick, the snare and the 808 are yours. Keep the floor."}
           </p>
           <p className="text-[17px] text-[#b9b09e]">{touch ? "Tap the pads as the bars reach the line." : `D F J K (or ← ↓ ↑ →) as the bars reach the line.${mode === "battle" ? "" : " The hats keep time."}`}</p>

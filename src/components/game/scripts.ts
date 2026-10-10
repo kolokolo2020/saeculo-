@@ -1,10 +1,11 @@
 import { styleOf } from "./character";
 import type { Actor } from "./life";
 import type { MenuTab } from "./Menu";
-import type { RhythmMode } from "./minigames/Rhythm";
+import { BATTLE_BEATS, type RhythmMode } from "./minigames/Rhythm";
 import type { ShopKind } from "./minigames/Shop";
 import { trainAt } from "./places/underground";
 import { MAX_HP, type SaveData } from "./save";
+import { PRESETS } from "./studio/presets";
 import type { Project } from "./studio/project";
 
 // What the people and things in the newer places say and do: the avenue,
@@ -15,7 +16,7 @@ export interface Choice {
   label: string;
   run: () => void;
 }
-export type Mini = { kind: "rhythm"; mode: RhythmMode; rival?: { name: string; score: number; stake: number } } | { kind: "dice" } | { kind: "crates" } | { kind: "hoops" } | { kind: "tag" } | { kind: "shop"; shop: ShopKind };
+export type Mini = { kind: "rhythm"; mode: RhythmMode; rival?: { name: string; score: number; stake: number; beat: string } } | { kind: "dice" } | { kind: "crates" } | { kind: "hoops" } | { kind: "tag" } | { kind: "shop"; shop: ShopKind };
 
 export interface Api {
   say: (lines: string[], choices?: Choice[]) => void;
@@ -259,7 +260,7 @@ export function operate(id: string, api: Api): boolean {
       api.say(["OUT OF ORDER. Someone's taped a note under it: so is everything."]);
       return true;
     case "poster":
-      api.say(["A poster for the album. saeculo, lit up on a spectrum analyser.", "Someone's drawn headphones on the moon. The speaker in the ceiling plays a bit of it, crackly."]);
+      api.say(["A poster for the album: \"saeculo\" in black across a pale grey disc, pastel rays all round it.", "Someone's drawn headphones on the moon. The speaker in the ceiling plays a bit of it, crackly."]);
       api.radio(api.someChops());
       return true;
     case "map":
@@ -326,24 +327,34 @@ function cdAsk(api: Api) {
   ]);
 }
 
-/** What it costs to battle Vee, and what Vee scores (better each time you win). */
+/** What it costs to battle Vee, and what Vee scores (better each time you win, a little better on the easier beats). */
 export const BATTLE_STAKE = 20;
-const rivalScore = (s: SaveData) => Math.min(90, 60 + 6 * s.stats.battleWins + Math.floor(Math.random() * 9));
+const rivalScore = (s: SaveData, ease: number) => Math.min(90, 60 + 6 * s.stats.battleWins + ease + Math.floor(Math.random() * 9));
 
-/** Vee, the other producer at the underpass: a beat battle for money. */
+/** Vee's beat for the next battle: one of the studio's starters, a different one each time, in turn. */
+export function veeBeat(s: SaveData) {
+  const b = BATTLE_BEATS[(s.stats.battleWins + s.stats.battleLosses) % BATTLE_BEATS.length];
+  const [name, bpm] = (PRESETS.find((p) => p.id === b.preset)?.name ?? b.preset).split(" · ");
+  return { ...b, name, bpm };
+}
+
+/** Vee, the other producer at the underpass: a beat battle for money, on her beat (she says which). */
 export function battle(api: Api, first = false) {
   const s = api.save();
+  const beat = veeBeat(s);
   const go = () => {
     if (!api.spend(BATTLE_STAKE)) return api.say(["“No money, no battle. Come back with twenty.”"]);
-    api.open({ kind: "rhythm", mode: "battle", rival: { name: "Vee", score: rivalScore(api.save()), stake: BATTLE_STAKE } });
+    api.open({ kind: "rhythm", mode: "battle", rival: { name: "Vee", score: rivalScore(api.save(), beat.ease), stake: BATTLE_STAKE, beat: beat.preset } });
   };
+  const n = s.stats.battleWins + s.stats.battleLosses;
+  const which = [`“Tonight it's my ${beat.name}. ${beat.bpm} BPM.”`, `“I'm bringing the ${beat.name} this time. ${beat.bpm}. Keep up.”`, `“My ${beat.name}. ${beat.bpm}. Try not to drop it.”`][n % 3];
   const lines = first
-    ? ["Someone peels off from the cypher and walks straight at you, a sampler under her arm.", "“You're the one Dre keeps buying from? I'm Vee.”", `“Beat battle. My beat, both of us play it live. $${BATTLE_STAKE} says I do it better.”`]
+    ? ["Someone peels off from the cypher and walks straight at you, a sampler under her arm.", "“You're the one Dre keeps buying from? I'm Vee.”", `“Beat battle. My ${beat.name}, ${beat.bpm} BPM, both of us play it live. $${BATTLE_STAKE} says I do it better.”`]
     : s.stats.battleWins
-      ? [s.stats.battleWins > s.stats.battleLosses ? "“Run it back. I've been practising.”" : "“Again? Fine. Same stakes.”", `(you ${s.stats.battleWins} · Vee ${s.stats.battleLosses})`]
+      ? [s.stats.battleWins > s.stats.battleLosses ? "“Run it back. I've been practising.”" : "“Again? Fine. Same stakes.”", which, `(you ${s.stats.battleWins} · Vee ${s.stats.battleLosses})`]
       : s.stats.battleLosses
-        ? ["“Back for more? I'll take your money all night.”"]
-        : ["“Still scared? Twenty dollars. My beat, both of us live.”"];
+        ? ["“Back for more? I'll take your money all night.”", which]
+        : ["“Still scared? Twenty dollars. Both of us live.”", which];
   api.say(lines, [
     { label: `Battle ($${BATTLE_STAKE})`, run: go },
     { label: "Not tonight", run: () => api.say([first ? "“Thought so. I'm here when you've got the nerve.”" : "“Your loss. Well. My win.”"]) },
@@ -368,7 +379,7 @@ function dreJob(api: Api) {
   const options = JOB_TO.filter((j) => !j.ok || j.ok(s));
   const pick = options[s.stats.jobs % options.length];
   const pay = 20 + 5 * Math.min(4, s.stats.jobs);
-  api.say(["Dre looks round, then holds out a tape with no label.", `“Take this to ${pick.where}. Don't play it. Bring back what they give you.”`, `“$${pay} when you're back.”`], [
+  api.say(["Dre looks round, then holds out a tape with no label.", `“Take this to ${pick.where}. Don't play it. Bring back what they give you.”`, "“Keep your head down. People can tell when you're carrying.”", `“$${pay} when you're back.”`], [
     {
       label: "I'll take it",
       run: () => {
@@ -385,6 +396,7 @@ function dreJob(api: Api) {
 export function jobText(s: SaveData): string | null {
   if (!s.job) return null;
   const where = JOB_TO.find((j) => j.id === s.job!.to)?.where ?? "someone";
+  if (s.job.stage === "lost") return "tell Dre his tape's gone (no pay)";
   return s.job.stage === "carry" ? `take Dre's tape to ${where}` : `bring the envelope back to Dre at the underpass ($${s.job.pay})`;
 }
 
@@ -483,6 +495,12 @@ export function talk(a: Actor, api: Api): boolean {
       cypher(api);
       return true;
     case "dre": {
+      // knocked out with his tape on you: it's gone, and so's the money
+      if (s.job?.stage === "lost") {
+        api.update((x) => ({ ...x, job: null }));
+        api.say(["Dre looks at your hands. Then at you.", "“Where's my tape?”", "You tell him. He doesn't say anything for a while.", "“Then there's no money. Don't lose the next one.”"]);
+        return true;
+      }
       if (s.job?.stage === "back") {
         const pay = s.job.pay;
         api.update((x) => ({ ...x, job: null, stats: { ...x.stats, jobs: x.stats.jobs + 1 } }));

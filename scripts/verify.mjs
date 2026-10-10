@@ -74,19 +74,35 @@ try {
     const { ctx, page } = await open({ seen: false });
     const intro = page.getByRole("dialog", { name: "Intro" });
     check("first visit: intro shows", await intro.isVisible());
-    await page.waitForTimeout(3200);
-    check("intro: the BIOS checks the crate", (await intro.textContent()).includes("3 beats found"));
+    check(
+      "intro: a dark room, the name, and a way in",
+      (await intro.getAttribute("data-phase")) === "gate" && (await intro.textContent()).includes("saeculo") && (await page.getByRole("button", { name: /to enter/i }).isVisible()),
+    );
+    check("intro: the music waits for the click", (await audio(page)).paused);
+    if (axeSource) {
+      await page.waitForTimeout(2200);
+      await page.addScriptTag({ content: axeSource });
+      const v = await page.evaluate(async () => (await window.axe.run(document.querySelector('[role="dialog"]'), { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+      check("axe: no violations on the intro", v.length === 0, v.join(", "));
+    }
     await page.keyboard.press("a");
-    await page.waitForTimeout(700);
-    check("intro: any key goes in", (await page.getByRole("button", { name: /enter/i }).count()) === 0);
-    check("intro: a key boots the machine", (await intro.getAttribute("data-phase")) === "boot");
-    check("intro: entering starts the music", !(await audio(page)).paused);
+    await page.waitForTimeout(1500);
+    check("intro: a key lights the cigarette", (await intro.getAttribute("data-phase")) === "burn");
+    const ember = await page.evaluate(() =>
+      [...document.querySelectorAll('[role="dialog"] canvas')].some((c) => {
+        const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+        for (let i = 0; i < d.length; i += 16) if (d[i + 3] > 200 && d[i] > 200 && d[i + 1] < 170 && d[i + 2] < 120) return true;
+        return false;
+      }),
+    );
+    check("intro: the coal glows", ember);
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(200);
-    check("intro: a key hurries the boot along", (await intro.getAttribute("data-phase")) === "orb");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(300);
-    check("intro: the welcome screen, with the album cover", (await intro.getAttribute("data-phase")) === "welcome" && (await intro.locator("img[src*='saeculo']").count()) === 1);
+    await page.waitForTimeout(900);
+    check("intro: a key hurries it along (the breath out)", (await intro.getAttribute("data-phase")) === "exhale");
+    await page.mouse.click(683, 600);
+    await page.waitForTimeout(900);
+    check("intro: a click too (the name, through the smoke)", (await intro.getAttribute("data-phase")) === "reveal" && (await intro.locator("[data-shown='true']").count()) === 1);
+    check("intro: the music comes up with the name", !(await audio(page)).paused);
     await page.getByRole("button", { name: /skip/i }).click();
     await page.waitForTimeout(500);
     check("intro: skip lands on the desktop with Beats open", (await intro.count()) === 0 && (await page.getByTestId("window-beats").isVisible()));
@@ -99,16 +115,36 @@ try {
     await page.getByRole("menuitem", { name: "Replay intro" }).click();
     await page.getByRole("dialog", { name: "Intro" }).waitFor({ timeout: 5000 }).catch(() => {});
     check("replay intro from the clock menu", await page.getByRole("dialog", { name: "Intro" }).isVisible());
-    await page.waitForTimeout(2000);
-    await page.getByRole("button", { name: /enter/i }).click();
+    await page.waitForTimeout(1000);
+    await page.getByRole("button", { name: /to enter/i }).click();
     await page.waitForTimeout(11500);
-    check("intro: boots all the way to the desktop by itself", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
+    check(
+      "intro: runs all the way to the desktop by itself",
+      (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused && (await page.getByTestId("window-beats").isVisible()),
+    );
     await page.getByRole("button", { name: "Clock and settings" }).click();
     await page.getByRole("menuitem", { name: "Replay intro" }).click();
     await page.waitForTimeout(300);
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(800);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
-    check("Escape skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
+    check("Escape skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
+    await page.getByTestId("icon-socials").click();
+    await page.waitForTimeout(300);
+    check("intro: nothing left blocking clicks after it", await page.getByTestId("window-socials").isVisible());
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await open({ seen: false, mobile: true, viewport: { width: 390, height: 844 } });
+    const intro = page.getByRole("dialog", { name: "Intro" });
+    await page.getByRole("button", { name: /tap to enter/i }).tap();
+    await page.waitForTimeout(500);
+    check("intro on a phone: a tap lights it", (await intro.getAttribute("data-phase")) === "burn");
+    check("intro on a phone: fits the screen", (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+    await page.getByRole("button", { name: /skip/i }).tap();
+    await page.waitForTimeout(500);
+    check("intro on a phone: skip lands on the desktop, music on", (await intro.count()) === 0 && !(await audio(page)).paused);
     await ctx.close();
   }
 
@@ -144,28 +180,37 @@ try {
     const a3 = await audio(page);
     check("previous restarts the track", a3.t < 2 && a3.src.includes("dull-knife"));
     await page.waitForTimeout(600);
-    const drawn = await page.evaluate(() => {
-      const c = document.querySelector("[data-testid=visualizer]");
-      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-      let lit = 0;
-      for (let i = 0; i < d.length; i += 400) lit += d[i] + d[i + 1] + d[i + 2] > 60 ? 1 : 0;
-      return lit;
+    // the cover is the hero: the owner's artwork, big and sharp; no visualizer anywhere
+    const cover = await page.getByTestId("cover").evaluate((img) => ({ src: img.getAttribute("src"), w: img.getBoundingClientRect().width, natural: img.naturalWidth, done: img.complete }));
+    check("Beats: the cover is the owner's artwork (saeculo.jpg)", cover.src.endsWith("/covers/saeculo.jpg") && cover.done && cover.natural >= 1000, cover.src);
+    check("Beats: the cover is the hero, shown large", cover.w >= 220, String(Math.round(cover.w)));
+    check("Beats: no visualizer, the only canvas is the seek bar", (await page.locator("[data-testid=visualizer]").count()) === 0 && (await page.locator("[data-testid=window-beats] canvas").count()) === 1 && (await page.locator("[data-testid=window-beats] canvas[data-testid=waveform]").count()) === 1);
+    check("Beats: no visuals switch, in the window or the clock menu", (await page.getByRole("button", { name: /visuals:/ }).count()) === 0);
+    // the theme: flat paper with hairlines, no bevels or glass
+    const look = await page.evaluate(() => {
+      const css = (sel) => getComputedStyle(document.querySelector(sel));
+      const win = css("[data-testid=window-beats]");
+      const title = css("[data-testid=window-beats] .win-title");
+      const cap = css("[data-testid=window-beats] .cap-btn");
+      const play = css("[data-testid=deck-play]");
+      return { winBg: win.backgroundColor, winBorder: win.borderTopWidth, winShadow: win.boxShadow, titleBg: title.backgroundImage, capShadow: cap.boxShadow, capRadius: parseFloat(cap.borderTopLeftRadius), mp: css(".mp").backgroundColor, playImg: play.backgroundImage, playShadow: play.boxShadow };
     });
-    check("the visualizer spells it out, live", drawn > 50, String(drawn));
-    await page.getByRole("button", { name: /visuals:/ }).click();
-    check("visuals: wave mode", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("wave"));
-    await page.waitForTimeout(400);
-    check("wave mode draws", await page.evaluate(() => {
-      const c = document.querySelector("[data-testid=visualizer]");
-      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-      let lit = 0;
-      for (let i = 0; i < d.length; i += 400) lit += d[i] + d[i + 1] + d[i + 2] > 60 ? 1 : 0;
-      return lit > 50;
+    check("theme: windows are flat paper with a hairline and a soft shadow", look.winBg === "rgb(251, 248, 242)" && look.winBorder === "1px" && !look.winShadow.includes("inset") && look.titleBg === "none", JSON.stringify(look).slice(0, 160));
+    check("theme: flat buttons (no bevels), rounded corners", look.capShadow === "none" && look.capRadius >= 4 && look.playImg === "none" && !look.playShadow.includes("inset"));
+    check("theme: the player is on the same paper, not night-blue glass", look.mp === "rgb(251, 248, 242)");
+    // the clock menu: still visuals is the one setting left
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    check("clock menu: no visualizer options, still visuals stays", (await page.getByRole("menu").getByRole("menuitem", { name: /led|wave/i }).count()) === 0 && (await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).count()) === 1);
+    await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).click();
+    check("clock menu: still visuals on", (await page.evaluate(() => document.documentElement.dataset.calm)) === "true" && (await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).getAttribute("aria-checked")) === "true");
+    check("still visuals: the playing row's bars stand still, still visible", await page.evaluate(() => {
+      const bars = [...document.querySelectorAll("[data-testid=window-beats] .eq-bars i")];
+      return bars.length === 3 && bars.every((b) => getComputedStyle(b).animationName === "none" && b.getBoundingClientRect().height > 2);
     }));
-    await page.getByRole("button", { name: /visuals:/ }).click();
-    check("visuals: still mode", (await page.evaluate(() => document.documentElement.dataset.calm)) === "true");
-    await page.getByRole("button", { name: /visuals:/ }).click();
-    check("visuals: back to led", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("led"));
+    await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).click();
+    check("clock menu: still visuals off again", (await page.evaluate(() => document.documentElement.dataset.calm)) === "false");
+    await page.keyboard.press("Escape");
+    check("clock menu: Escape closes it", (await page.getByRole("menu").count()) === 0);
     await page.getByRole("button", { name: "Repeat this beat" }).click();
     await page.getByRole("button", { name: "Shuffle" }).click();
     const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-player")));
@@ -206,6 +251,13 @@ try {
     await page.waitForTimeout(300);
     const links = await page.locator("[data-testid=window-socials] a").evaluateAll((as) => as.map((a) => [a.href, a.target]));
     check("socials: five real links, new tab", links.length === 5 && links.every(([h, t]) => h.startsWith("https://") && t === "_blank"));
+    const onLink = () => page.evaluate(() => !!document.activeElement?.closest?.("[data-testid=window-socials] a"));
+    await page.locator("[data-testid=window-socials] .win-title h2").click();
+    for (let i = 0; i < 8 && !(await onLink()); i++) await page.keyboard.press("Tab");
+    check("socials: tabbing onto a link shows a clear ring", (await onLink()) && (await page.evaluate(() => {
+      const s = getComputedStyle(document.activeElement);
+      return s.outlineStyle !== "none" && parseFloat(s.outlineWidth) >= 2;
+    })));
     await page.getByTestId("icon-beats").click();
     await page.getByRole("slider", { name: "Volume" }).fill("0.3");
     check("volume", Math.abs((await page.evaluate(() => document.querySelector("audio").volume)) - 0.3) < 0.01);
@@ -236,14 +288,21 @@ try {
   }
   {
     const { ctx, page } = await open({ seen: false, reduced: true });
+    const intro = page.getByRole("dialog", { name: "Intro" });
+    check("reduced motion: the intro has no burning or smoke", (await intro.isVisible()) && (await intro.locator("canvas").count()) === 0);
     await page.keyboard.press("a");
-    await page.waitForTimeout(2600);
-    check("reduced motion: the intro goes straight to welcome and in", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
+    await page.waitForTimeout(300);
+    check("reduced motion: a key goes straight to the name", (await intro.getAttribute("data-phase")) === "reveal");
+    await page.waitForTimeout(2300);
+    check("reduced motion: a short, still intro, then in", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
     await ctx.close();
   }
   {
     const { ctx, page } = await open({ reduced: true });
-    check("reduced motion: visuals start still", (await page.getByRole("button", { name: /visuals:/ }).textContent()).includes("still"));
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    check("reduced motion: still visuals start on", (await page.getByRole("menuitemcheckbox", { name: "Still visuals" }).getAttribute("aria-checked")) === "true");
+    check("reduced motion: windows open without animating", await page.getByTestId("window-beats").evaluate((w) => getComputedStyle(w).animationName === "none"));
+    await page.keyboard.press("Escape");
     await page.evaluate(() => localStorage.setItem("saeculo-game", JSON.stringify({ found: [], seenHelp: true, unseen: [], profile: { name: "R", skin: 1, hair: "short", hairColor: 0, body: "slim" } })));
     await page.getByTestId("icon-game").click();
     await page.waitForTimeout(800);
@@ -263,6 +322,10 @@ try {
     await win.getByRole("button", { name: "Send" }).click();
     check("contact: empty form shows two errors", (await win.locator("[aria-invalid=true]").count()) === 2);
     check("contact: focus goes to the first problem", await page.evaluate(() => document.activeElement?.id === "contact-name"));
+    check("contact: the focused field shows a clear ring", await page.evaluate(() => {
+      const s = getComputedStyle(document.activeElement);
+      return s.outlineStyle !== "none" && parseFloat(s.outlineWidth) >= 2;
+    }));
     await win.getByLabel("Name").fill("Test");
     await win.getByLabel("Message").fill("Hi");
     await win.getByRole("button", { name: "Send" }).click();
@@ -660,10 +723,12 @@ try {
     await page.evaluate(() => window.__game.give({ cash: 200, stats: { ...window.__game.save().stats, beatsSold: 1 } }));
     await page.evaluate(() => window.__game.teleport("underpass", 8, 6.5, "right"));
     await page.waitForTimeout(1400);
-    const veeTalk = (await page.getByTestId("game-dialog").count()) ? await dialogText() : "";
+    const veeTalk = (await page.getByTestId("game-dialog").count()) ? await readAll() : "";
     check("underpass: Vee comes over and challenges you", /walks straight at you/.test(veeTalk) && (await saved()).seen.includes("vee"), veeTalk);
+    check("battle: Vee names her beat (the first time, her night drill)", /My night drill, 142 BPM/.test(veeTalk), veeTalk);
     await pick(/Battle/);
     check("battle: the stake goes in, the hard rhythm game opens", (await saved()).cash === 180 && (await page.getByRole("dialog", { name: "Beat battle" }).isVisible()));
+    check("battle: on the beat she named", /played the night drill first/.test(await page.getByTestId("rhythm").textContent()));
     await page.keyboard.press("Escape");
     await page.evaluate(() => window.__game.battle(80, 70));
     const bt = await saved();
@@ -779,6 +844,16 @@ try {
     const w = await page.getByTestId("window-beats").boundingBox();
     check("phone: windows fill the screen", w && w.width >= 385);
     check("phone: no sideways scroll", await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    const pc = await page.getByTestId("cover").boundingBox();
+    check("phone: the cover leads the player, big and whole", pc && pc.width >= 220 && pc.x >= 0 && pc.x + pc.width <= 390 && Math.abs(pc.width - pc.height) < 2, pc ? `${Math.round(pc.width)}×${Math.round(pc.height)}` : "");
+    check("phone: play is on the first screen", await page.getByTestId("deck-play").evaluate((b) => b.getBoundingClientRect().bottom < window.innerHeight - 44));
+    await page.getByTestId("track-dull-knife").scrollIntoViewIfNeeded();
+    check("phone: the tracklist scrolls into reach", await page.getByTestId("track-dull-knife").isVisible());
+    if (axeSource) {
+      await page.addScriptTag({ content: axeSource });
+      const pv = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+      check("axe: no violations on a phone, Beats open", pv.length === 0, pv.join(", "));
+    }
     await page.getByRole("button", { name: "Close Beats" }).tap();
     await page.getByTestId("icon-game").tap();
     await page.waitForTimeout(1800);
@@ -840,6 +915,16 @@ try {
     const v = vs.map((x) => `${x.id} (${x.nodes.length})`);
     check("axe: no violations on the desktop", v.length === 0, v.join(", "));
     if (v.length) console.log(JSON.stringify(vs));
+    const axeNow = () => page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length}): ${x.nodes.map((n) => n.target).join(" ")}`));
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    const mv = await axeNow();
+    check("axe: no violations with the clock menu open", mv.length === 0, mv.join(", "));
+    await page.getByRole("menuitem", { name: "Keyboard shortcuts" }).click();
+    await page.waitForTimeout(300);
+    const kv = await axeNow();
+    check("axe: no violations on the shortcuts card", kv.length === 0, kv.join(", "));
+    await page.keyboard.press("Escape");
+    if (await page.getByTestId("shortcuts").count()) await page.getByRole("button", { name: "Close shortcuts" }).click();
     await page.getByTestId("icon-game").click();
     await page.waitForTimeout(1600);
     const g = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));

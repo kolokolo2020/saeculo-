@@ -70,16 +70,70 @@ commit + push after each step, extend scripts/verify.mjs).
     studio controls/code paragraph and the old `room/` folder removed,
     `sharp` added to the dev install line.
 
-## Next
-The list is done. Waiting on the owner to playtest PR #17 and say "merge"
-(or what to change). Ideas if more is wanted, none started:
-- a second rival battle beat (Vee picks a different preset each time);
-- Dre's jobs with a risk (trouble more likely while you carry the tape);
-- the cat following you a few steps after you've petted it a few times.
+11. The owner's redesign request (session 2, partly reviewed; see below):
+    - **Cover**: the owner's artwork, `public/covers/saeculo.jpg`.
+    - **Beats**: the visualizer removed (screen, led/wave/still switch,
+      siteStore vis state); the cover is the large hero of the player.
+    - **Theme**: flat retro: warm paper windows, hairline borders, small
+      radii, soft shadows, classic-Mac pinstripes on active title bars,
+      Windows-style window buttons and taskbar, no bevels or glass. Tokens
+      in the @theme block of globals.css; fonts IBM Plex Sans, Jersey 10,
+      VT323.
+    - **Intro**: replaced the Vista boot with the cigarette intro: dark
+      archival gate with "saeculo" (click/key to enter), a cigarette smoked
+      to the filter with falling ash and crackle, an exhale, smoke blowing in
+      from the side revealing a bright "saeculo", then the dark blown away
+      to the desktop. Phases on the dialog's data-phase: gate, burn, exhale,
+      reveal, out. Reduced motion: name and a quick fade.
+    - **Game**: Vee picks a different starter beat each battle and names it;
+      carrying Dre's tape brings trouble sooner and more often, they ask
+      about the tape, and a knockout loses it (job stage "lost", Dre says so,
+      no pay); pet the alley cat 3 times in a visit and it follows you
+      ~15 s.
+    - Checks at handoff: tsc, lint, build clean; verify.mjs 207/207.
 
-Notes for the next session:
-- Fight tuning was done with a headless simulation (combat.ts through
-  jiti, a bot that swings when in reach and dodges a share of wind-ups);
-  worth re-running if foe stats change.
+## Handoff: what's next (in order)
+
+The work in item 11 was done by parallel agents. The theme and intro tracks
+finished their build step; the game track was stopped near the end of its
+build; none of the three got their planned independent review or fix
+round. So:
+
+1. **Review the three tracks with fresh eyes** (desktop 1366x800 and
+   phone 390x844 screenshots, read the diffs):
+   - theme: desktop with all windows open, clock menu, Socials and Contact
+     focus rings, phone Beats, phone held sideways (the tracklist is below
+     the fold there), all three windows open at 1366px (Socials and
+     Contact overlap Beats' right edge);
+   - intro: every phase on desktop and phone, the reduced-motion version,
+     replay from the clock menu; frame time on the reveal (~30 ms in
+     headless software rendering);
+   - game: Vee's battle line names the beat and each battle uses another
+     starter with a playable chart; a group asking about the tape; a
+     knockout while carrying (job lost, Dre's line); the cat following
+     and going home when you leave or trouble comes. Add screenshots to
+     `scripts/playtest.mjs` for these.
+2. **Things only a person can check**: listen to the intro (lighter,
+   crackle, exhale) and the game sounds; try the intro on a real iPhone
+   (the music starts at the reveal, ~4 s after the click, from the
+   animation loop; the click starts and pauses the player to unlock audio:
+   untested on iOS Safari); try touch controls on a real phone.
+3. **Cleanup, only with the owner's OK** (the owner's rule is never to
+   delete files): now-unused `src/components/beats/Visualizer.tsx`,
+   `beats/wordmark.ts`, `player/spectrum.ts`, `public/covers/saeculo.svg`,
+   the old per-track covers (`care4me.jpg`, `elbtunnel.jpg`,
+   `dull-knife.jpg`), the dead `.boot-*` rules and `--font-vista` in
+   globals.css, the player's unread AnalyserNode. **`scripts/make-cover.mjs`
+   would overwrite the owner's cover** if run: retire it or point it
+   elsewhere.
+4. Small polish: `.intro-cover` in globals.css could use the intro's
+   near-black (#0b0a09) instead of #000.
+5. Update PR #17's description for item 11, then wait for the owner to say
+   "merge".
+
+Notes:
+- Fight tuning was done with a headless simulation (combat.ts through jiti,
+  a bot that swings in reach and dodges a share of wind-ups).
 - The machine can run out of memory with the dev server, a build and the
-  verify browser all at once; run them one after another.
+  verify browser at once: run them one after another. With 4 CPUs only two
+  workflow agents run at a time.
