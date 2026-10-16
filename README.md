@@ -13,12 +13,14 @@ Windows-style buttons and taskbar), with four things on it.
 A first visit opens with a short intro that plays by itself: the block at
 night, in the game's pixels. The camera goes down your building, past the
 dark windows and the fire escape, to the one window that's lit, and in
-through the glass (about 4 seconds). Then it stays in the room: the bedroom
-from the game, the lamp on, the album cover on the wall, the laptop on the
-desk, and someone in the desk chair beside it, hood up, lighting a joint
-and smoking it, slowly, over and over. Once it's lit, "press any key" (on
-a phone, "tap to play") comes up. A key or a tap: they stop, lean over and
-press the laptop's space bar; the beat starts, "saeculo" comes up on the
+through the glass (about 4 seconds). Then it stays in the room, seen from the
+back of it: the bedroom from the game, a bed, a rug, the tapes, the album
+cover on the wall, the lamp on, the laptop on the desk, and him in the
+desk chair, side on, leaned right back with his feet up on the desk (curly
+brown hair under on-ear headphones, a white tee, jeans, white socks in
+slides), lighting a joint and smoking it, slowly, over and over. Once it's
+lit, "press any key" (on a phone, "tap to play") comes up. A key or a tap:
+he stops, takes his feet down, sits up and presses the laptop's space bar; the beat starts, "saeculo" comes up on the
 screen, and the camera goes into the screen, which opens onto the desktop
 with Beats open. That key is also what lets sound start, so the intro is
 silent until then. A click or key on the way in hurries it to the room;
@@ -30,7 +32,7 @@ motion or still visuals it's one still picture of the room; a key puts
 sees and draws the person and the smoke) and the sounds are synthesized.
 Code: `src/components/intro/` (`BlockIntro.tsx` runs the sequence, input
 and the music; `block.ts` draws the block and the camera; `room.ts` the
-room and the person in it; `city.ts` the sounds; `block.module.css` the
+room and him; `city.ts` the sounds; `block.module.css` the
 styles). The earlier cigarette intro (`BootIntro.tsx`, `scene.ts`,
 `sounds.ts`, `intro.module.css`) is still in the folder, unused.
 
