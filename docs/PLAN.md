@@ -154,6 +154,16 @@ commit + push after each step, extend scripts/verify.mjs).
     poppa, sing4me boo, under pressure, wiedertäufer) have no file yet.
     `trackAnalysis.json` re-measured; the studio's chops follow the list.
 
+16. The owner's notes on the character: no hood. Side on, seen from the
+    back of the room (the camera pulled back so the whole room shows: a
+    bed, a rug, the tapes, the desk), leaned right back in the desk chair
+    with his feet up on the desk; curly brown hair under on-ear
+    headphones, a white tee, blue jeans, white socks in black slides,
+    fair to lightly tanned skin. The key: he takes his feet down, sits up
+    and leans over to press space. `room.ts` poses him with a few joints
+    (hip, shoulder, head, knee, ankle, toe) blended between "leaned back"
+    and "sat up".
+
 ## Handoff: what's next (in order)
 
 The work in item 11 was done by parallel agents. The theme and intro tracks
