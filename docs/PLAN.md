@@ -131,6 +131,20 @@ commit + push after each step, extend scripts/verify.mjs).
     lit window. The cigarette intro's files are kept, unused (removing them
     needs the owner's OK). verify.mjs: 225 checks.
 
+14. The owner's notes on item 13: faster, and the room. The intro now plays
+    by itself (no click first): down the building in ~2.5 s and in through
+    the window by ~3.7 s, then it stays in the room (`room.ts`): someone in
+    the desk chair beside the laptop, hood up, lights a joint and smokes it
+    on a loop (hand up, the coal brightening on the pull, the smoke let
+    out). "press any key" / "tap to play" comes up once it's lit. The key:
+    they stop, lean over and press the laptop's space bar (the click is
+    synthesized); the beat starts from the laptop, "saeculo" on the
+    screen, the camera goes into the screen and onto the desktop. Phases:
+    sky, descend, window, room, press, screen; data-ready when the key's
+    asked for, data-screen="saeculo" once it's on the screen. The music
+    is unlocked inside the key handler and started at the space bar.
+    verify.mjs: 229 checks.
+
 ## Handoff: what's next (in order)
 
 The work in item 11 was done by parallel agents. The theme and intro tracks

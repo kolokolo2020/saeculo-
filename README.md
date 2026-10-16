@@ -10,26 +10,29 @@ Windows-style buttons and taskbar), with four things on it.
 - **Game**: a small top-down neighbourhood where you find sounds and make a
   beat with them.
 
-A first visit opens with a short intro: the block at night, in the game's
-pixels. "saeculo" quietly over the sky, the moon and the skyline, waiting
-for a click or key (that click is what lets sound start, and the beat starts
-right on it, muffled, from somewhere in the building, with the city's hum
-and a car going past). The camera goes down your building, past the dark
-windows and the fire escape, to the one window that's lit: the bedroom from
-the game, the lamp on, the album cover on the wall, the laptop open on the
-desk. It goes in through the glass and on into the laptop's screen, and the
-screen is the site: it opens onto the desktop, Beats open and the beat
-clear. About 7 seconds after the click. It's skippable (Skip or Esc; a click
-or key hurries it along), plays once per browser, and the clock menu in the
+A first visit opens with a short intro that plays by itself: the block at
+night, in the game's pixels. The camera goes down your building, past the
+dark windows and the fire escape, to the one window that's lit, and in
+through the glass (about 4 seconds). Then it stays in the room: the bedroom
+from the game, the lamp on, the album cover on the wall, the laptop on the
+desk, and someone in the desk chair beside it, hood up, lighting a joint
+and smoking it, slowly, over and over. Once it's lit, "press any key" (on
+a phone, "tap to play") comes up. A key or a tap: they stop, lean over and
+press the laptop's space bar; the beat starts, "saeculo" comes up on the
+screen, and the camera goes into the screen, which opens onto the desktop
+with Beats open. That key is also what lets sound start, so the intro is
+silent until then. A click or key on the way in hurries it to the room;
+Skip or Esc skips it. It plays once per browser, and the clock menu in the
 taskbar replays it. Share links (`/#track=<id>`) skip it. With reduced
-motion or still visuals it's one still picture of the lit window with the
-name, then a quick fade. Everything is drawn on canvas (the building once,
-small; each frame copies what the camera sees) and every sound but the beat
-is synthesized. Code: `src/components/intro/` (`BlockIntro.tsx` runs the
-sequence, input and the music; `block.ts` draws it; `city.ts` makes the
-sounds; `block.module.css` the styles). The earlier cigarette intro
-(`BootIntro.tsx`, `scene.ts`, `sounds.ts`, `intro.module.css`) is still in
-the folder, unused.
+motion or still visuals it's one still picture of the room; a key puts
+"saeculo" on the screen, then a quick fade. Everything is drawn on canvas
+(the building and the room once, small; each frame copies what the camera
+sees and draws the person and the smoke) and the sounds are synthesized.
+Code: `src/components/intro/` (`BlockIntro.tsx` runs the sequence, input
+and the music; `block.ts` draws the block and the camera; `room.ts` the
+room and the person in it; `city.ts` the sounds; `block.module.css` the
+styles). The earlier cigarette intro (`BootIntro.tsx`, `scene.ts`,
+`sounds.ts`, `intro.module.css`) is still in the folder, unused.
 
 ## Beats
 

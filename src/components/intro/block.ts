@@ -2,24 +2,28 @@
 // strip (the sky, the skyline, your building and the street) is painted
 // once at its own small size; each frame copies the part the camera sees,
 // scaled up without smoothing, and adds the few things that move: windows
-// across the way going on and off, one car, and the room behind the lit
-// window, which is painted finer so the camera can go in through the glass
-// and on into the laptop's screen. The screen is the site: at the end it
-// opens up and the real desktop shows through it.
-// Times are in ms from the click; before it (t < 0) the camera waits on the
-// sky.
+// across the way going on and off, one car, and the lit window. The camera
+// goes down the building and in through that window, and then it's in the
+// room (room.ts), where it stays until a key: then into the laptop's
+// screen, which opens onto the real desktop underneath.
+// Times are in ms from when the intro opens; the press, in ms from the key.
+
+import { createRoom, FLOOR, FLOOR_Y, FOCUS, FOCUS_TALL, PEEK, PRESS, RH, RW, SCREEN, WALL } from "./room";
 
 export const T = {
   /** The camera starts down the building. */
-  descend: 1200,
-  /** It settles by the lit window and starts to go in. */
-  window: 3800,
-  /** Through the glass, on into the screen. */
-  screen: 5600,
-  /** The screen opens onto the desktop. */
-  open: 5900,
-  end: 7000,
+  descend: 700,
+  /** It settles by the lit window and goes in. */
+  window: 2500,
+  /** In the room. */
+  room: 3700,
 } as const;
+/** After the key: the camera goes into the screen, which opens onto the desktop. */
+export const ZOOM = { start: 1450, open: 2500, end: 3050 } as const;
+export { PRESS, READY_AT } from "./room";
+
+/** The dissolve from outside the glass to inside the room. */
+const IN = 420;
 
 /** The strip, in its own pixels. */
 const SW = 560;
@@ -28,19 +32,12 @@ const SH = 430;
 const BX = 220;
 const BW = 120;
 const ROOF = 168;
-const FLOOR = 44;
+const STOREY = 44;
 const WIN = { x: 271, y: 222, w: 18, h: 24 };
-/** The room behind it is painted this many times finer. */
-const FINE = 4;
-const RW = WIN.w * FINE;
-const RH = WIN.h * FINE;
-/** The laptop's screen, in room px. */
-const SCR = { x: 26, y: 55, w: 20, h: 12 };
 const STREET = 360;
 const ROAD = 372;
-/** Where the camera stops on the way down, and the screen it goes into (strip px). */
+/** Where the camera stops on the way down (strip px). */
 const STOP_Y = 262;
-const SCREEN_C = { x: WIN.x + (SCR.x + SCR.w / 2) / FINE, y: WIN.y + (SCR.y + SCR.h / 2) / FINE };
 
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const smooth = (a: number, b: number, v: number) => {
@@ -120,7 +117,7 @@ function paintStrip(spots: Spot[]) {
   const neighbour = (x0: number, w: number, top: number, base: string, line: string, seed: number) => {
     paintBrick(g, x0, top, w, STREET - top, base, line, seed);
     r(g, x0, top - 3, w, 3, "#1b1620");
-    for (let fy = top + 12; fy < STREET - 40; fy += FLOOR)
+    for (let fy = top + 12; fy < STREET - 40; fy += STOREY)
       for (let wx = x0 + 9; wx < x0 + w - 16; wx += 26) {
         r(g, wx - 1, fy - 1, 16, 22, "#1a1419");
         r(g, wx, fy, 14, 20, "#0c0f19");
@@ -152,7 +149,7 @@ function paintStrip(spots: Spot[]) {
   // three floors of windows (the middle one, in the middle, is lit)
   const cols = [236, 271, 306];
   for (let f = 0; f < 3; f++) {
-    const wy = ROOF + 10 + f * FLOOR;
+    const wy = ROOF + 10 + f * STOREY;
     for (const wx of cols) {
       r(g, wx - 2, wy - 3, 22, 3, "#4a3a3e"); // lintel
       r(g, wx - 1, wy - 1, 20, 26, "#1e1518");
@@ -170,7 +167,7 @@ function paintStrip(spots: Spot[]) {
   // the fire escape, in front of the right-hand windows
   const fx = 300;
   for (let f = 0; f < 3; f++) {
-    const py = ROOF + 36 + f * FLOOR;
+    const py = ROOF + 36 + f * STOREY;
     r(g, fx, py, 32, 2, "#17141a");
     r(g, fx, py - 9, 32, 1, "#17141a");
     for (let k = 0; k <= 32; k += 4) r(g, fx + k, py - 9, 1, 9, "#17141a");
@@ -182,7 +179,7 @@ function paintStrip(spots: Spot[]) {
   for (let k = ROOF - 4; k < ROOF + 36; k += 4) r(g, fx + 28, k, 5, 1, "#17141a");
 
   // the ground floor: the door, a light over it, shutters
-  const gy = ROOF + 3 * FLOOR + 8;
+  const gy = ROOF + 3 * STOREY + 8;
   r(g, BX, gy - 4, BW, 3, "#4a3a3e");
   r(g, 270, gy + 10, 20, STREET - gy - 10, "#1d140f");
   r(g, 272, gy + 12, 16, STREET - gy - 12, "#4a3325");
@@ -225,80 +222,13 @@ function paintStrip(spots: Spot[]) {
   return c;
 }
 
-// ------------------------------------------------------------ the room
-
-/** The room behind the lit window, in room px: the game's bedroom, seen through the glass. */
-function paintRoom(cover: HTMLImageElement | null) {
-  const c = canvas(RW, RH);
-  const g = c.getContext("2d")!;
-  // the wall: the bedroom's faded stripes
-  r(g, 0, 0, RW, RH, "#2b2a3a");
-  for (let x = 3; x < RW; x += 8) r(g, x, 0, 1, RH, "#302f40");
-  // the poster: the album cover
-  r(g, 39, 11, 26, 26, "#16151c");
-  if (cover) {
-    g.imageSmoothingEnabled = true;
-    g.drawImage(cover, 41, 13, 22, 22);
-  } else r(g, 41, 13, 22, 22, "#3a3550");
-  // a shelf of tapes
-  r(g, 6, 32, 24, 2, "#4d3526");
-  ["#a3321f", "#3d5a8a", "#e4b95a", "#cfc8b9", "#2f6b3a", "#6b6357"].forEach((col, i) => r(g, 7 + i * 4, 26, 3, 6, col));
-  // the desk, under the window
-  r(g, 0, 70, RW, 4, "#4d3526");
-  r(g, 0, 74, RW, RH - 74, "#3a281d");
-  r(g, 0, 74, RW, 1, "#2b1e17");
-  for (let x = 4; x < RW; x += 17) r(g, x, 78, 1, RH - 80, "#33241b");
-  // the lamp
-  r(g, 8, 67, 9, 3, "#1c1a1e");
-  r(g, 12, 52, 1, 15, "#1c1a1e");
-  r(g, 12, 52, 7, 1, "#1c1a1e");
-  r(g, 15, 49, 9, 5, "#c9a96a");
-  r(g, 16, 54, 7, 1, "#fff2c9");
-  // the laptop, open
-  r(g, SCR.x - 2, SCR.y - 2, SCR.w + 4, SCR.h + 4, "#16171b");
-  r(g, SCR.x - 4, SCR.y + SCR.h + 2, SCR.w + 8, 2, "#2a2c31");
-  // a mug, headphones, a speaker
-  r(g, 52, 65, 4, 5, "#8e3a2b");
-  r(g, 56, 66, 1, 2, "#8e3a2b");
-  r(g, 59, 56, 8, 14, "#141417");
-  r(g, 61, 61, 4, 4, "#26262b");
-  r(g, 61, 57, 4, 2, "#26262b");
-  // warm light from the lamp, cooler from the screen
-  const warm = g.createRadialGradient(19, 56, 1, 19, 56, 70);
-  warm.addColorStop(0, "rgba(255, 214, 140, 0.42)");
-  warm.addColorStop(0.5, "rgba(255, 190, 110, 0.12)");
-  warm.addColorStop(1, "rgba(255, 190, 110, 0)");
-  g.fillStyle = warm;
-  g.fillRect(0, 0, RW, RH);
-  return c;
-}
-
-/** The screen: the site, too far off to make out yet (the desk's stone, the
- * taskbar, the light of it), so it fades straight into the real one. */
-function paintScreen(g: G, x: number, y: number, w: number, h: number) {
-  r(g, x, y, w, h, "#cfc8b9");
-  const light = g.createRadialGradient(x + w / 2, y + h * 0.4, 0, x + w / 2, y + h * 0.4, w * 0.6);
-  light.addColorStop(0, "rgba(251, 248, 242, 0.55)");
-  light.addColorStop(1, "rgba(251, 248, 242, 0)");
-  g.fillStyle = light;
-  g.fillRect(x, y, w, h);
-  r(g, x, y + h - h / 14, w, h / 14, "#f3eee4");
-}
-
 // ------------------------------------------------------------ the camera
 
-export interface Camera {
-  x: number;
-  y: number;
-  /** Screen px per strip px. */
-  z: number;
-}
-
 export interface Scene {
-  /** Draw the moment `t` (ms since the click; < 0 before it). */
-  frame: (t: number, now: number) => void;
-  /** The still picture (reduced motion): the lit window, nothing moving. */
-  still: () => void;
+  /** Draw intro time `t`; `press`: ms since the key, or null. */
+  frame: (t: number, now: number, dt: number, press: number | null) => void;
+  /** The still picture (reduced motion): the room, and the screen once a key's been pressed. */
+  still: (pressed: boolean) => void;
   resize: () => void;
   destroy: () => void;
 }
@@ -308,22 +238,26 @@ export function createScene(el: HTMLCanvasElement, onChange?: () => void): Scene
   const g = el.getContext("2d")!;
   const spots: Spot[] = [];
   const strip = paintStrip(spots);
-  let room = paintRoom(null);
+  const room = createRoom();
   let alive = true;
   const cover = new Image();
   cover.decoding = "async";
   cover.onload = () => {
     if (!alive) return;
-    room = paintRoom(cover);
+    room.setCover(cover);
     onChange?.();
   };
   cover.src = "/covers/saeculo.jpg";
+  const face = getComputedStyle(document.documentElement).getPropertyValue("--nf-ui").trim() || "sans-serif";
 
   let W = 1;
   let H = 1;
   let dpr = 1;
-  /** The camera's resting zoom: whole screen px per strip px. */
+  /** Outside: whole screen px per strip px. */
   let z0 = 4;
+  /** Inside: whole device px per room px. */
+  let zr = 4;
+  let focus: typeof FOCUS = FOCUS;
 
   const resize = () => {
     const box = el.getBoundingClientRect();
@@ -334,11 +268,13 @@ export function createScene(el: HTMLCanvasElement, onChange?: () => void): Scene
     el.height = Math.round(H * dpr);
     // the sky to the street on a phone, a floor or two less on a wide screen
     z0 = Math.max(2, Math.round(Math.min(H / 190, W / 136)));
+    focus = H > W * 1.2 ? FOCUS_TALL : FOCUS;
+    zr = Math.max(1, Math.floor(Math.min(el.width / focus.w, el.height / focus.h)));
   };
   resize();
 
-  /** Where the camera is at `t`. */
-  function camera(t: number): Camera {
+  /** Outside: down the building, then in at the lit window (strip px, screen px per px). */
+  function outside(t: number) {
     const vh = H / z0;
     const top = Math.min(vh / 2, SH - vh / 2);
     const stop = Math.min(STOP_Y, SH - vh / 2);
@@ -346,20 +282,20 @@ export function createScene(el: HTMLCanvasElement, onChange?: () => void): Scene
       const k = easeInOut(clamp((t - T.descend) / (T.window - T.descend)));
       return { x: SW / 2, y: top + (stop - top) * k, z: z0 };
     }
-    // in through the window to the screen: the zoom eases in log space, and
-    // the centre moves so the push looks straight on
-    const scrW = SCR.w / FINE;
-    const scrH = SCR.h / FINE;
-    const z1 = Math.max(W / scrW, H / scrH) * 1.04;
-    const k = easeInOut(clamp((t - T.window) / (T.end - T.window)));
+    // the zoom eases in log space, and the centre moves so the push looks straight on
+    const cx = WIN.x + WIN.w / 2;
+    const cy = WIN.y + WIN.h / 2;
+    const z1 = Math.max(W / WIN.w, H / WIN.h) * 1.3;
+    const k = easeInOut(clamp((t - T.window) / (T.room - T.window)));
     const z = z0 * Math.pow(z1 / z0, k);
     const w = (1 / z0 - 1 / z) / (1 / z0 - 1 / z1);
-    return { x: SW / 2 + (SCREEN_C.x - SW / 2) * w, y: stop + (SCREEN_C.y - stop) * w, z };
+    return { x: SW / 2 + (cx - SW / 2) * w, y: stop + (cy - stop) * w, z };
   }
 
-  function draw(t: number, now: number, moving: boolean) {
-    const cam = camera(t);
+  function drawOutside(t: number, now: number, moving: boolean) {
+    const cam = outside(t);
     g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = 1;
     g.imageSmoothingEnabled = false;
     r(g, 0, 0, el.width, el.height, "#070b1c");
     const s = cam.z * dpr;
@@ -382,9 +318,9 @@ export function createScene(el: HTMLCanvasElement, onChange?: () => void): Scene
         }
       }
 
-    // the lit window: the room, then the glass and the sash over it
-    g.imageSmoothingEnabled = cam.z < FINE;
-    g.drawImage(room, WIN.x, WIN.y, WIN.w, WIN.h);
+    // the lit window: the room through it, then the glass and the sash
+    g.imageSmoothingEnabled = cam.z < PEEK.w / WIN.w;
+    g.drawImage(room.canvas, PEEK.x, PEEK.y, PEEK.w, PEEK.h, WIN.x, WIN.y, WIN.w, WIN.h);
     g.imageSmoothingEnabled = false;
     const sg = g.createLinearGradient(WIN.x, WIN.y, WIN.x + WIN.w, WIN.y + WIN.h);
     sg.addColorStop(0, "rgba(255, 236, 200, 0.07)");
@@ -393,12 +329,6 @@ export function createScene(el: HTMLCanvasElement, onChange?: () => void): Scene
     g.fillRect(WIN.x, WIN.y, WIN.w, WIN.h);
     r(g, WIN.x, WIN.y, WIN.w, 1.5, "#d9c49a"); // the blind, pulled up
     r(g, WIN.x, WIN.y + 8.5, WIN.w, 1, "#2a2026"); // the sash
-    // the screen, the site on it
-    const sx = WIN.x + SCR.x / FINE;
-    const sy = WIN.y + SCR.y / FINE;
-    const sw = SCR.w / FINE;
-    const sh = SCR.h / FINE;
-    paintScreen(g, sx, sy, sw, sh);
 
     // the glow the window throws out onto the bricks
     const glow = g.createRadialGradient(WIN.x + WIN.w / 2, WIN.y + WIN.h / 2, 4, WIN.x + WIN.w / 2, WIN.y + WIN.h / 2, 34);
@@ -408,21 +338,84 @@ export function createScene(el: HTMLCanvasElement, onChange?: () => void): Scene
     g.fillRect(WIN.x - 34, WIN.y - 34, WIN.w + 68, WIN.h + 68);
 
     if (moving) drawCar(t);
+  }
 
-    // the screen opens onto the desktop underneath
-    const open = smooth(T.open, T.end - 120, t);
-    if (open > 0) {
-      g.globalCompositeOperation = "destination-out";
-      g.globalAlpha = open;
-      g.fillRect(sx, sy, sw, sh);
-      g.globalAlpha = 1;
-      g.globalCompositeOperation = "source-over";
+  /** Inside: the room, held still; after the key, on into the screen. `zoom`: ms since the key, or null. */
+  function drawRoom(zoom: number | null, alpha: number) {
+    const Wd = el.width;
+    const Hd = el.height;
+    let cx = focus.x;
+    let cy = focus.y;
+    let z = zr;
+    let exact = true;
+    if (zoom !== null && zoom > ZOOM.start) {
+      const sx = SCREEN.x + SCREEN.w / 2;
+      const sy = SCREEN.y + SCREEN.h / 2;
+      const z1 = Math.max(Wd / SCREEN.w, Hd / SCREEN.h) * 1.04;
+      const k = easeInOut(clamp((zoom - ZOOM.start) / (ZOOM.end - ZOOM.start)));
+      z = zr * Math.pow(z1 / zr, k);
+      const w = (1 / zr - 1 / z) / (1 / zr - 1 / z1);
+      cx += (sx - cx) * w;
+      cy += (sy - cy) * w;
+      exact = false;
     }
+    const round = exact ? Math.round : (v: number) => v;
+    const ox = round(Wd / 2 - cx * z);
+    const oy = round(Hd / 2 - cy * z);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = alpha;
+    // past the room's edges: more wall, more floor, in the dark
+    const floor = Math.max(0, Math.min(Hd, oy + FLOOR_Y * z));
+    r(g, 0, 0, Wd, floor, WALL);
+    r(g, 0, floor, Wd, Hd - floor, FLOOR);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(room.canvas, ox, oy, RW * z, RH * z);
+    const edge = g.createRadialGradient(Wd / 2, Hd / 2, Math.min(Wd, Hd) * 0.35, Wd / 2, Hd / 2, Math.max(Wd, Hd) * 0.75);
+    edge.addColorStop(0, "rgba(8, 8, 14, 0)");
+    edge.addColorStop(1, "rgba(8, 8, 14, 0.7)");
+    g.fillStyle = edge;
+    g.fillRect(0, 0, Wd, Hd);
+
+    // the screen: "saeculo", once the space bar's down
+    const sx = ox + SCREEN.x * z;
+    const sy = oy + SCREEN.y * z;
+    const sw = SCREEN.w * z;
+    const sh = SCREEN.h * z;
+    if (room.screenOn() && zoom !== null) {
+      const shown = clamp((zoom - PRESS.hit) / 380);
+      g.save();
+      g.globalAlpha = alpha * shown;
+      g.fillStyle = "#ece6dc";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.font = `300 ${Math.max(4, sw * 0.12)}px ${face}`;
+      try {
+        g.letterSpacing = `${(sw * 0.12 * 0.32).toFixed(1)}px`;
+      } catch {
+        // older browsers: no tracking
+      }
+      g.shadowColor = "rgba(236, 230, 220, 0.45)";
+      g.shadowBlur = sw * 0.04;
+      g.fillText("saeculo", sx + sw / 2 + sw * 0.02, sy + sh / 2);
+      g.restore();
+    }
+
+    // and opens onto the desktop underneath
+    if (zoom !== null) {
+      const open = smooth(ZOOM.open, ZOOM.end - 80, zoom);
+      if (open > 0) {
+        g.globalCompositeOperation = "destination-out";
+        g.globalAlpha = open;
+        g.fillRect(sx, sy, sw, sh);
+        g.globalCompositeOperation = "source-over";
+      }
+    }
+    g.globalAlpha = 1;
   }
 
   /** One car, left to right, its headlights across the ground floor. */
   function drawCar(t: number) {
-    const k = (t - 2300) / 2300;
+    const k = (t - 1000) / 1800;
     if (k < 0 || k > 1) return;
     const x = -60 + k * (SW + 120);
     const y = ROAD + 8;
@@ -453,9 +446,21 @@ export function createScene(el: HTMLCanvasElement, onChange?: () => void): Scene
     r(g, x + 27, y + 7, 6, 3, "#0a0a0d");
   }
 
+  function frame(t: number, now: number, dt: number, press: number | null) {
+    room.update(t - T.room, dt, press);
+    if (t < T.room) {
+      drawOutside(t, now, true);
+      if (t > T.room - IN) drawRoom(null, smooth(T.room - IN, T.room, t));
+    } else drawRoom(press, 1);
+  }
+
   return {
-    frame: (t, now) => draw(t < 0 ? -1 : t, now, true),
-    still: () => draw(T.window, 0, false),
+    frame,
+    still: (pressed) => {
+      // lit, resting, the joint in hand; and once pressed, "saeculo" on the screen
+      room.update(READY_AT_STILL, 0, pressed ? PRESS.back[1] + 50 : null);
+      drawRoom(pressed ? PRESS.back[1] + 50 : null, 1);
+    },
     resize,
     destroy: () => {
       alive = false;
@@ -463,3 +468,6 @@ export function createScene(el: HTMLCanvasElement, onChange?: () => void): Scene
     },
   };
 }
+
+/** The still picture's moment: lit, the hand down, the coal glowing. */
+const READY_AT_STILL = 2000;

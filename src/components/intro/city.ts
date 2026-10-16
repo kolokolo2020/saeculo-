@@ -1,8 +1,9 @@
 import { getAudioContext } from "@/lib/audioContext";
 
-// The block's sounds, all synthesized: the low hum of the city at night,
-// far-off traffic washing about in it, and one car going past on a wet
-// road. One bus, so the intro can hush it all at once (Skip, Esc, the end).
+// The intro's sounds, all synthesized: the low hum of the city at night,
+// far-off traffic washing about in it, one car going past on a wet road,
+// and a laptop's space bar. One bus, so the intro can hush it all at once
+// (Skip, Esc, the end).
 
 let bus: GainNode | null = null;
 const live = new Set<AudioScheduledSourceNode>();
@@ -112,6 +113,28 @@ export function carBy(at: number, dur = 2.3) {
   src.connect(hiss).connect(hissAmp).connect(amp);
   amp.connect(pan).connect(dest);
   src.stop(end + 0.1);
+}
+
+/** A laptop's space bar, pressed and let go; `at` seconds from now. */
+export function keyClick(at = 0) {
+  const o = out();
+  if (!o) return;
+  const { ctx, bus: dest } = o;
+  const hit = (t0: number, level: number, freq: number) => {
+    const amp = ctx.createGain();
+    amp.gain.setValueAtTime(level, t0);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.045);
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.value = freq;
+    band.Q.value = 1.4;
+    const src = source(ctx, t0);
+    src.connect(band).connect(amp).connect(dest);
+    src.stop(t0 + 0.06);
+  };
+  const t0 = ctx.currentTime + at;
+  hit(t0, 0.9, 2400);
+  hit(t0 + 0.11, 0.45, 3200);
 }
 
 /** Everything off, over `seconds`. */

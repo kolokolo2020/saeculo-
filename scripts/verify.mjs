@@ -82,17 +82,9 @@ try {
         return null;
       })) === "rgb(7, 11, 28)",
     );
-    check(
-      "intro: the night sky, the name, and a way in",
-      (await intro.getAttribute("data-phase")) === "gate" && (await intro.textContent()).includes("saeculo") && (await page.getByRole("button", { name: /to enter/i }).isVisible()),
-    );
-    check("intro: the music waits for the click", (await audio(page)).paused);
-    if (axeSource) {
-      await page.waitForTimeout(2200);
-      await page.addScriptTag({ content: axeSource });
-      const v = await page.evaluate(async () => (await window.axe.run(document.querySelector('[role="dialog"]'), { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
-      check("axe: no violations on the intro", v.length === 0, v.join(", "));
-    }
+    const ph = () => intro.getAttribute("data-phase").catch(() => null);
+    check("intro: plays by itself, from the sky down the building", ["sky", "descend", "window"].includes(await ph()));
+    check("intro: no sound before a key", (await audio(page)).paused);
     /** The share of the intro's canvas that's warm light (the lit window, the lamp, the room). */
     const warm = () =>
       page.evaluate(() => {
@@ -103,32 +95,35 @@ try {
         return n / (d.length / 16);
       });
     const skyWarm = await warm();
+    await page.waitForFunction(() => document.querySelector('[role="dialog"]')?.dataset.phase === "room", null, { timeout: 6000 }).catch(() => {});
+    check("intro: then in through the lit window, into the room", (await ph()) === "room");
+    const roomWarm = await warm();
+    check("intro: the room is lamp-lit, warm against the night", roomWarm > skyWarm, `${skyWarm.toFixed(4)} → ${roomWarm.toFixed(4)}`);
+    check("intro: the key isn't asked for yet (they're lighting up)", (await intro.getAttribute("data-ready")) !== "true");
+    /** Two frames of the canvas, apart: is anything moving? */
+    const moving = async () => {
+      const a = await page.evaluate(() => document.querySelector('[role="dialog"] canvas').toDataURL());
+      await page.waitForTimeout(400);
+      return a !== (await page.evaluate(() => document.querySelector('[role="dialog"] canvas').toDataURL()));
+    };
+    await page.waitForTimeout(2200);
+    check("intro: then a key is asked for", (await intro.getAttribute("data-ready")) === "true" && (await page.getByRole("button", { name: /press any key/i }).isVisible()));
+    check("intro: the room stays, the smoke keeps moving", (await ph()) === "room" && (await moving()));
+    check("intro: still no sound", (await audio(page)).paused);
+    if (axeSource) {
+      await page.addScriptTag({ content: axeSource });
+      const v = await page.evaluate(async () => (await window.axe.run(document.querySelector('[role="dialog"]'), { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+      check("axe: no violations on the intro", v.length === 0, v.join(", "));
+    }
     await page.keyboard.press("a");
     await page.waitForTimeout(300);
-    check("intro: a key opens on the sky", (await intro.getAttribute("data-phase")) === "sky");
-    check("intro: the beat starts with the click (far off, behind the walls)", !(await audio(page)).paused);
-    await page.waitForTimeout(1500);
-    check("intro: then down the building", (await intro.getAttribute("data-phase")) === "descend");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(900);
-    check("intro: a key hurries it along (to the lit window)", (await intro.getAttribute("data-phase")) === "window");
-    const winWarm = await warm();
-    check("intro: the lit window is there, warm against the night", winWarm > skyWarm * 1.15, `${skyWarm.toFixed(4)} → ${winWarm.toFixed(4)}`);
-    await page.mouse.click(683, 600);
-    await page.waitForTimeout(900);
-    check("intro: a click too (into the laptop's screen)", (await intro.getAttribute("data-phase")) === "screen");
-    check("intro: the desktop is there behind the screen, Beats open", await page.getByTestId("window-beats").isVisible());
-    check(
-      "intro: by now the screen fills the frame",
-      await page.evaluate(() => {
-        const c = document.querySelector('[role="dialog"] canvas');
-        const [r, g, b] = c.getContext("2d").getImageData(c.width >> 1, c.height >> 1, 1, 1).data;
-        return r > 170 && g > 160 && b > 140;
-      }),
-    );
-    await page.getByRole("button", { name: /skip/i }).click();
+    check("intro: a key: they stop and lean over", (await ph()) === "press" && (await intro.getAttribute("data-screen")) !== "saeculo");
+    await page.waitForTimeout(1100);
+    check("intro: the space bar: the beat starts, saeculo on the screen", !(await audio(page)).paused && (await intro.getAttribute("data-screen")) === "saeculo");
     await page.waitForTimeout(500);
-    check("intro: skip lands on the desktop with Beats open", (await intro.count()) === 0 && (await page.getByTestId("window-beats").isVisible()));
+    check("intro: then into the screen, the desktop there behind it", (await ph()) === "screen" && (await page.getByTestId("window-beats").isVisible()));
+    await page.waitForTimeout(2000);
+    check("intro: lands on the desktop with Beats open", (await intro.count()) === 0 && (await page.getByTestId("window-beats").isVisible()));
     check("intro: remembered", (await page.evaluate(() => localStorage.getItem("saeculo-intro-seen"))) === "1");
     check("intro: music carries on after it", !(await audio(page)).paused);
     await page.reload({ waitUntil: "networkidle" });
@@ -138,18 +133,16 @@ try {
     await page.getByRole("menuitem", { name: "Replay intro" }).click();
     await page.getByRole("dialog", { name: "Intro" }).waitFor({ timeout: 5000 }).catch(() => {});
     check("replay intro from the clock menu", await page.getByRole("dialog", { name: "Intro" }).isVisible());
-    await page.waitForTimeout(1000);
-    await page.getByRole("button", { name: /to enter/i }).click();
-    await page.waitForTimeout(9000);
-    check(
-      "intro: runs all the way to the desktop by itself",
-      (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused && (await page.getByTestId("window-beats").isVisible()),
-    );
+    await page.waitForTimeout(300);
+    await page.mouse.click(683, 400);
+    await page.waitForTimeout(1300);
+    check("intro: a click on the way in hurries it to the room", (await ph()) === "room");
+    await page.getByRole("button", { name: /skip/i }).click();
+    await page.waitForTimeout(500);
+    check("intro: skip lands on the desktop with Beats open, music on", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && (await page.getByTestId("window-beats").isVisible()) && !(await audio(page)).paused);
     await page.getByRole("button", { name: "Clock and settings" }).click();
     await page.getByRole("menuitem", { name: "Replay intro" }).click();
     await page.waitForTimeout(300);
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(800);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
     check("Escape skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
@@ -161,10 +154,13 @@ try {
   {
     const { ctx, page } = await open({ seen: false, mobile: true, viewport: { width: 390, height: 844 } });
     const intro = page.getByRole("dialog", { name: "Intro" });
-    await page.getByRole("button", { name: /tap to enter/i }).tap();
-    await page.waitForTimeout(500);
-    check("intro on a phone: a tap starts it", (await intro.getAttribute("data-phase")) === "sky");
     check("intro on a phone: fits the screen", (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+    // (the prompt is in the page but see-through until then, so wait on the attribute)
+    await page.waitForFunction(() => document.querySelector('[role="dialog"]')?.dataset.ready === "true", null, { timeout: 9000 }).catch(() => {});
+    check("intro on a phone: asks for a tap in the room", (await intro.getAttribute("data-phase")) === "room" && (await page.getByRole("button", { name: /tap to play/i }).isVisible()));
+    await page.getByRole("button", { name: /tap to play/i }).tap();
+    await page.waitForTimeout(1500);
+    check("intro on a phone: the tap presses space, the beat on", (await intro.getAttribute("data-screen")) === "saeculo" && !(await audio(page)).paused);
     await page.getByRole("button", { name: /skip/i }).tap();
     await page.waitForTimeout(500);
     check("intro on a phone: skip lands on the desktop, music on", (await intro.count()) === 0 && !(await audio(page)).paused);
@@ -317,10 +313,11 @@ try {
     const still = () => page.evaluate(() => document.querySelector('[role="dialog"] canvas').toDataURL());
     const first = await still();
     await page.waitForTimeout(700);
-    check("reduced motion: one still picture, nothing moving", (await intro.isVisible()) && (await intro.locator("canvas").count()) === 1 && first === (await still()));
+    check("reduced motion: one still picture of the room, nothing moving", (await intro.isVisible()) && (await intro.getAttribute("data-phase")) === "room" && first === (await still()));
+    check("reduced motion: a key asked for straight away", await page.getByRole("button", { name: /press any key/i }).isVisible());
     await page.keyboard.press("a");
     await page.waitForTimeout(300);
-    check("reduced motion: a key goes straight to the lit window", (await intro.getAttribute("data-phase")) === "window");
+    check("reduced motion: a key puts saeculo on the screen", (await intro.getAttribute("data-screen")) === "saeculo" && first !== (await still()));
     await page.waitForTimeout(2300);
     check("reduced motion: a short, still intro, then in", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
     await ctx.close();
