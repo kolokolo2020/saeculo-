@@ -1,7 +1,8 @@
 // Draws the album cover: "saeculo" lit up on a spectrum analyser, over a
-// night-blue aurora, with its reflection on the glass below. Writes
-// public/covers/saeculo.svg (used on the site) and saeculo.jpg (share
-// cards, lock screens). Run after changing the wordmark:
+// night-blue aurora, with its reflection on the glass below. This was the
+// site's cover before the owner's artwork (public/covers/saeculo.jpg), which
+// it must never overwrite: it writes public/covers/wordmark-cover.svg and
+// wordmark-cover.jpg, which nothing on the site uses. Run with:
 //   npm i --no-save sharp
 //   node --experimental-strip-types scripts/make-cover.mjs
 import { writeFileSync } from "fs";
@@ -99,7 +100,7 @@ ${dust}
 </svg>
 `;
 
-writeFileSync(new URL("../public/covers/saeculo.svg", import.meta.url), svg);
+writeFileSync(new URL("../public/covers/wordmark-cover.svg", import.meta.url), svg);
 const sharp = createRequire(import.meta.url)("sharp");
-await sharp(Buffer.from(svg)).resize(1200).jpeg({ quality: 88, mozjpeg: true }).toFile(new URL("../public/covers/saeculo.jpg", import.meta.url).pathname);
-console.log("wrote public/covers/saeculo.svg and saeculo.jpg");
+await sharp(Buffer.from(svg)).resize(1200).jpeg({ quality: 88, mozjpeg: true }).toFile(new URL("../public/covers/wordmark-cover.jpg", import.meta.url).pathname);
+console.log("wrote public/covers/wordmark-cover.svg and wordmark-cover.jpg (the owner's saeculo.jpg is untouched)");

@@ -5,21 +5,20 @@
 //     beat pulse on iPhones follows these)
 //   - the loudness (integrated, ITU-R BS.1770 / EBU R128, in LUFS; within
 //     0.1 LU of ffmpeg's ebur128), so the player can turn loud beats down
-// (It also stores the waveform and a cover palette; the player pulls its
-// colours from the cover itself, so new tracks work without running this.)
+// and src/data/trackWaveforms.json, the waveform the seek bar draws (kept
+// apart so it loads after the page, not with it).
 //
 // Run it after adding or replacing a track:
 //   node scripts/analyze-tracks.mjs
 //
 // Audio is decoded by the Chromium that Playwright drives (Web Audio's
-// decoder handles MP3/WAV/AAC), colours come from sharp.
+// decoder handles MP3/WAV/AAC).
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright-core");
-const sharp = require("sharp");
 
 const root = path.join(path.dirname(new URL(import.meta.url).pathname), "..");
 const tracksSrc = fs.readFileSync(path.join(root, "src/data/tracks.ts"), "utf8");
@@ -47,24 +46,19 @@ async function analyseAudio(file, nominal) {
       const L = buf.getChannelData(0);
       const Rr = buf.numberOfChannels > 1 ? buf.getChannelData(1) : L;
 
-      // waveform: per column, the peak and the RMS
+      // waveform: per column, the peak
       const per = Math.floor(buf.length / COLUMNS);
       const peaks = [];
-      const rms = [];
       for (let c = 0; c < COLUMNS; c++) {
         let pk = 0;
-        let sq = 0;
         for (let i = c * per; i < (c + 1) * per; i++) {
           const v = (L[i] + Rr[i]) / 2;
           const a = Math.abs(v);
           if (a > pk) pk = a;
-          sq += v * v;
         }
         peaks.push(pk);
-        rms.push(Math.sqrt(sq / per));
       }
       const maxPk = Math.max(...peaks) || 1;
-      const maxRms = Math.max(...rms) || 1;
 
       // integrated loudness: K-weighting (a high shelf, then a high-pass, with
       // the coefficients for this sample rate), mean square per channel over
@@ -172,83 +166,26 @@ async function analyseAudio(file, nominal) {
         beatOffset: Math.round(fine.ph * 1000) / 1000,
         loudness,
         peaks: peaks.map((v) => Math.round((v / maxPk) * 100) / 100),
-        rms: rms.map((v) => Math.round((v / maxRms) * 100) / 100),
       };
     },
     { b64, nominal, COLUMNS },
   );
 }
 
-// ---- cover: a small k-means palette, then accent / second / deep picks
-async function palette(file) {
-  const { data } = await sharp(file).resize(40, 40, { fit: "cover" }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-  const px = [];
-  for (let i = 0; i < data.length; i += 3) px.push([data[i], data[i + 1], data[i + 2]]);
-  const K = 8;
-  let centers = Array.from({ length: K }, (_, q) => px[Math.floor((q / K) * (px.length - 1))]);
-  for (let iter = 0; iter < 15; iter++) {
-    const sums = centers.map(() => [0, 0, 0, 0]);
-    for (const p of px) {
-      let bi = 0;
-      let bd = Infinity;
-      centers.forEach((c, i) => {
-        const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2;
-        if (d < bd) [bd, bi] = [d, i];
-      });
-      sums[bi][0] += p[0];
-      sums[bi][1] += p[1];
-      sums[bi][2] += p[2];
-      sums[bi][3] += 1;
-    }
-    centers = sums.map((s, i) => (s[3] ? [s[0] / s[3], s[1] / s[3], s[2] / s[3], s[3]] : centers[i]));
-  }
-  const hsl = ([r, g, b]) => {
-    r /= 255;
-    g /= 255;
-    b /= 255;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const l = (max + min) / 2;
-    const d = max - min;
-    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
-    let h = 0;
-    if (d) {
-      if (max === r) h = ((g - b) / d) % 6;
-      else if (max === g) h = (b - r) / d + 2;
-      else h = (r - g) / d + 4;
-    }
-    return [Math.round(((h * 60) + 360) % 360), s, l];
-  };
-  const clusters = centers.map((c) => ({ rgb: c.slice(0, 3), weight: c[3] ?? 1, hsl: hsl(c) }));
-  // accent: the most saturated colour with some presence (lightness barely
-  // matters: the picks are re-lit for a dark UI below); second: the same, of
-  // a clearly different hue; deep: the darkest
-  const vividness = (c) => c.hsl[1] * Math.sqrt(c.weight) * (c.hsl[2] > 0.04 ? 1 : 0.2);
-  const vivid = [...clusters].sort((a, b) => vividness(b) - vividness(a));
-  const accent = vivid[0];
-  const hueGap = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
-  const second = vivid.find((c) => hueGap(c.hsl[0], accent.hsl[0]) >= 40) ?? vivid[1];
-  const deep = [...clusters].sort((a, b) => a.hsl[2] - b.hsl[2])[0];
-  // keep the accents readable on a dark UI
-  const tone = ([h, s], l) => `hsl(${h} ${Math.round(Math.max(0.45, s) * 100)}% ${Math.round(l * 100)}%)`;
-  return {
-    accent: tone(accent.hsl, Math.min(0.72, Math.max(0.55, accent.hsl[2]))),
-    second: tone(second.hsl, Math.min(0.7, Math.max(0.5, second.hsl[2]))),
-    deep: `hsl(${deep.hsl[0]} ${Math.round(Math.min(0.6, deep.hsl[1]) * 100)}% ${Math.round(Math.min(0.12, deep.hsl[2]) * 100)}%)`,
-  };
-}
-
 const out = {};
+const waves = {};
 for (const t of tracks) {
   if (!t.bpm) {
     console.log(`${t.id}: no bpm listed, skipped (it plays fine; add a bpm to measure the exact tempo)`);
     continue;
   }
   const audio = await analyseAudio(path.join(root, "public", t.file), t.bpm);
-  const colors = t.cover ? await palette(path.join(root, "public", t.cover)) : null;
-  out[t.id] = { ...audio, palette: colors };
-  console.log(`${t.id}: ${audio.duration}s, ${audio.tempo} bpm (listed ${t.bpm}), first beat ${audio.beatOffset}s, ${audio.loudness} LUFS, accent ${colors?.accent}`);
+  const { peaks, ...numbers } = audio;
+  out[t.id] = numbers;
+  waves[t.id] = peaks;
+  console.log(`${t.id}: ${audio.duration}s, ${audio.tempo} bpm (listed ${t.bpm}), first beat ${audio.beatOffset}s, ${audio.loudness} LUFS`);
 }
 await browser.close();
 fs.writeFileSync(path.join(root, "src/data/trackAnalysis.json"), JSON.stringify(out) + "\n");
+fs.writeFileSync(path.join(root, "src/data/trackWaveforms.json"), JSON.stringify(waves) + "\n");
 console.log("wrote src/data/trackAnalysis.json");

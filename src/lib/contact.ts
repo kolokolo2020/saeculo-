@@ -3,6 +3,8 @@
 export interface ContactInput {
   name: string;
   message: string;
+  /** The beat a "lease this" from Beats is about, if any (its title). */
+  beat?: string;
 }
 
 export type ContactErrors = Partial<Record<keyof ContactInput, string>>;
@@ -24,7 +26,7 @@ export function validateContact(input: ContactInput): ContactErrors {
 /** The mailto: link that opens the visitor's email app with the message written. */
 export function mailtoFor(to: string, input: ContactInput): string {
   const name = input.name.trim();
-  const subject = `Message from ${name || "the site"}`;
+  const subject = input.beat ? `Leasing “${input.beat}”${name ? ` (${name})` : ""}` : `Message from ${name || "the site"}`;
   const body = `${input.message.trim()}\n\n${name}`;
   return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }

@@ -45,6 +45,10 @@ interface SiteState {
   setShortcutsOpen: (open: boolean) => void;
   /** Take the playing beat into the game's studio, cut from this moment. */
   sampleInStudio: (trackId: string, at: number) => void;
+  /** The beat Contact is about ("lease this" in Beats), by title, or null. */
+  contactBeat: string | null;
+  /** Open Contact about a beat (null: a plain message). */
+  askAbout: (beat: string | null) => void;
 }
 
 const CALM_KEY = "saeculo-calm";
@@ -66,6 +70,7 @@ export const useSiteStore = create<SiteState>((set, get) => ({
   calm: false,
   shortcutsOpen: false,
   sample: null,
+  contactBeat: null,
 
   openWindow: (id) =>
     set((s) => ({
@@ -115,6 +120,10 @@ export const useSiteStore = create<SiteState>((set, get) => ({
   },
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
   sampleInStudio: (trackId, at) => set({ sample: { trackId, at }, gameOpen: true }),
+  askAbout: (beat) => {
+    set({ contactBeat: beat });
+    if (beat) get().openWindow("contact");
+  },
 }));
 
 /** Saved window positions, applied after the first render. */
