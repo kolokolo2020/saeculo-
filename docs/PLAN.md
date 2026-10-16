@@ -145,6 +145,15 @@ commit + push after each step, extend scripts/verify.mjs).
     is unlocked inside the key handler and started at the space bar.
     verify.mjs: 229 checks.
 
+15. The owner's new beats: 14 tracks in `public/audio` (six had been
+    uploaded to the repo root and were moved in with `git mv`), key and BPM
+    from the owner's screenshots in `public/screenshots`, newest first by
+    the date in the file name. File names keep their spaces and brackets;
+    `src` is URL-encoded (`analyze-tracks.mjs` decodes it). elbtunnel was
+    deleted on main and isn't listed; four beats in the screenshots (pale
+    poppa, sing4me boo, under pressure, wiedertäufer) have no file yet.
+    `trackAnalysis.json` re-measured; the studio's chops follow the list.
+
 ## Handoff: what's next (in order)
 
 The work in item 11 was done by parallel agents. The theme and intro tracks

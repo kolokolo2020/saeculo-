@@ -180,9 +180,9 @@ the game's top bar (or on the first-visit card) jumps straight there.
 
 - **Sounds:** 55 synthesized sounds (8 kicks, 6 snares, claps and a snap,
   8 hats, 10 percussion, 808s and bass, rhodes, piano, organ, music box,
-  bell, pad, strings, choir, pluck, lead, flute), 24 **chops** sliced on
-  the beat from care4me, elbtunnel and dull knife (each track loads the
-  first time one of its chops is used), four sounds you find around the
+  bell, pad, strings, choir, pluck, lead, flute), eight **chops** sliced
+  on the beat from each of the beats in the Beats folder (each track loads
+  the first time one of its chops is used), four sounds you find around the
   block, and your own samples. Browse by category or search; click to
   hear, **+** to add a channel, **swap** to change the selected one.
 - **Channel rack:** up to 16 channels, each with mute/solo and volume.

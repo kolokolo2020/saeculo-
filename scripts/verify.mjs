@@ -171,7 +171,7 @@ try {
   {
     const { ctx, page } = await open();
     check("Beats opens by default", await page.getByTestId("window-beats").isVisible());
-    check("tracklist lists the beats", (await page.locator("[data-testid^=track-]").count()) === 3);
+    check("tracklist lists the beats", (await page.locator("[data-testid^=track-]").count()) === 14);
     check("one album cover for every beat", (await page.locator("[data-testid=window-beats] img").count()) === 1 && (await page.locator("[data-testid=window-beats] img").getAttribute("src")).includes("saeculo"));
     await page.getByTestId("deck-play").click();
     await page.waitForTimeout(1200);
@@ -190,16 +190,16 @@ try {
     // the next file can take a moment to buffer
     for (let i = 0; i < 10 && (await audio(page)).paused; i++) await page.waitForTimeout(250);
     const a2 = await audio(page);
-    check("next track", a2.src.includes("elbtunnel") && !a2.paused);
-    check("active row follows", (await page.getByTestId("track-elbtunnel").getAttribute("aria-current")) === "true");
+    check("next track", a2.src.includes("kiss%20me") && !a2.paused);
+    check("active row follows", (await page.getByTestId("track-kiss-me-miss-ya").getAttribute("aria-current")) === "true");
     await page.getByTestId("track-dull-knife").click();
     await page.waitForTimeout(600);
-    check("pick from the folder", (await audio(page)).src.includes("dull-knife"));
+    check("pick from the folder", (await audio(page)).src.includes("dull%20knife"));
     await seekTo(page, 20);
     await page.getByRole("button", { name: "Previous" }).click();
     await page.waitForTimeout(600);
     const a3 = await audio(page);
-    check("previous restarts the track", a3.t < 2 && a3.src.includes("dull-knife"));
+    check("previous restarts the track", a3.t < 2 && a3.src.includes("dull%20knife"));
     await page.waitForTimeout(600);
     // the cover is the hero: the owner's artwork, big and sharp; no visualizer anywhere
     const cover = await page.getByTestId("cover").evaluate((img) => ({ src: img.getAttribute("src"), w: img.getBoundingClientRect().width, natural: img.naturalWidth, done: img.complete }));
@@ -287,21 +287,21 @@ try {
 
   // share link, unavailable file, reduced motion
   {
-    const { ctx, page } = await open({ seen: false, hash: "#track=elbtunnel" });
+    const { ctx, page } = await open({ seen: false, hash: "#track=joy4us" });
     check("share link skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
-    check("share link selects the track", (await page.getByTestId("track-elbtunnel").getAttribute("aria-current")) === "true");
+    check("share link selects the track", (await page.getByTestId("track-joy4us").getAttribute("aria-current")) === "true");
     await ctx.close();
   }
   {
     const ctx = await browser.newContext({ viewport: { width: 1366, height: 800 } });
     await ctx.addInitScript(() => localStorage.setItem("saeculo-intro-seen", "1"));
-    await ctx.route("**/audio/care4me.mp3", (r) => r.fulfill({ status: 404, body: "" }));
+    await ctx.route("**/audio/growin*", (r) => r.fulfill({ status: 404, body: "" }));
     const page = await ctx.newPage();
     await page.goto(BASE, { waitUntil: "networkidle" });
     await page.getByTestId("deck-play").click();
     await page.waitForTimeout(1000);
     check("missing file: player says so", (await page.getByTestId("lcd").textContent()).includes("FILE UNAVAILABLE"));
-    check("missing file: row marked", (await page.getByTestId("track-care4me").textContent()).includes("unavailable"));
+    check("missing file: row marked", (await page.getByTestId("track-growin-and-slowin").textContent()).includes("unavailable"));
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.waitForTimeout(800);
     check("missing file: next still plays", !(await audio(page)).paused);
@@ -938,10 +938,10 @@ try {
     await page.getByTestId("sample-this").click();
     await page.waitForTimeout(2500);
     const st = await page.evaluate(() => window.__game?.studio());
-    const cuts = st?.project.channels.filter((c) => c.voice.startsWith("cut:care4me:")) ?? [];
+    const cuts = st?.project.channels.filter((c) => c.voice.startsWith("cut:growin-and-slowin:")) ?? [];
     check("sample this: opens the studio with the beat cut into four pieces", (await page.getByTestId("studio").isVisible()) && cuts.length === 4);
-    check("sample this: cut from where the player was", cuts.length > 0 && Math.abs(Number(cuts[0].voice.split(":")[2]) * (60 / 142.68) - 40) < 4, cuts[0]?.voice);
-    check("sample this: at the track's tempo and key, and playing", st.project.tempo === 143 && st.project.key === 5 && st.project.scale === "major" && st.playing);
+    check("sample this: cut from where the player was", cuts.length > 0 && Math.abs(Number(cuts[0].voice.split(":")[2]) * (60 / 100.77) - 40) < 4, cuts[0]?.voice);
+    check("sample this: at the track's tempo and key, and playing", st.project.tempo === 101 && st.project.key === 3 && st.project.scale === "major" && st.playing);
     check("sample this: the site player is paused, not underneath", (await audio(page)).paused);
     await page.getByTestId("studio").getByRole("button", { name: "Undo" }).click();
     check("sample this: undo brings back the project you had", !(await page.evaluate(() => window.__game.studio())).project.channels.some((c) => c.voice.startsWith("cut:")));

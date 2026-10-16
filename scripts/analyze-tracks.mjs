@@ -189,7 +189,7 @@ for (const t of tracks) {
     console.log(`${t.id}: no bpm listed, skipped (it plays fine; add a bpm to measure the exact tempo)`);
     continue;
   }
-  const audio = await analyseAudio(path.join(root, "public", t.src), t.bpm);
+  const audio = await analyseAudio(path.join(root, "public", decodeURIComponent(t.src)), t.bpm);
   const colors = t.cover ? await palette(path.join(root, "public", t.cover)) : null;
   out[t.id] = { ...audio, palette: colors };
   console.log(`${t.id}: ${audio.duration}s, ${audio.tempo} bpm (listed ${t.bpm}), first beat ${audio.beatOffset}s, accent ${colors?.accent}`);
