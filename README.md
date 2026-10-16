@@ -196,6 +196,9 @@ Reduced motion (or still visuals) turns off the rain, flicker, haze, shake
 and the lightning flash.
 
 Code: `src/components/game/`: `Game.tsx` (loop, input, dialogue, fights),
+`hud.tsx` (the top bar, prompts, dialogue box, help, notices, touch pad,
+knocked-out screen), `tuning.ts` (speed, keys, place names, trouble odds),
+`lines.ts` (what people say),
 `world.ts` and `places/` (the maps, the subway ride), `life.ts` (people,
 traffic, the cat), `actors.ts` (drawing them), `people.ts` (sprites), `character.ts` (looks, clothes), `combat.ts`, `weapons.ts`,
 `goals.ts`, `scripts.ts` (what the newer places' people say and do),
