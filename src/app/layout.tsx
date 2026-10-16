@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Jersey_10, VT323 } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import { PROFILE } from "@/data/profile";
 import { ALBUM, TRACKS } from "@/data/tracks";
 import "./globals.css";
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="h-full overflow-hidden">
         {children}
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
