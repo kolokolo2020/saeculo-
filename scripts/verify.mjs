@@ -362,6 +362,10 @@ try {
     check("address: share cards point at saeculobeats.com", attr(/<meta property="og:url" content="([^"]+)"/) === SITE && !!og && [SITE, new URL(BASE).origin].includes(og.origin) && og.pathname === "/opengraph-image", ogImage);
     check("address: the structured data points at saeculobeats.com", html.includes(`"url":"${SITE}"`));
     check("address: nothing points at saeculo.vercel.app any more", !html.includes("saeculo.vercel.app"));
+    // Vercel Web Analytics: its script is on the page (the dev build loads the
+    // debug one, which records nothing) and it sets no cookies
+    check("analytics: the Web Analytics script is on the page", await page.evaluate(() => !!document.querySelector('script[src*="/insights/script"], script[src*="vercel-scripts.com/v1/script"]')));
+    check("analytics: no cookies", (await ctx.cookies()).length === 0);
     const robots = await (await page.request.get(BASE + "/robots.txt")).text();
     check("address: robots.txt names the sitemap on saeculobeats.com", robots.includes(`Sitemap: ${SITE}/sitemap.xml`), robots.replace(/\n/g, " "));
     const sitemap = await (await page.request.get(BASE + "/sitemap.xml")).text();

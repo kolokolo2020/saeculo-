@@ -248,6 +248,14 @@ Code: `src/components/game/studio/` (the DAW: `voices.ts` sounds,
 `engine.ts` mixer and sequencer, `project.ts` model and saves, `presets.ts`
 starters, and the panels).
 
+## Visitor stats
+
+Vercel Web Analytics (`<Analytics />` in `src/app/layout.tsx`) counts page
+views: visitors, countries, referrers, devices, and which beat pages people
+land on. It uses no cookies. It only records once Web Analytics is switched
+on for the project in the Vercel dashboard (saeculo → Analytics → Enable),
+and never in development.
+
 ## Project structure
 
 - `src/app/`: layout (fonts, and a tiny script that decides before the
