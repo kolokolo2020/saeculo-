@@ -25,7 +25,8 @@ screen, and the camera goes into the screen, which opens onto the desktop
 with Beats open. That key is also what lets sound start, so the intro is
 silent until then. A click or key on the way in hurries it to the room;
 Skip or Esc skips it. It plays once per browser, and the clock menu in the
-taskbar replays it. Share links (`/#track=<id>`) skip it. With reduced
+taskbar replays it. Beat pages (`/beat/<id>`) and old share links
+(`/#track=<id>`) skip it. With reduced
 motion or still visuals it's one still picture of the room; a key puts
 "saeculo" on the screen, then a quick fade. Everything is drawn on canvas
 (the building and the room once, small; each frame copies what the camera
@@ -57,6 +58,12 @@ to −10 LUFS in the player (their loudness is measured by
 nothing is turned up, so nothing clips. The files themselves are never
 changed. iPhones play the files as they are (the player keeps Web Audio off
 there, because iOS silences it when the screen locks).
+
+Every beat has its own page, `/beat/<id>` (built from `tracks.ts`, so a new
+beat gets one by itself): the same desktop with that beat ready in Beats,
+its own title, and its own preview card when the link is shared (the cover,
+the title, key and bpm; `src/app/beat/[id]/`). **copy link** gives that
+address. The sitemap lists them all, and an unknown id is a 404.
 
 States: "LOADING…" while a file buffers; "FILE UNAVAILABLE" (and the row
 marked) if a file fails, with next/previous still working and play retrying;

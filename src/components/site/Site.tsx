@@ -5,6 +5,7 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 import AudioEngine from "@/components/player/AudioEngine";
 import { usePlayerStore } from "@/components/player/playerStore";
 import BeatsWindow from "@/components/beats/BeatsWindow";
+import { TRACKS } from "@/data/tracks";
 import { trackIndexFromHash } from "@/lib/trackLink";
 import ContactWindow from "./ContactWindow";
 import { BeatsIcon, ContactIcon, GameIcon, SocialsIcon } from "./Icons";
@@ -44,7 +45,8 @@ const ICONS: { id: WindowId | "game"; label: string; Icon: typeof BeatsIcon }[] 
   { id: "game", label: "Game", Icon: GameIcon },
 ];
 
-export default function Site() {
+/** The desktop. On a beat's own page (/beat/<id>) that beat is ready in Beats. */
+export default function Site({ initialTrackId }: { initialTrackId?: string } = {}) {
   useShortcuts();
   const windows = useSiteStore((s) => s.windows);
   const gameOpen = useSiteStore((s) => s.gameOpen);
@@ -62,12 +64,15 @@ export default function Site() {
       calm: readCalm() || window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     });
     restoreSitePrefs();
-    const fromLink = trackIndexFromHash(window.location.hash);
+    // a #track= link wins over the page's own beat
+    const fromHash = trackIndexFromHash(window.location.hash);
+    const fromPage = initialTrackId ? TRACKS.findIndex((t) => t.id === initialTrackId) : -1;
+    const fromLink = fromHash >= 0 ? fromHash : fromPage;
     if (fromLink >= 0) usePlayerStore.getState().selectTrack(fromLink, false);
     const site = useSiteStore.getState();
     if (document.documentElement.dataset.intro === "skip") site.openWindow("beats");
     else site.setIntroOpen(true);
-  }, []);
+  }, [initialTrackId]);
 
   // a share link followed while the site is already open
   useEffect(() => {

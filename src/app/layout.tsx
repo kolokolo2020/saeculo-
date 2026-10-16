@@ -40,16 +40,16 @@ const jsonLd = {
   track: TRACKS.map((t) => ({
     "@type": "MusicRecording",
     name: t.title,
-    url: `${siteUrl}/#track=${t.id}`,
+    url: `${siteUrl}/beat/${t.id}`,
     byArtist: { "@type": "MusicGroup", name: PROFILE.artistName },
     inAlbum: { "@type": "MusicAlbum", name: ALBUM.title },
     image: `${siteUrl}${ALBUM.coverJpg}`,
   })),
 };
 
-// Runs before first paint: returning visitors and share links skip the
+// Runs before first paint: returning visitors, share links and beat pages skip the
 // intro, and the visitor's "calm visuals" choice applies immediately.
-const bootScript = `try{var s=localStorage;if(s.getItem("saeculo-intro-seen")==="1"||/track=/.test(location.hash))document.documentElement.dataset.intro="skip";if(s.getItem("saeculo-calm")==="1")document.documentElement.dataset.calm="true"}catch(e){}`;
+const bootScript = `try{var s=localStorage;if(s.getItem("saeculo-intro-seen")==="1"||/track=/.test(location.hash)||location.pathname.indexOf("/beat/")===0)document.documentElement.dataset.intro="skip";if(s.getItem("saeculo-calm")==="1")document.documentElement.dataset.calm="true"}catch(e){}`;
 
 export const viewport: Viewport = {
   // the paper of the window title bars and the taskbar

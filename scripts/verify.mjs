@@ -27,7 +27,7 @@ const errors = [];
 
 const browser = await chromium.launch({ executablePath: CHROME, args: ["--autoplay-policy=no-user-gesture-required"] });
 
-async function open({ seen = true, viewport = { width: 1366, height: 800 }, hash = "", reduced = false, mobile = false, init, now } = {}) {
+async function open({ seen = true, viewport = { width: 1366, height: 800 }, hash = "", reduced = false, mobile = false, init, now, path = "/" } = {}) {
   const ctx = await browser.newContext({
     viewport,
     reducedMotion: reduced ? "reduce" : "no-preference",
@@ -47,7 +47,7 @@ async function open({ seen = true, viewport = { width: 1366, height: 800 }, hash
   if (now) await page.clock.setFixedTime(new Date(now));
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => m.type() === "error" && !isEnvNoise(m.text()) && errors.push(m.text()));
-  await page.goto(BASE + "/" + hash, { waitUntil: "networkidle" });
+  await page.goto(BASE + path + hash, { waitUntil: "networkidle" });
   await page.waitForTimeout(400);
   return { ctx, page };
 }
@@ -437,6 +437,39 @@ try {
     await page.waitForTimeout(400);
     check("new tags: and stop saying it after 30 days", (await page.locator("[data-testid^=track-] .mp-new").count()) === 0);
     await ctx.close();
+  }
+
+  // ---------------------------------------------------------------- a page per beat
+  {
+    const SITE = "https://www.saeculobeats.com";
+    const { ctx, page } = await open({ seen: false, path: "/beat/joy4us" });
+    check("beat page: a first visit there skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
+    check("beat page: Beats is open on that beat, ready, not playing", (await page.getByTestId("window-beats").isVisible()) && (await page.getByTestId("track-joy4us").getAttribute("aria-current")) === "true" && (await audio(page)).paused);
+    check("beat page: the tab is titled with the beat", (await page.title()).startsWith("joy4us"), await page.title());
+    const html = await (await page.request.get(BASE + "/beat/joy4us")).text();
+    const attr = (re) => (html.match(re) ?? [])[1];
+    check("beat page: its canonical link is its own address", attr(/<link rel="canonical" href="([^"]+)"/) === `${SITE}/beat/joy4us`, attr(/<link rel="canonical" href="([^"]+)"/));
+    check("beat page: its share card names the beat", attr(/<meta property="og:title" content="([^"]+)"/) === "joy4us — saeculo" && attr(/<meta property="og:url" content="([^"]+)"/) === `${SITE}/beat/joy4us` && (attr(/<meta property="og:description" content="([^"]+)"/) ?? "").includes("96 bpm"));
+    const ogImage = attr(/<meta property="og:image" content="([^"]+)"/) ?? "";
+    check("beat page: one card image, its own", (html.match(/property="og:image"/g) ?? []).length === 1 && new URL(ogImage).pathname === "/beat/joy4us/opengraph-image", ogImage);
+    const card = await page.request.get(BASE + new URL(ogImage).pathname);
+    check("beat page: the card image is drawn", card.status() === 200 && card.headers()["content-type"] === "image/png" && (await card.body()).length > 20_000);
+    check("beat page: an unknown beat is a 404", (await page.request.get(BASE + "/beat/nope")).status() === 404 && (await page.request.get(BASE + "/beat/nope/opengraph-image")).status() === 404);
+    const sitemap = await (await page.request.get(BASE + "/sitemap.xml")).text();
+    check("beat page: the sitemap lists every beat's page", (sitemap.match(/<loc>[^<]*\/beat\/[a-z0-9-]+<\/loc>/g) ?? []).length === 14);
+    // copy link gives the beat's own page
+    await page.evaluate(() => {
+      window.__copied = null;
+      navigator.clipboard.writeText = async (t) => { window.__copied = t; };
+    });
+    await page.getByTestId("track-dull-knife").click();
+    await page.getByRole("button", { name: "copy link" }).click();
+    await page.waitForTimeout(200);
+    check("copy link: gives the beat's own page", (await page.evaluate(() => window.__copied)) === new URL(BASE).origin + "/beat/dull-knife", await page.evaluate(() => window.__copied));
+    await ctx.close();
+    const { ctx: c2, page: p2 } = await open({ path: "/beat/analog", hash: "#track=day2nite" });
+    check("beat page: an old #track= link on it still wins", (await p2.getByTestId("track-day2nite").getAttribute("aria-current")) === "true");
+    await c2.close();
   }
 
   // ---------------------------------------------------------------- contact
