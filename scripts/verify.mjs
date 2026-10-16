@@ -380,6 +380,10 @@ try {
       });
     const old = await head("/sitemap.xml?x=1", "saeculo.vercel.app");
     check("address: saeculo.vercel.app redirects to saeculobeats.com for good", old.status === 308 && old.location === `${SITE}/sitemap.xml?x=1`, `${old.status} ${old.location}`);
+    const oldTab = await head("/audio/analog.mp3", "saeculo.vercel.app");
+    check("address: a tab already open on the old address still gets its MP3s", oldTab.status === 200, String(oldTab.status));
+    const oldRoot = await head("/", "saeculo.vercel.app");
+    check("address: the old address's front page redirects too", oldRoot.status === 308 && oldRoot.location === `${SITE}/`, `${oldRoot.status} ${oldRoot.location}`);
     const preview = await head("/robots.txt", "saeculo-git-main-turfmap.vercel.app");
     check("address: preview addresses are not redirected", preview.status === 200, String(preview.status));
 

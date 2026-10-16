@@ -20,7 +20,10 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: "/:path*",
+        // pages only: files (MP3s, scripts) keep loading from the address a
+        // tab is already open on; a redirected MP3 would come from another
+        // origin and play silent through the player's Web Audio graph
+        source: "/:path((?!audio/|_next/|_vercel/).*)",
         has: [{ type: "host", value: "saeculo\\.vercel\\.app" }],
         destination: `${SITE_URL}/:path*`,
         permanent: true,
