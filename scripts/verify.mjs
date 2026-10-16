@@ -75,15 +75,15 @@ try {
     const intro = page.getByRole("dialog", { name: "Intro" });
     check("first visit: intro shows", await intro.isVisible());
     check(
-      "first visit: the cover before the intro is the intro's own near-black",
+      "first visit: the cover before the intro is the intro's own night sky",
       (await page.evaluate(() => {
         // it's gone once the page is ready, so read the rule
         for (const sh of document.styleSheets) for (const r of (() => { try { return sh.cssRules; } catch { return []; } })()) if (r.selectorText === ".intro-cover") return r.style.backgroundColor;
         return null;
-      })) === "rgb(11, 10, 9)",
+      })) === "rgb(7, 11, 28)",
     );
     check(
-      "intro: a dark room, the name, and a way in",
+      "intro: the night sky, the name, and a way in",
       (await intro.getAttribute("data-phase")) === "gate" && (await intro.textContent()).includes("saeculo") && (await page.getByRole("button", { name: /to enter/i }).isVisible()),
     );
     check("intro: the music waits for the click", (await audio(page)).paused);
@@ -93,24 +93,39 @@ try {
       const v = await page.evaluate(async () => (await window.axe.run(document.querySelector('[role="dialog"]'), { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
       check("axe: no violations on the intro", v.length === 0, v.join(", "));
     }
-    await page.keyboard.press("a");
-    await page.waitForTimeout(1500);
-    check("intro: a key lights the cigarette", (await intro.getAttribute("data-phase")) === "burn");
-    const ember = await page.evaluate(() =>
-      [...document.querySelectorAll('[role="dialog"] canvas')].some((c) => {
+    /** The share of the intro's canvas that's warm light (the lit window, the lamp, the room). */
+    const warm = () =>
+      page.evaluate(() => {
+        const c = document.querySelector('[role="dialog"] canvas');
         const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-        for (let i = 0; i < d.length; i += 16) if (d[i + 3] > 200 && d[i] > 200 && d[i + 1] < 170 && d[i + 2] < 120) return true;
-        return false;
-      }),
-    );
-    check("intro: the coal glows", ember);
+        let n = 0;
+        for (let i = 0; i < d.length; i += 16) if (d[i] > 150 && d[i] - d[i + 2] > 50) n++;
+        return n / (d.length / 16);
+      });
+    const skyWarm = await warm();
+    await page.keyboard.press("a");
+    await page.waitForTimeout(300);
+    check("intro: a key opens on the sky", (await intro.getAttribute("data-phase")) === "sky");
+    check("intro: the beat starts with the click (far off, behind the walls)", !(await audio(page)).paused);
+    await page.waitForTimeout(1500);
+    check("intro: then down the building", (await intro.getAttribute("data-phase")) === "descend");
     await page.keyboard.press("Enter");
     await page.waitForTimeout(900);
-    check("intro: a key hurries it along (the breath out)", (await intro.getAttribute("data-phase")) === "exhale");
+    check("intro: a key hurries it along (to the lit window)", (await intro.getAttribute("data-phase")) === "window");
+    const winWarm = await warm();
+    check("intro: the lit window is there, warm against the night", winWarm > skyWarm * 1.15, `${skyWarm.toFixed(4)} → ${winWarm.toFixed(4)}`);
     await page.mouse.click(683, 600);
     await page.waitForTimeout(900);
-    check("intro: a click too (the name, through the smoke)", (await intro.getAttribute("data-phase")) === "reveal" && (await intro.locator("[data-shown='true']").count()) === 1);
-    check("intro: the music comes up with the name", !(await audio(page)).paused);
+    check("intro: a click too (into the laptop's screen)", (await intro.getAttribute("data-phase")) === "screen");
+    check("intro: the desktop is there behind the screen, Beats open", await page.getByTestId("window-beats").isVisible());
+    check(
+      "intro: by now the screen fills the frame",
+      await page.evaluate(() => {
+        const c = document.querySelector('[role="dialog"] canvas');
+        const [r, g, b] = c.getContext("2d").getImageData(c.width >> 1, c.height >> 1, 1, 1).data;
+        return r > 170 && g > 160 && b > 140;
+      }),
+    );
     await page.getByRole("button", { name: /skip/i }).click();
     await page.waitForTimeout(500);
     check("intro: skip lands on the desktop with Beats open", (await intro.count()) === 0 && (await page.getByTestId("window-beats").isVisible()));
@@ -125,7 +140,7 @@ try {
     check("replay intro from the clock menu", await page.getByRole("dialog", { name: "Intro" }).isVisible());
     await page.waitForTimeout(1000);
     await page.getByRole("button", { name: /to enter/i }).click();
-    await page.waitForTimeout(11500);
+    await page.waitForTimeout(9000);
     check(
       "intro: runs all the way to the desktop by itself",
       (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused && (await page.getByTestId("window-beats").isVisible()),
@@ -148,7 +163,7 @@ try {
     const intro = page.getByRole("dialog", { name: "Intro" });
     await page.getByRole("button", { name: /tap to enter/i }).tap();
     await page.waitForTimeout(500);
-    check("intro on a phone: a tap lights it", (await intro.getAttribute("data-phase")) === "burn");
+    check("intro on a phone: a tap starts it", (await intro.getAttribute("data-phase")) === "sky");
     check("intro on a phone: fits the screen", (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390);
     await page.getByRole("button", { name: /skip/i }).tap();
     await page.waitForTimeout(500);
@@ -299,10 +314,13 @@ try {
   {
     const { ctx, page } = await open({ seen: false, reduced: true });
     const intro = page.getByRole("dialog", { name: "Intro" });
-    check("reduced motion: the intro has no burning or smoke", (await intro.isVisible()) && (await intro.locator("canvas").count()) === 0);
+    const still = () => page.evaluate(() => document.querySelector('[role="dialog"] canvas').toDataURL());
+    const first = await still();
+    await page.waitForTimeout(700);
+    check("reduced motion: one still picture, nothing moving", (await intro.isVisible()) && (await intro.locator("canvas").count()) === 1 && first === (await still()));
     await page.keyboard.press("a");
     await page.waitForTimeout(300);
-    check("reduced motion: a key goes straight to the name", (await intro.getAttribute("data-phase")) === "reveal");
+    check("reduced motion: a key goes straight to the lit window", (await intro.getAttribute("data-phase")) === "window");
     await page.waitForTimeout(2300);
     check("reduced motion: a short, still intro, then in", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0 && !(await audio(page)).paused);
     await ctx.close();

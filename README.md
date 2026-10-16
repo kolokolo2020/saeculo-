@@ -10,20 +10,26 @@ Windows-style buttons and taskbar), with four things on it.
 - **Game**: a small top-down neighbourhood where you find sounds and make a
   beat with them.
 
-A first visit opens with a short intro in a dark, archival room: just
-"saeculo", quietly, waiting for a click or key (that click is what lets
-sound start). Then a cigarette is smoked down to the filter in a couple of
-seconds: the coal creeps, the ash builds up and drops off, you hear the
-crackle. The breath goes out, the smoke blows in from the side, and
-"saeculo" shows through it, bright. Then the dark is blown away to the
-desktop and the beat comes up. About 9 seconds after the click. It's
-skippable (Skip or Esc; a click or key hurries it along), plays once per
-browser, and the clock menu in the taskbar replays it. Share links
-(`/#track=<id>`) skip it. With reduced motion or still visuals it's just the
-name on the dark screen and a quick fade. Everything is drawn on canvas and
-every sound is synthesized. Code: `src/components/intro/` (`BootIntro.tsx`
-runs the sequence, input and the music hand-off; `scene.ts` draws it;
-`sounds.ts` makes the sounds; `intro.module.css` the styles).
+A first visit opens with a short intro: the block at night, in the game's
+pixels. "saeculo" quietly over the sky, the moon and the skyline, waiting
+for a click or key (that click is what lets sound start, and the beat starts
+right on it, muffled, from somewhere in the building, with the city's hum
+and a car going past). The camera goes down your building, past the dark
+windows and the fire escape, to the one window that's lit: the bedroom from
+the game, the lamp on, the album cover on the wall, the laptop open on the
+desk. It goes in through the glass and on into the laptop's screen, and the
+screen is the site: it opens onto the desktop, Beats open and the beat
+clear. About 7 seconds after the click. It's skippable (Skip or Esc; a click
+or key hurries it along), plays once per browser, and the clock menu in the
+taskbar replays it. Share links (`/#track=<id>`) skip it. With reduced
+motion or still visuals it's one still picture of the lit window with the
+name, then a quick fade. Everything is drawn on canvas (the building once,
+small; each frame copies what the camera sees) and every sound but the beat
+is synthesized. Code: `src/components/intro/` (`BlockIntro.tsx` runs the
+sequence, input and the music; `block.ts` draws it; `city.ts` makes the
+sounds; `block.module.css` the styles). The earlier cigarette intro
+(`BootIntro.tsx`, `scene.ts`, `sounds.ts`, `intro.module.css`) is still in
+the folder, unused.
 
 ## Beats
 

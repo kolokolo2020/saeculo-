@@ -1,0 +1,155 @@
+/* The intro (BlockIntro.tsx): the block at night, the lit window, the
+   laptop. Everything here sits above the desktop and is gone after. */
+
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: clip;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: default;
+  /* the sky's darkest blue, until the canvas has drawn it */
+  background: #070b1c;
+  color: #d9d3c9;
+  font-family: var(--nf-ui), "Helvetica Neue", system-ui, sans-serif;
+  outline: none;
+}
+/* the screen opens onto the desktop underneath */
+.root[data-phase="screen"]:not(.still) {
+  background: transparent;
+}
+.still[data-phase="out"] {
+  animation: fade-out 0.35s ease-in forwards;
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.vignette {
+  background: radial-gradient(ellipse 80% 75% at 50% 45%, transparent 50%, rgba(3, 4, 12, 0.55) 100%);
+  transition: opacity 0.8s;
+}
+[data-phase="screen"] .vignette,
+[data-phase="screen"] .skip {
+  opacity: 0;
+}
+
+/* ------------------------------------------------------------ the gate */
+
+.gate {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 62%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.9s ease-out;
+}
+/* the still picture has the lit window in the middle: the name goes below it */
+.still .gate {
+  inset: auto 0 0;
+  height: 34%;
+}
+[data-phase]:not([data-phase="gate"]) .gate {
+  opacity: 0;
+  pointer-events: none;
+}
+.name {
+  margin: 0;
+  /* the tracking would push it right of centre; pad it back */
+  padding-left: 0.42em;
+  font-size: clamp(20px, 2.4vw, 26px);
+  font-weight: 400;
+  letter-spacing: 0.42em;
+  line-height: 1;
+  color: #c4bdb1;
+  text-shadow: 0 0 18px rgba(7, 11, 28, 0.9);
+  animation: rise 1.6s ease-out both;
+}
+.enter {
+  position: relative;
+  margin-top: 30px;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #aba496;
+  animation: rise 1.6s 0.5s ease-out both;
+  transition: color 0.2s;
+}
+.enter:hover,
+.enter:focus-visible {
+  color: #ece6dc;
+}
+.enter::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 22px;
+  height: 1px;
+  margin-left: -11px;
+  background: rgba(217, 211, 201, 0.4);
+  animation: breathe 2.8s ease-in-out infinite;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes breathe {
+  50% {
+    transform: scaleX(2.2);
+    opacity: 0.25;
+  }
+}
+
+/* ------------------------------------------------------------ skip */
+
+.skip {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 3;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #a49e94;
+  transition: color 0.2s, opacity 0.5s;
+}
+.skip:hover,
+.skip:focus-visible {
+  color: #ece6dc;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .name,
+  .enter,
+  .enter::after {
+    animation: none;
+  }
+}
+.still .name,
+.still .enter,
+.still .enter::after {
+  animation: none;
+}

@@ -119,6 +119,18 @@ commit + push after each step, extend scripts/verify.mjs).
       placement, sideways phone). playtest.mjs adds Vee's battle, the tape
       lost in a knockout and Dre's line, the cat following and scared off.
 
+13. A new intro (session 4, branch `claude/saeculo-beats-improvements-n5mq3f`):
+    "the block at night". The gate is the night sky with the name; the click
+    starts the beat (muffled, from inside the building) and the city sound;
+    the camera goes down your building to the lit window (the bedroom: lamp,
+    album cover, laptop), in through the glass and into the laptop's screen,
+    which opens onto the real desktop with Beats open. Phases on the
+    dialog's data-phase: gate, sky, descend, window, screen (and out for the
+    still version). The music starts inside the click, which should also
+    settle the untested iOS start. Reduced motion: one still picture of the
+    lit window. The cigarette intro's files are kept, unused (removing them
+    needs the owner's OK). verify.mjs: 225 checks.
+
 ## Handoff: what's next (in order)
 
 The work in item 11 was done by parallel agents. The theme and intro tracks

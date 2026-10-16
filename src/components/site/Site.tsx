@@ -18,7 +18,7 @@ import Window from "./Window";
 // The intro and the game are only downloaded when they're needed: returning
 // visitors never fetch the intro, and nobody fetches the game until they
 // open it.
-const BootIntro = dynamic(() => import("@/components/intro/BootIntro"), { ssr: false });
+const BlockIntro = dynamic(() => import("@/components/intro/BlockIntro"), { ssr: false });
 const Game = dynamic(() => import("@/components/game/Game"), { ssr: false, loading: () => <GameLoading /> });
 
 const SEEN_KEY = "saeculo-intro-seen";
@@ -93,6 +93,10 @@ export default function Site() {
     site.openWindow("beats");
   }, []);
 
+  // the intro's last shot goes into the laptop's screen: the desktop is
+  // there, Beats open, by the time it opens up
+  const revealDesktop = useCallback(() => useSiteStore.getState().openWindow("beats"), []);
+
   const open = (id: WindowId | "game") => {
     const site = useSiteStore.getState();
     if (id === "game") site.setGameOpen(true);
@@ -141,7 +145,7 @@ export default function Site() {
       {/* film grain for the intro and the game; the desktop stays clean paper */}
       {(gameOpen || introOpen) && <div className="grain" aria-hidden />}
       {!ready && <div className="intro-cover" aria-hidden />}
-      {introOpen && <BootIntro onDone={endIntro} />}
+      {introOpen && <BlockIntro onDone={endIntro} onReveal={revealDesktop} />}
       {gameOpen && <Game onExit={() => useSiteStore.getState().setGameOpen(false)} />}
     </main>
   );
