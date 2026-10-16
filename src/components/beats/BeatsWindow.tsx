@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
@@ -217,8 +218,20 @@ export default function BeatsWindow() {
     <div className="mp flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ ["--accent" as string]: ACCENT }}>
       <div className="mp-hero flex shrink-0 flex-col items-center gap-4 px-4 pt-5 pb-4 sm:flex-row sm:items-stretch sm:gap-6 sm:p-5">
         <div className="mp-cover">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={ALBUM.cover} alt={`${ALBUM.title}: the album cover`} width={464} height={464} className="block h-full w-full object-cover" data-testid="cover" />
+          {/* Next serves it resized for the size it's shown at (globals.css .mp-cover)
+              and the screen's density, at quality 90: lower smooths away the
+              artwork's grain */}
+          <Image
+            src={ALBUM.cover}
+            alt={`${ALBUM.title}: the album cover`}
+            width={248}
+            height={248}
+            sizes="(max-height: 560px) and (min-width: 640px) 120px, (max-height: 560px) 150px, 248px"
+            quality={90}
+            loading="eager"
+            className="block h-full w-full object-cover"
+            data-testid="cover"
+          />
         </div>
         <div className="flex w-full min-w-0 flex-1 flex-col justify-between gap-4 sm:py-0.5">
           <NowPlaying />

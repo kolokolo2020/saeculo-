@@ -27,7 +27,7 @@ const errors = [];
 
 const browser = await chromium.launch({ executablePath: CHROME, args: ["--autoplay-policy=no-user-gesture-required"] });
 
-async function open({ seen = true, viewport = { width: 1366, height: 800 }, hash = "", reduced = false, mobile = false, init } = {}) {
+async function open({ seen = true, viewport = { width: 1366, height: 800 }, hash = "", reduced = false, mobile = false, init, now, path = "/" } = {}) {
   const ctx = await browser.newContext({
     viewport,
     reducedMotion: reduced ? "reduce" : "no-preference",
@@ -43,9 +43,11 @@ async function open({ seen = true, viewport = { width: 1366, height: 800 }, hash
     [seen, init ?? null],
   );
   const page = await ctx.newPage();
+  // a fixed date (Date.now, new Date) for date-dependent things like "new" tags
+  if (now) await page.clock.setFixedTime(new Date(now));
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => m.type() === "error" && !isEnvNoise(m.text()) && errors.push(m.text()));
-  await page.goto(BASE + "/" + hash, { waitUntil: "networkidle" });
+  await page.goto(BASE + path + hash, { waitUntil: "networkidle" });
   await page.waitForTimeout(400);
   return { ctx, page };
 }
@@ -172,7 +174,7 @@ try {
     const { ctx, page } = await open();
     check("Beats opens by default", await page.getByTestId("window-beats").isVisible());
     check("tracklist lists the beats", (await page.locator("[data-testid^=track-]").count()) === 14);
-    check("one album cover for every beat", (await page.locator("[data-testid=window-beats] img").count()) === 1 && (await page.locator("[data-testid=window-beats] img").getAttribute("src")).includes("saeculo"));
+    check("one album cover for every beat", (await page.locator("[data-testid=window-beats] img").count()) === 1 && decodeURIComponent(await page.locator("[data-testid=window-beats] img").getAttribute("src")).includes("url=/covers/saeculo.jpg"));
     await page.getByTestId("deck-play").click();
     await page.waitForTimeout(1200);
     const a1 = await audio(page);
@@ -202,8 +204,15 @@ try {
     check("previous restarts the track", a3.t < 2 && a3.src.includes("dull%20knife"));
     await page.waitForTimeout(600);
     // the cover is the hero: the owner's artwork, big and sharp; no visualizer anywhere
-    const cover = await page.getByTestId("cover").evaluate((img) => ({ src: img.getAttribute("src"), w: img.getBoundingClientRect().width, natural: img.naturalWidth, done: img.complete }));
-    check("Beats: the cover is the owner's artwork (saeculo.jpg)", cover.src.endsWith("/covers/saeculo.jpg") && cover.done && cover.natural >= 1000, cover.src);
+    const cover = await page.getByTestId("cover").evaluate((img) => ({ src: img.currentSrc || img.src, w: img.getBoundingClientRect().width, natural: img.naturalWidth, done: img.complete, bytes: performance.getEntriesByName(img.currentSrc || img.src)[0]?.encodedBodySize ?? -1 }));
+    check("Beats: the cover is the owner's artwork (saeculo.jpg)", decodeURIComponent(cover.src).includes("url=/covers/saeculo.jpg") && cover.done, cover.src);
+    const servedW = Number(new URL(cover.src).searchParams.get("w"));
+    const servedQ = Number(new URL(cover.src).searchParams.get("q"));
+    check("Beats: the cover is served resized, sharp but not the 1200px original", servedW >= cover.w && servedW < 400, `${servedW}px for ${Math.round(cover.w)}px`);
+    check("Beats: the cover keeps its grain (quality 90)", servedQ === 90, `q=${servedQ}`);
+    check("Beats: the cover weighs a fraction of the original", cover.bytes > 0 && cover.bytes < 60_000, `${Math.round(cover.bytes / 1024)} KB`);
+    const mini = await page.locator("[data-testid=mini-player] img").evaluate((img) => ({ src: img.currentSrc || img.src, natural: img.naturalWidth }));
+    check("taskbar: the little cover is a small copy", decodeURIComponent(mini.src).includes("url=/covers/saeculo.jpg") && mini.natural > 0 && mini.natural <= 64, `${mini.natural}px`);
     check("Beats: the cover is the hero, shown large", cover.w >= 220, String(Math.round(cover.w)));
     check("Beats: no visualizer, the only canvas is the seek bar", (await page.locator("[data-testid=visualizer]").count()) === 0 && (await page.locator("[data-testid=window-beats] canvas").count()) === 1 && (await page.locator("[data-testid=window-beats] canvas[data-testid=waveform]").count()) === 1);
     check("Beats: no visuals switch, in the window or the clock menu", (await page.getByRole("button", { name: /visuals:/ }).count()) === 0);
@@ -337,6 +346,134 @@ try {
     const calm = await page.evaluate(() => window.__game.state());
     check("reduced motion: thunder, but no lightning flash", calm.bolts === 1 && calm.bolt === 0);
     await ctx.close();
+  }
+
+  // ------------------------------------- address, files, even loudness, new tags
+  {
+    const SITE = "https://www.saeculobeats.com";
+    const { ctx, page } = await open();
+    const html = await (await page.request.get(BASE + "/")).text();
+    const attr = (re) => (html.match(re) ?? [])[1];
+    check("address: the canonical link is saeculobeats.com", attr(/<link rel="canonical" href="([^"]+)"/) === SITE, attr(/<link rel="canonical" href="([^"]+)"/));
+    // (the card's image URL takes the dev server's own host in development, by
+    // Next's design; a production build puts it on saeculobeats.com)
+    const ogImage = attr(/<meta property="og:image" content="([^"]+)"/) ?? "";
+    const og = ogImage ? new URL(ogImage) : null;
+    check("address: share cards point at saeculobeats.com", attr(/<meta property="og:url" content="([^"]+)"/) === SITE && !!og && [SITE, new URL(BASE).origin].includes(og.origin) && og.pathname === "/opengraph-image", ogImage);
+    check("address: the structured data points at saeculobeats.com", html.includes(`"url":"${SITE}"`));
+    check("address: nothing points at saeculo.vercel.app any more", !html.includes("saeculo.vercel.app"));
+    // Vercel Web Analytics: its script is on the page (the dev build loads the
+    // debug one, which records nothing) and it sets no cookies
+    check("analytics: the Web Analytics script is on the page", await page.evaluate(() => !!document.querySelector('script[src*="/insights/script"], script[src*="vercel-scripts.com/v1/script"]')));
+    check("analytics: no cookies", (await ctx.cookies()).length === 0);
+    const robots = await (await page.request.get(BASE + "/robots.txt")).text();
+    check("address: robots.txt names the sitemap on saeculobeats.com", robots.includes(`Sitemap: ${SITE}/sitemap.xml`), robots.replace(/\n/g, " "));
+    const sitemap = await (await page.request.get(BASE + "/sitemap.xml")).text();
+    check("address: the sitemap lists saeculobeats.com", sitemap.includes(`<loc>${SITE}</loc>`) && !sitemap.includes("vercel.app"));
+    // the old address sends everyone to the new one, path and all; nothing else is redirected
+    const { request: rawGet } = await import("node:http");
+    const head = (path, host) =>
+      new Promise((resolve, reject) => {
+        const u = new URL(BASE);
+        const req = rawGet({ host: u.hostname, port: u.port, path, method: "GET", headers: { host } }, (res) => {
+          res.resume();
+          resolve({ status: res.statusCode, location: res.headers.location ?? "" });
+        });
+        req.on("error", reject);
+        req.end();
+      });
+    const old = await head("/sitemap.xml?x=1", "saeculo.vercel.app");
+    check("address: saeculo.vercel.app redirects to saeculobeats.com for good", old.status === 308 && old.location === `${SITE}/sitemap.xml?x=1`, `${old.status} ${old.location}`);
+    const oldTab = await head("/audio/analog.mp3", "saeculo.vercel.app");
+    check("address: a tab already open on the old address still gets its MP3s", oldTab.status === 200, String(oldTab.status));
+    const oldRoot = await head("/", "saeculo.vercel.app");
+    check("address: the old address's front page redirects too", oldRoot.status === 308 && oldRoot.location === `${SITE}/`, `${oldRoot.status} ${oldRoot.location}`);
+    const preview = await head("/robots.txt", "saeculo-git-main-turfmap.vercel.app");
+    check("address: preview addresses are not redirected", preview.status === 200, String(preview.status));
+
+    // every beat's file is there, under the URL the player asks for
+    const list = await page.evaluate(() => window.__player.tracks());
+    const missing = [];
+    for (const t of list) {
+      const r = await page.request.get(BASE + t.src, { headers: { range: "bytes=0-1" } });
+      if (![200, 206].includes(r.status())) missing.push(`${t.id} ${r.status()}`);
+    }
+    check("files: every beat's MP3 loads", list.length === 14 && missing.length === 0, missing.join(", "));
+    check("files: names with brackets and commas are linked as-is", list.some((t) => t.src.includes("(24.09.26)")) && list.some((t) => t.src.includes("%2C")) && !list.some((t) => /%28|%29/.test(t.src)));
+    check("files: every link is the file name through encodeURIComponent", list.every((t) => t.src === "/audio/" + encodeURIComponent(decodeURIComponent(t.src.slice(7)))));
+
+    // even loudness: loud beats are turned down to the target, quiet ones left alone
+    check("loudness: measured for every beat", list.every((t) => typeof t.loudness === "number" && t.loudness < 0 && t.loudness > -30), list.map((t) => `${t.id} ${t.loudness}`).join(", "));
+    const played = list.map((t) => t.loudness + 20 * Math.log10(t.level));
+    const spreadBefore = Math.max(...list.map((t) => t.loudness)) - Math.min(...list.map((t) => t.loudness));
+    const spreadAfter = Math.max(...played) - Math.min(...played);
+    check("loudness: nothing is pushed up", list.every((t) => t.level <= 1));
+    check("loudness: the beats play within about 1.5 LU of each other", spreadAfter <= 1.5, `${spreadBefore.toFixed(1)} LU → ${spreadAfter.toFixed(1)} LU`);
+    const loud = list.reduce((a, b) => (b.loudness > a.loudness ? b : a));
+    const quiet = list.reduce((a, b) => (b.loudness < a.loudness ? b : a));
+    await page.getByTestId(`track-${loud.id}`).click();
+    await page.waitForTimeout(900);
+    const gLoud = await page.evaluate(() => window.__player.level());
+    check(`loudness: the loudest (${loud.id}) plays turned down`, gLoud !== null && Math.abs(gLoud - loud.level) < 0.01 && gLoud < 0.9, `gain ${gLoud}`);
+    await page.getByTestId(`track-${quiet.id}`).click();
+    await page.waitForTimeout(600);
+    const gQuiet = await page.evaluate(() => window.__player.level());
+    check(`loudness: the quietest (${quiet.id}) plays as it is`, gQuiet === 1, `gain ${gQuiet}`);
+    await page.getByTestId(`track-${loud.id}`).click();
+    await page.waitForTimeout(400);
+    check("loudness: going back to a loud beat turns it down again", Math.abs((await page.evaluate(() => window.__player.level())) - loud.level) < 0.01);
+    await ctx.close();
+
+  }
+  // "new" tags: the beats added in the last 30 days, on a fixed date
+  {
+    const { ctx, page } = await open({ now: "2026-10-01T12:00:00Z" });
+    const tagged = await page.locator("[data-testid^=track-]:has(.mp-new)").evaluateAll((rows) => rows.map((r) => r.dataset.testid.replace("track-", "")));
+    check("new tags: on 1 October the three September beats say new", JSON.stringify(tagged) === JSON.stringify(["growin-and-slowin", "kiss-me-miss-ya", "joy4us"]), tagged.join(", "));
+    check("new tags: still fourteen rows, the tag isn't one", (await page.locator("[data-testid^=track-]").count()) === 14);
+    if (axeSource) {
+      await page.addScriptTag({ content: axeSource });
+      const v = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+      check("axe: no violations with new tags showing", v.length === 0, v.join(", "));
+    }
+    await page.clock.setFixedTime(new Date("2026-11-30T12:00:00Z"));
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(400);
+    check("new tags: and stop saying it after 30 days", (await page.locator("[data-testid^=track-] .mp-new").count()) === 0);
+    await ctx.close();
+  }
+
+  // ---------------------------------------------------------------- a page per beat
+  {
+    const SITE = "https://www.saeculobeats.com";
+    const { ctx, page } = await open({ seen: false, path: "/beat/joy4us" });
+    check("beat page: a first visit there skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
+    check("beat page: Beats is open on that beat, ready, not playing", (await page.getByTestId("window-beats").isVisible()) && (await page.getByTestId("track-joy4us").getAttribute("aria-current")) === "true" && (await audio(page)).paused);
+    check("beat page: the tab is titled with the beat", (await page.title()).startsWith("joy4us"), await page.title());
+    const html = await (await page.request.get(BASE + "/beat/joy4us")).text();
+    const attr = (re) => (html.match(re) ?? [])[1];
+    check("beat page: its canonical link is its own address", attr(/<link rel="canonical" href="([^"]+)"/) === `${SITE}/beat/joy4us`, attr(/<link rel="canonical" href="([^"]+)"/));
+    check("beat page: its share card names the beat", attr(/<meta property="og:title" content="([^"]+)"/) === "joy4us — saeculo" && attr(/<meta property="og:url" content="([^"]+)"/) === `${SITE}/beat/joy4us` && (attr(/<meta property="og:description" content="([^"]+)"/) ?? "").includes("96 bpm"));
+    const ogImage = attr(/<meta property="og:image" content="([^"]+)"/) ?? "";
+    check("beat page: one card image, its own", (html.match(/property="og:image"/g) ?? []).length === 1 && new URL(ogImage).pathname === "/beat/joy4us/opengraph-image", ogImage);
+    const card = await page.request.get(BASE + new URL(ogImage).pathname);
+    check("beat page: the card image is drawn", card.status() === 200 && card.headers()["content-type"] === "image/png" && (await card.body()).length > 20_000);
+    check("beat page: an unknown beat is a 404", (await page.request.get(BASE + "/beat/nope")).status() === 404 && (await page.request.get(BASE + "/beat/nope/opengraph-image")).status() === 404);
+    const sitemap = await (await page.request.get(BASE + "/sitemap.xml")).text();
+    check("beat page: the sitemap lists every beat's page", (sitemap.match(/<loc>[^<]*\/beat\/[a-z0-9-]+<\/loc>/g) ?? []).length === 14);
+    // copy link gives the beat's own page
+    await page.evaluate(() => {
+      window.__copied = null;
+      navigator.clipboard.writeText = async (t) => { window.__copied = t; };
+    });
+    await page.getByTestId("track-dull-knife").click();
+    await page.getByRole("button", { name: "copy link" }).click();
+    await page.waitForTimeout(200);
+    check("copy link: gives the beat's own page", (await page.evaluate(() => window.__copied)) === new URL(BASE).origin + "/beat/dull-knife", await page.evaluate(() => window.__copied));
+    await ctx.close();
+    const { ctx: c2, page: p2 } = await open({ path: "/beat/analog", hash: "#track=day2nite" });
+    check("beat page: an old #track= link on it still wins", (await p2.getByTestId("track-day2nite").getAttribute("aria-current")) === "true");
+    await c2.close();
   }
 
   // ---------------------------------------------------------------- contact

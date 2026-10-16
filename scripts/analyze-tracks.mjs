@@ -3,6 +3,8 @@
 //   - the length shown in the Beats folder before a file is opened
 //   - the exact tempo and first-beat offset (the visualizer's fallback
 //     beat pulse on iPhones follows these)
+//   - the loudness (integrated, ITU-R BS.1770 / EBU R128, in LUFS; within
+//     0.1 LU of ffmpeg's ebur128), so the player can turn loud beats down
 // (It also stores the waveform and a cover palette; the player pulls its
 // colours from the cover itself, so new tracks work without running this.)
 //
@@ -21,9 +23,10 @@ const sharp = require("sharp");
 
 const root = path.join(path.dirname(new URL(import.meta.url).pathname), "..");
 const tracksSrc = fs.readFileSync(path.join(root, "src/data/tracks.ts"), "utf8");
-// id, bpm, src and cover for each track entry
-const tracks = [...tracksSrc.matchAll(/\{\s*id: "([^"]+)",[^{}]*?(?:bpm: (\d+(?:\.\d+)?),[^{}]*?)?(?:cover: "([^"]+)",[^{}]*?)?src: "([^"]+)"/g)].map(
-  ([, id, bpm, cover, src]) => ({ id, bpm: Number(bpm), cover, src }),
+// id, bpm, cover and the audio file for each track entry (`src` is either
+// audioFile("name.mp3"), a file in public/audio/, or a URL-encoded path)
+const tracks = [...tracksSrc.matchAll(/\{\s*id: "([^"]+)",[^{}]*?(?:bpm: (\d+(?:\.\d+)?),[^{}]*?)?(?:cover: "([^"]+)",[^{}]*?)?src: (?:audioFile\("([^"]+)"\)|"([^"]+)")/g)].map(
+  ([, id, bpm, cover, name, src]) => ({ id, bpm: Number(bpm), cover, file: name ? path.join("audio", name) : decodeURIComponent(src) }),
 );
 if (!tracks.length) throw new Error("no tracks found in src/data/tracks.ts");
 
@@ -33,7 +36,7 @@ const browser = await chromium.launch({ executablePath });
 const page = await browser.newPage();
 await page.goto("about:blank");
 
-// ---- audio: waveform, tempo, first beat
+// ---- audio: waveform, tempo, first beat, loudness
 async function analyseAudio(file, nominal) {
   const b64 = fs.readFileSync(file).toString("base64");
   return page.evaluate(
@@ -62,6 +65,57 @@ async function analyseAudio(file, nominal) {
       }
       const maxPk = Math.max(...peaks) || 1;
       const maxRms = Math.max(...rms) || 1;
+
+      // integrated loudness: K-weighting (a high shelf, then a high-pass, with
+      // the coefficients for this sample rate), mean square per channel over
+      // 400 ms blocks every 100 ms, gated at -70 LUFS and then 10 LU under
+      // the mean of what's left
+      const loudness = (() => {
+        const biquad = (b0, b1, b2, a1, a2) => ({ b0, b1, b2, a1, a2 });
+        const shelf = (() => {
+          const f0 = 1681.974450955533, G = 3.999843853973347, Q = 0.7071752369554196;
+          const K = Math.tan((Math.PI * f0) / sr), Vh = Math.pow(10, G / 20), Vb = Math.pow(Vh, 0.4996667741545416);
+          const a0 = 1 + K / Q + K * K;
+          return biquad((Vh + (Vb * K) / Q + K * K) / a0, (2 * (K * K - Vh)) / a0, (Vh - (Vb * K) / Q + K * K) / a0, (2 * (K * K - 1)) / a0, (1 - K / Q + K * K) / a0);
+        })();
+        const hp = (() => {
+          const f0 = 38.13547087602444, Q = 0.5003270373238773;
+          const K = Math.tan((Math.PI * f0) / sr);
+          const a0 = 1 + K / Q + K * K;
+          return biquad(1, -2, 1, (2 * (K * K - 1)) / a0, (1 - K / Q + K * K) / a0);
+        })();
+        const hop = Math.round(sr * 0.1);
+        const hops = Math.floor(buf.length / hop);
+        const energy = new Float64Array(hops);
+        for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+          const x = buf.getChannelData(ch);
+          let x1 = 0, x2 = 0, y1 = 0, y2 = 0, z1 = 0, z2 = 0;
+          for (let h = 0; h < hops; h++) {
+            let sum = 0;
+            for (let i = h * hop, end = i + hop; i < end; i++) {
+              const v = x[i];
+              const y = shelf.b0 * v + shelf.b1 * x1 + shelf.b2 * x2 - shelf.a1 * y1 - shelf.a2 * y2;
+              x2 = x1;
+              x1 = v;
+              const z = hp.b0 * y + hp.b1 * y1 + hp.b2 * y2 - hp.a1 * z1 - hp.a2 * z2;
+              y2 = y1;
+              y1 = y;
+              z2 = z1;
+              z1 = z;
+              sum += z * z;
+            }
+            energy[h] += sum;
+          }
+        }
+        const blocks = [];
+        for (let h = 0; h + 4 <= hops; h++) blocks.push((energy[h] + energy[h + 1] + energy[h + 2] + energy[h + 3]) / (hop * 4));
+        const lufs = (ms) => -0.691 + 10 * Math.log10(ms);
+        const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+        const loud = blocks.filter((ms) => lufs(ms) > -70);
+        if (!loud.length) return undefined;
+        const gate = lufs(mean(loud)) - 10;
+        return Math.round(lufs(mean(loud.filter((ms) => lufs(ms) > gate))) * 10) / 10;
+      })();
 
       // tempo + phase from the hi-hat grid: high-passed onsets, scanned
       // around the nominal tempo for the 16th-note period that lines up best
@@ -116,6 +170,7 @@ async function analyseAudio(file, nominal) {
         duration: Math.round(buf.duration * 100) / 100,
         tempo: Math.round(fine.bpm * 100) / 100,
         beatOffset: Math.round(fine.ph * 1000) / 1000,
+        loudness,
         peaks: peaks.map((v) => Math.round((v / maxPk) * 100) / 100),
         rms: rms.map((v) => Math.round((v / maxRms) * 100) / 100),
       };
@@ -189,10 +244,10 @@ for (const t of tracks) {
     console.log(`${t.id}: no bpm listed, skipped (it plays fine; add a bpm to measure the exact tempo)`);
     continue;
   }
-  const audio = await analyseAudio(path.join(root, "public", decodeURIComponent(t.src)), t.bpm);
+  const audio = await analyseAudio(path.join(root, "public", t.file), t.bpm);
   const colors = t.cover ? await palette(path.join(root, "public", t.cover)) : null;
   out[t.id] = { ...audio, palette: colors };
-  console.log(`${t.id}: ${audio.duration}s, ${audio.tempo} bpm (listed ${t.bpm}), first beat ${audio.beatOffset}s, accent ${colors?.accent}`);
+  console.log(`${t.id}: ${audio.duration}s, ${audio.tempo} bpm (listed ${t.bpm}), first beat ${audio.beatOffset}s, ${audio.loudness} LUFS, accent ${colors?.accent}`);
 }
 await browser.close();
 fs.writeFileSync(path.join(root, "src/data/trackAnalysis.json"), JSON.stringify(out) + "\n");

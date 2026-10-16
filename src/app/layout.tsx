@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Jersey_10, VT323 } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
 import { ALBUM, TRACKS } from "@/data/tracks";
+import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
 
 // Plex Sans is the desktop's clean body face (and the game's stand-in for
@@ -16,7 +18,7 @@ const lcdFont = VT323({ weight: "400", subsets: ["latin"], variable: "--nf-lcd" 
 
 const title = "saeculo — instrumentals & beats";
 const description = "Instrumentals by saeculo. Listen to the beats, find the socials, get in touch, or walk around the neighbourhood and make a beat.";
-const siteUrl = "https://saeculo.vercel.app";
+const siteUrl = SITE_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -39,16 +41,16 @@ const jsonLd = {
   track: TRACKS.map((t) => ({
     "@type": "MusicRecording",
     name: t.title,
-    url: `${siteUrl}/#track=${t.id}`,
+    url: `${siteUrl}/beat/${t.id}`,
     byArtist: { "@type": "MusicGroup", name: PROFILE.artistName },
     inAlbum: { "@type": "MusicAlbum", name: ALBUM.title },
     image: `${siteUrl}${ALBUM.coverJpg}`,
   })),
 };
 
-// Runs before first paint: returning visitors and share links skip the
+// Runs before first paint: returning visitors, share links and beat pages skip the
 // intro, and the visitor's "calm visuals" choice applies immediately.
-const bootScript = `try{var s=localStorage;if(s.getItem("saeculo-intro-seen")==="1"||/track=/.test(location.hash))document.documentElement.dataset.intro="skip";if(s.getItem("saeculo-calm")==="1")document.documentElement.dataset.calm="true"}catch(e){}`;
+const bootScript = `try{var s=localStorage;if(s.getItem("saeculo-intro-seen")==="1"||/track=/.test(location.hash)||location.pathname.indexOf("/beat/")===0)document.documentElement.dataset.intro="skip";if(s.getItem("saeculo-calm")==="1")document.documentElement.dataset.calm="true"}catch(e){}`;
 
 export const viewport: Viewport = {
   // the paper of the window title bars and the taskbar
@@ -68,6 +70,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="h-full overflow-hidden">
         {children}
+        {/* Vercel Web Analytics: page views, no cookies (on once it's enabled
+            in the Vercel project; it records nothing in development) */}
+        <Analytics />
         <SpeedInsights />
       </body>
     </html>
