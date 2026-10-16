@@ -10,20 +10,29 @@ Windows-style buttons and taskbar), with four things on it.
 - **Game**: a small top-down neighbourhood where you find sounds and make a
   beat with them.
 
-A first visit opens with a short intro in a dark, archival room: just
-"saeculo", quietly, waiting for a click or key (that click is what lets
-sound start). Then a cigarette is smoked down to the filter in a couple of
-seconds: the coal creeps, the ash builds up and drops off, you hear the
-crackle. The breath goes out, the smoke blows in from the side, and
-"saeculo" shows through it, bright. Then the dark is blown away to the
-desktop and the beat comes up. About 9 seconds after the click. It's
-skippable (Skip or Esc; a click or key hurries it along), plays once per
-browser, and the clock menu in the taskbar replays it. Share links
-(`/#track=<id>`) skip it. With reduced motion or still visuals it's just the
-name on the dark screen and a quick fade. Everything is drawn on canvas and
-every sound is synthesized. Code: `src/components/intro/` (`BootIntro.tsx`
-runs the sequence, input and the music hand-off; `scene.ts` draws it;
-`sounds.ts` makes the sounds; `intro.module.css` the styles).
+A first visit opens with a short intro that plays by itself: the block at
+night, in the game's pixels. The camera goes down your building, past the
+dark windows and the fire escape, to the one window that's lit, and in
+through the glass (about 4 seconds). Then it stays in the room: the bedroom
+from the game, the lamp on, the album cover on the wall, the laptop on the
+desk, and someone in the desk chair beside it, hood up, lighting a joint
+and smoking it, slowly, over and over. Once it's lit, "press any key" (on
+a phone, "tap to play") comes up. A key or a tap: they stop, lean over and
+press the laptop's space bar; the beat starts, "saeculo" comes up on the
+screen, and the camera goes into the screen, which opens onto the desktop
+with Beats open. That key is also what lets sound start, so the intro is
+silent until then. A click or key on the way in hurries it to the room;
+Skip or Esc skips it. It plays once per browser, and the clock menu in the
+taskbar replays it. Share links (`/#track=<id>`) skip it. With reduced
+motion or still visuals it's one still picture of the room; a key puts
+"saeculo" on the screen, then a quick fade. Everything is drawn on canvas
+(the building and the room once, small; each frame copies what the camera
+sees and draws the person and the smoke) and the sounds are synthesized.
+Code: `src/components/intro/` (`BlockIntro.tsx` runs the sequence, input
+and the music; `block.ts` draws the block and the camera; `room.ts` the
+room and the person in it; `city.ts` the sounds; `block.module.css` the
+styles). The earlier cigarette intro (`BootIntro.tsx`, `scene.ts`,
+`sounds.ts`, `intro.module.css`) is still in the folder, unused.
 
 ## Beats
 
@@ -171,9 +180,9 @@ the game's top bar (or on the first-visit card) jumps straight there.
 
 - **Sounds:** 55 synthesized sounds (8 kicks, 6 snares, claps and a snap,
   8 hats, 10 percussion, 808s and bass, rhodes, piano, organ, music box,
-  bell, pad, strings, choir, pluck, lead, flute), 24 **chops** sliced on
-  the beat from care4me, elbtunnel and dull knife (each track loads the
-  first time one of its chops is used), four sounds you find around the
+  bell, pad, strings, choir, pluck, lead, flute), eight **chops** sliced
+  on the beat from each of the beats in the Beats folder (each track loads
+  the first time one of its chops is used), four sounds you find around the
   block, and your own samples. Browse by category or search; click to
   hear, **+** to add a channel, **swap** to change the selected one.
 - **Channel rack:** up to 16 channels, each with mute/solo and volume.

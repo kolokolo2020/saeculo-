@@ -119,6 +119,41 @@ commit + push after each step, extend scripts/verify.mjs).
       placement, sideways phone). playtest.mjs adds Vee's battle, the tape
       lost in a knockout and Dre's line, the cat following and scared off.
 
+13. A new intro (session 4, branch `claude/saeculo-beats-improvements-n5mq3f`):
+    "the block at night". The gate is the night sky with the name; the click
+    starts the beat (muffled, from inside the building) and the city sound;
+    the camera goes down your building to the lit window (the bedroom: lamp,
+    album cover, laptop), in through the glass and into the laptop's screen,
+    which opens onto the real desktop with Beats open. Phases on the
+    dialog's data-phase: gate, sky, descend, window, screen (and out for the
+    still version). The music starts inside the click, which should also
+    settle the untested iOS start. Reduced motion: one still picture of the
+    lit window. The cigarette intro's files are kept, unused (removing them
+    needs the owner's OK). verify.mjs: 225 checks.
+
+14. The owner's notes on item 13: faster, and the room. The intro now plays
+    by itself (no click first): down the building in ~2.5 s and in through
+    the window by ~3.7 s, then it stays in the room (`room.ts`): someone in
+    the desk chair beside the laptop, hood up, lights a joint and smokes it
+    on a loop (hand up, the coal brightening on the pull, the smoke let
+    out). "press any key" / "tap to play" comes up once it's lit. The key:
+    they stop, lean over and press the laptop's space bar (the click is
+    synthesized); the beat starts from the laptop, "saeculo" on the
+    screen, the camera goes into the screen and onto the desktop. Phases:
+    sky, descend, window, room, press, screen; data-ready when the key's
+    asked for, data-screen="saeculo" once it's on the screen. The music
+    is unlocked inside the key handler and started at the space bar.
+    verify.mjs: 229 checks.
+
+15. The owner's new beats: 14 tracks in `public/audio` (six had been
+    uploaded to the repo root and were moved in with `git mv`), key and BPM
+    from the owner's screenshots in `public/screenshots`, newest first by
+    the date in the file name. File names keep their spaces and brackets;
+    `src` is URL-encoded (`analyze-tracks.mjs` decodes it). elbtunnel was
+    deleted on main and isn't listed; four beats in the screenshots (pale
+    poppa, sing4me boo, under pressure, wiedertäufer) have no file yet.
+    `trackAnalysis.json` re-measured; the studio's chops follow the list.
+
 ## Handoff: what's next (in order)
 
 The work in item 11 was done by parallel agents. The theme and intro tracks
