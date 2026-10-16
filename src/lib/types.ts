@@ -8,6 +8,8 @@ export interface Track {
   tempo?: number;
   /** Seconds from the start of the file to the first beat (measured). */
   beatOffset?: number;
+  /** Integrated loudness of the file in LUFS (measured). */
+  loudness?: number;
   /** Key or a short note, shown next to the title. Optional. */
   key?: string;
   /** The MP3 under public/. */

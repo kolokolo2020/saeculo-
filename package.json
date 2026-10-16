@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "gen:audio": "node scripts/generate-audio.mjs"
+    "lint": "eslint"
   },
   "dependencies": {
     "@vercel/speed-insights": "^2.0.0",

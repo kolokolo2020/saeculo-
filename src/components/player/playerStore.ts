@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { TRACKS } from "@/data/tracks";
+import { TRACKS, levelFor } from "@/data/tracks";
 import { getAudioContext } from "@/lib/audioContext";
 
 // One <audio> element lives for the whole visit (see AudioEngine), and
@@ -92,6 +92,19 @@ function loadPrefs(): Prefs | null {
 let tone: BiquadFilterNode | null = null;
 let bleed: GainNode | null = null;
 let muffle = 0;
+// Evens out the beats' loudness (see levelFor in data/tracks). Like the
+// muffle, it needs the graph, so iPhones play every file as it is.
+let level: GainNode | null = null;
+function applyLevel(index: number) {
+  if (level) level.gain.value = levelFor(TRACKS[index]);
+}
+// scripts/verify.mjs reads the gain in development
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  (window as unknown as { __player?: unknown }).__player = {
+    level: () => level?.gain.value ?? null,
+    tracks: () => TRACKS.map((t) => ({ id: t.id, src: t.src, added: t.added ?? null, loudness: t.loudness ?? null, level: levelFor(t) })),
+  };
+}
 function applyMuffle(ctx: BaseAudioContext, amount: number, seconds: number) {
   if (!tone || !bleed) return;
   const freq = 20000 * Math.pow(380 / 20000, amount);
@@ -129,8 +142,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     tone = context.createBiquadFilter();
     tone.type = "lowpass";
     bleed = context.createGain();
+    level = context.createGain();
     applyMuffle(context, muffle, 0);
-    source.connect(tone).connect(bleed).connect(analyser);
+    applyLevel(get().trackIndex);
+    source.connect(tone).connect(bleed).connect(level).connect(analyser);
     analyser.connect(context.destination);
     set({ ctx: context, analyser });
   };
@@ -150,6 +165,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     const track = TRACKS[index];
     if (!track) return;
     audio.src = track.src;
+    applyLevel(index);
     audio.load();
   };
 

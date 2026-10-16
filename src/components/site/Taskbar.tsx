@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
 import { BeatsIcon, ChevronUpGlyph, ContactIcon, NextGlyph, PauseGlyph, PlayGlyph, SocialsIcon } from "./Icons";
@@ -26,8 +27,7 @@ function MiniPlayer() {
   return (
     <div className="tray min-w-0 gap-0.5 pr-0.5 pl-[3px]" data-testid="mini-player">
       <button className="tray-link flex h-[28px] min-w-0 items-center gap-2 pr-1.5 pl-[1px] text-left" onClick={() => openWindow("beats")} aria-label={`Open Beats: ${track.title}`}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={ALBUM.cover} alt="" width={26} height={26} className="h-[26px] w-[26px] shrink-0 rounded-[5px] border border-edge object-cover" />
+        <Image src={ALBUM.cover} alt="" width={26} height={26} quality={90} className="h-[26px] w-[26px] shrink-0 rounded-[5px] border border-edge object-cover" />
         <span className="flex min-w-0 flex-col justify-center leading-tight">
           <span className="max-w-[22vw] truncate text-[12.5px] font-medium sm:max-w-[150px]">{track.title}</span>
           <span className="relative mt-[3px] hidden h-[2px] w-[104px] overflow-hidden rounded-full bg-rule sm:block" aria-hidden>

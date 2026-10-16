@@ -51,6 +51,13 @@ into the game's studio: cut into four two-beat pieces at the track's own
 tempo and key, over a plain drum part (pattern A as played, B flipped).
 One undo brings back the project you had.
 
+Every beat plays at about the same level: the louder ones are turned down
+to −10 LUFS in the player (their loudness is measured by
+`scripts/analyze-tracks.mjs`), the quieter ones play as they are, and
+nothing is turned up, so nothing clips. The files themselves are never
+changed. iPhones play the files as they are (the player keeps Web Audio off
+there, because iOS silences it when the screen locks).
+
 States: "LOADING…" while a file buffers; "FILE UNAVAILABLE" (and the row
 marked) if a file fails, with next/previous still working and play retrying;
 an empty-folder message if there are no tracks. Nothing is decoded ahead of
@@ -59,14 +66,21 @@ headers.
 
 ### Adding a beat
 
-1. Put the MP3 in `public/audio/` and a square cover (JPG or PNG) in
-   `public/covers/`.
+1. Put the MP3 in `public/audio/`.
 2. Add an entry at the top of `TRACKS` in `src/data/tracks.ts`. Only `id`,
-   `title` and `src` are required; `cover`, `bpm`, `key` and `added`
-   (`"YYYY-MM-DD"`, shows a "new" tag for 30 days) are optional.
+   `title` and `src` are required. `src` is the file name exactly as it is
+   on disk, in `audioFile(…)`: `src: audioFile("joy4us (21.09.26).mp3")`.
+   `bpm`, `key` and `added` (`"YYYY-MM-DD"`, shows a "new" tag for 30
+   days) are optional.
 3. Optional: `node scripts/analyze-tracks.mjs` (needs
-   `npm i --no-save playwright-core sharp`) measures the exact tempo and
-   first beat for tracks that list a `bpm`.
+   `npm i --no-save playwright-core sharp`) measures the exact tempo, first
+   beat and loudness for tracks that list a `bpm`. Without it a new beat
+   plays at its own level.
+
+The cover is served resized (Next's image optimisation). If you ever
+replace `public/covers/saeculo.jpg`, give the new file a new name and
+point `ALBUM` in `tracks.ts` at it: resized copies of the old one can be
+cached for a few hours.
 
 ## Keyboard
 

@@ -1,6 +1,6 @@
 import { TRACKS } from "@/data/tracks";
 
-// Direct links to one track: saeculo.vercel.app/#track=<id> opens the
+// Direct links to one track: saeculobeats.com/#track=<id> opens the
 // media player on that track, ready to play.
 const HASH_RE = /^#?track=([a-z0-9-]+)$/i;
 

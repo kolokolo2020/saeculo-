@@ -3,6 +3,7 @@ import { IBM_Plex_Mono, IBM_Plex_Sans, Jersey_10, VT323 } from "next/font/google
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PROFILE } from "@/data/profile";
 import { ALBUM, TRACKS } from "@/data/tracks";
+import { SITE_URL } from "@/lib/siteUrl";
 import "./globals.css";
 
 // Plex Sans is the desktop's clean body face (and the game's stand-in for
@@ -16,7 +17,7 @@ const lcdFont = VT323({ weight: "400", subsets: ["latin"], variable: "--nf-lcd" 
 
 const title = "saeculo — instrumentals & beats";
 const description = "Instrumentals by saeculo. Listen to the beats, find the socials, get in touch, or walk around the neighbourhood and make a beat.";
-const siteUrl = "https://saeculo.vercel.app";
+const siteUrl = SITE_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
