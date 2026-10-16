@@ -47,6 +47,10 @@ play button, next, volume) and the tracklist with key, bpm and length.
 There's no visualizer. The playing row has three small bars, which stand
 still with reduced motion or still visuals.
 
+**lease this** (in the status bar) opens Contact about the beat playing:
+the beat shows at the top of the form and goes in the email's subject
+("Leasing “joy4us”"). No prices or terms are on the site.
+
 **sample this** (in the status bar) takes the two bars playing right now
 into the game's studio: cut into four two-beat pieces at the track's own
 tempo and key, over a plain drum part (pattern A as played, B flipped).
@@ -80,8 +84,9 @@ headers.
    `bpm`, `key` and `added` (`"YYYY-MM-DD"`, shows a "new" tag for 30
    days) are optional.
 3. Optional: `node scripts/analyze-tracks.mjs` (needs
-   `npm i --no-save playwright-core sharp`) measures the exact tempo, first
-   beat and loudness for tracks that list a `bpm`. Without it a new beat
+   `npm i --no-save playwright-core`) measures the exact tempo, first
+   beat and loudness for tracks that list a `bpm` (`trackAnalysis.json`), and
+   draws the waveform (`trackWaveforms.json`, loaded after the page). Without it a new beat
    plays at its own level.
 
 The cover is served resized (Next's image optimisation). If you ever
@@ -191,6 +196,9 @@ Reduced motion (or still visuals) turns off the rain, flicker, haze, shake
 and the lightning flash.
 
 Code: `src/components/game/`: `Game.tsx` (loop, input, dialogue, fights),
+`hud.tsx` (the top bar, prompts, dialogue box, help, notices, touch pad,
+knocked-out screen), `tuning.ts` (speed, keys, place names, trouble odds),
+`lines.ts` (what people say),
 `world.ts` and `places/` (the maps, the subway ride), `life.ts` (people,
 traffic, the cat), `actors.ts` (drawing them), `people.ts` (sprites), `character.ts` (looks, clothes), `combat.ts`, `weapons.ts`,
 `goals.ts`, `scripts.ts` (what the newer places' people say and do),

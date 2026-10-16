@@ -271,6 +271,14 @@ export default function BeatsWindow() {
             >
               sample this
             </button>
+            <button
+              className="mp-link"
+              onClick={() => useSiteStore.getState().askAbout(track.title)}
+              title="Write to saeculo about leasing this beat"
+              data-testid="lease-this"
+            >
+              lease this
+            </button>
             <button className="mp-link" onClick={copyLink}>
               {copied ? "link copied" : "copy link"}
             </button>

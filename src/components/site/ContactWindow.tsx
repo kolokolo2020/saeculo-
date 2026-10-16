@@ -2,14 +2,19 @@
 
 import { useRef, useState } from "react";
 import { PROFILE } from "@/data/profile";
+import { useSiteStore } from "./siteStore";
 import { LIMITS, mailtoFor, validateContact, type ContactErrors, type ContactInput } from "@/lib/contact";
 
 // A short form that hands the message to the visitor's own email app: Send
 // opens a new email to saeculo with the subject and message filled in, and
 // they press send there. Replies go to whatever address they send from.
+// "lease this" in Beats opens it about that beat: the beat shows at the top
+// and goes in the email's subject.
 
 export default function ContactWindow() {
-  const [form, setForm] = useState<ContactInput>({ name: "", message: "" });
+  const [fields, setForm] = useState<ContactInput>({ name: "", message: "" });
+  const beat = useSiteStore((s) => s.contactBeat);
+  const form: ContactInput = { ...fields, beat: beat ?? undefined };
   const [errors, setErrors] = useState<ContactErrors>({});
   const [opened, setOpened] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -66,6 +71,16 @@ export default function ContactWindow() {
 
   return (
     <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto bg-cream p-4">
+      {beat && (
+        <p className="flex items-center justify-between gap-2 rounded-[8px] border border-rule bg-cream-2 px-3 py-2 text-[13px]" data-testid="contact-beat">
+          <span className="min-w-0 truncate">
+            About leasing <span className="font-semibold">{beat}</span>
+          </span>
+          <button type="button" className="shrink-0 rounded-[3px] text-[12.5px] underline decoration-dotted underline-offset-2" onClick={() => useSiteStore.getState().askAbout(null)}>
+            just a message
+          </button>
+        </p>
+      )}
       {field(
         "name",
         "Name",
@@ -89,6 +104,7 @@ export default function ContactWindow() {
           id="contact-message"
           className="field min-h-[120px] flex-1 resize-none"
           rows={8}
+          placeholder={beat ? "What it's for (a song, a video, a release) and anything else saeculo should know." : undefined}
           maxLength={LIMITS.message}
           value={form.message}
           onChange={set("message")}

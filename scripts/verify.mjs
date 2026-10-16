@@ -476,6 +476,75 @@ try {
     await c2.close();
   }
 
+  // -------------------------------- lighter first load, a taller Beats, lease this
+  {
+    const { ctx, page } = await open();
+    // the waveforms come in their own small chunk, after the page
+    const waveChunk = await page.evaluate(() => performance.getEntriesByType("resource").some((r) => /trackWaveforms/.test(r.name)));
+    const drawn = await page.getByTestId("waveform").evaluate((c) => {
+      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return true;
+      return false;
+    });
+    check("first load: the waveforms load on their own, and get drawn", waveChunk && drawn);
+    const html = await (await page.request.get(BASE + "/")).text();
+    check("first load: the page itself carries no waveform data", !html.includes('"peaks"') && !/\[0\.\d+,0\.\d+,0\.\d+,0\.\d+,0\.\d+,0\.\d+,0\.\d+,0\.\d+/.test(html));
+    // the tracklist: how many rows are wholly in view without scrolling
+    const rowsInView = (p) =>
+      p.evaluate(() => {
+        const list = document.querySelector("[data-testid=window-beats] .mp");
+        const box = list.getBoundingClientRect();
+        const foot = document.querySelector("[data-testid=window-beats] .mp-foot").getBoundingClientRect();
+        return [...document.querySelectorAll("[data-testid^=track-]")].filter((r) => {
+          const b = r.getBoundingClientRect();
+          return b.top >= box.top && b.bottom <= Math.min(box.bottom, foot.top) + 0.5;
+        }).length;
+      });
+    const at1366 = await rowsInView(page);
+    check("1366×800: Beats shows most of the tracklist without scrolling", at1366 >= 7, `${at1366} of 14 rows`);
+    await ctx.close();
+    const { ctx: big, page: bp } = await open({ viewport: { width: 1920, height: 1080 } });
+    const at1080 = await rowsInView(bp);
+    check("1920×1080: Beats shows the whole tracklist", at1080 === 14, `${at1080} of 14 rows`);
+    await big.close();
+
+    // lease this: Contact, about that beat, and the beat in the email's subject
+    const { ctx: c3, page: p3 } = await open();
+    await p3.getByTestId("track-joy4us").click();
+    await p3.getByTestId("lease-this").click();
+    const win = p3.getByTestId("window-contact");
+    check("lease this: opens Contact about that beat", (await win.isVisible()) && (await win.getByTestId("contact-beat").textContent()).includes("joy4us"));
+    await p3.evaluate(() => {
+      window.__mailto = null;
+      document.addEventListener("click", (e) => {
+        const a = e.target.closest?.("a[href^='mailto:']");
+        if (a) {
+          window.__mailto = a.href;
+          e.preventDefault();
+        }
+      }, true);
+    });
+    await win.getByLabel("Name").fill("Test");
+    await win.getByLabel("Message").fill("For a single, out in spring.");
+    await win.getByRole("button", { name: "Send" }).click();
+    await p3.waitForTimeout(200);
+    const mail = decodeURIComponent((await p3.evaluate(() => window.__mailto)) ?? "");
+    check("lease this: the email's subject names the beat", mail.includes("subject=Leasing “joy4us” (Test)") && mail.includes("For a single, out in spring."), mail.slice(0, 90));
+    await win.getByRole("button", { name: "just a message" }).click();
+    check("lease this: can go back to a plain message", (await win.getByTestId("contact-beat").count()) === 0);
+    if (axeSource) {
+      await p3.getByTestId("lease-this").click();
+      await p3.addScriptTag({ content: axeSource });
+      const v = await p3.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+      check("axe: no violations with Contact about a beat", v.length === 0, v.join(", "));
+    }
+    await c3.close();
+    const { ctx: c4, page: p4 } = await open({ viewport: { width: 390, height: 844 }, mobile: true });
+    const foot = await p4.locator("[data-testid=window-beats] .mp-foot").evaluate((f) => ({ sw: f.scrollWidth, cw: f.clientWidth, lease: !!f.querySelector("[data-testid=lease-this]") }));
+    check("phone: the Beats footer fits, lease this included", foot.lease && foot.sw <= foot.cw + 1, `${foot.sw} / ${foot.cw}`);
+    await c4.close();
+  }
+
   // ---------------------------------------------------------------- contact
   {
     const { ctx, page } = await open();

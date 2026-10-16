@@ -32,6 +32,9 @@ import { sampleProject } from "./studio/sample";
 import { TRACKS } from "@/data/tracks";
 import { formatTime } from "@/lib/audio";
 import { blocked, inside, SCENES, START, tileAt, TILE, type Dir, type Door } from "./world";
+import { ambushOdds, BOOMBOX, BREATHER, CARRY_SOONER, carrying, CAT_PETS, HINT_AT, KEYMAP, PLACE_NAMES, ROUGH, SPEED, tapeLines } from "./tuning";
+import { LINES, savedProjects, verdict } from "./lines";
+import { KnockedOut, Overlays, TopBar, TouchPad, type Choice, type Dialog } from "./hud";
 
 // The game: a bedroom, the street outside, the corner store and a basement
 // studio. You start at the laptop the website lives on; closing it puts you
@@ -40,104 +43,6 @@ import { blocked, inside, SCENES, START, tileAt, TILE, type Dir, type Door } fro
 // and find it on your shelf later.
 
 type Phase = "closing" | "play" | "leaving";
-interface Choice {
-  label: string;
-  run: () => void;
-}
-interface Dialog {
-  lines: string[];
-  i: number;
-  choices?: Choice[];
-}
-
-const SPEED = 62; // px per second
-const KEYMAP: Record<string, Dir> = {
-  ArrowUp: "up",
-  KeyW: "up",
-  ArrowDown: "down",
-  KeyS: "down",
-  ArrowLeft: "left",
-  KeyA: "left",
-  ArrowRight: "right",
-  KeyD: "right",
-};
-const PLACE_NAMES: Record<Place, string> = {
-  bedroom: "Your room",
-  street: "Outside",
-  store: "Corner store",
-  studio: "Studio",
-  park: "The park",
-  rooftop: "The roof",
-  avenue: "The avenue",
-  alley: "The alley",
-  records: "Record shop",
-  thrift: "Thrift shop",
-  club: "The club",
-  subway: "Subway",
-  underpass: "Underpass",
-};
-const HINT_AT: Record<string, string> = { rain: "window", phone: "phone", bottle: "counter", lighter: "bench", basketball: "hoop", chimes: "chimes", spray: "wall", dice: "dice", scratch: "crates", train: "edge", crowd: "booth", mic: "speaker" };
-/** Where trouble finds you, and how likely it is when you walk in. */
-const ROUGH: Partial<Record<Place, number>> = { street: 0, park: 0, avenue: 0.05, alley: 0.25, subway: 0.1, underpass: 0.2 };
-/** Seconds of peace after trouble, whichever way it went. */
-const BREATHER = 60;
-/**
- * Carrying Dre's tape you're worth stopping: trouble comes this much sooner,
- * and is this much likelier to be waiting when you walk into a rough place
- * (never more than 45%, and never inside the breather).
- */
-const CARRY_SOONER = 1.6;
-const CARRY_ODDS = 1.8;
-const carrying = (v: SaveData) => v.job?.stage === "carry";
-/** How likely trouble is to be waiting when you walk in. */
-const ambushOdds = (place: Place, v: SaveData) => Math.min(0.45, (ROUGH[place] ?? 0) * (carrying(v) ? CARRY_ODDS : 1));
-/** What they say when they've seen the tape on you. */
-const TAPE_LINES = [
-  ["One of them nods at your pocket.", "\u201cWhat's on the tape?\u201d"],
-  ["\u201cOi. That a tape?\u201d", "\u201cWhat's on the tape? Give us a listen.\u201d"],
-  ["\u201cYou're carrying. Anyone can see you're carrying.\u201d", "\u201cSo what's on the tape?\u201d"],
-];
-const tapeLines = () => TAPE_LINES[Math.floor(Math.random() * TAPE_LINES.length)];
-/** Pet the alley cat this many times in one visit and it comes with you for a bit. */
-const CAT_PETS = 3;
-const BOOMBOX = { x: 17.6 * TILE, y: 4.4 * TILE };
-
-/** Lines people say, cycled one set per conversation. */
-const LINES: Record<string, string[][]> = {
-  "crew-smoke": [
-    ["\u201cYou live up top? Light's on all night.\u201d"],
-    ["\u201cThis block's quieter than it looks.\u201d", "\u201cThat's the problem.\u201d"],
-    ["\u201cDon't answer that payphone. Or do. Your business.\u201d"],
-  ],
-  "crew-drink": [["\u201cStore never closes. Neither do we.\u201d"], ["\u201cMilo found that speaker in a skip. Still slaps.\u201d"]],
-  "crew-box": [["\u201cThis speaker's older than me.\u201d"], ["\u201cYou make beats? Bring us something.\u201d"]],
-  walker: [["\u201cHe likes you. He doesn't like anyone.\u201d"], ["\u201cSame walk every night. He insists.\u201d"]],
-  "couch-cup": [["\u201cSip slow.\u201d"], ["\u201cYou cooking tonight or just looking at the pads?\u201d"]],
-  "couch-blunt": [["\u201cSit down, you're making the room nervous.\u201d"]],
-  "couch-phones": [["She slides one side of her headphones off."]],
-  oldman: [
-    ["\u201cSame pigeons every night. I think they know me.\u201d"],
-    ["\u201cThat payphone on the corner rings for years now.\u201d", "\u201cI stopped wondering who.\u201d"],
-  ],
-  "hooper-1": [["\u201cNext.\u201d"]],
-  "hooper-2": [["\u201cHe's been missing all night. Don't tell him.\u201d"]],
-  "alley-cat": [
-    ["The cat lets you scratch behind one ear. Then it decides that's enough."],
-    ["It looks at you like you owe it money."],
-    ["It purrs, very quietly, like it doesn't want anyone to know."],
-  ],
-  ledge: [["She doesn't turn around."], ["\u201cYou can see the whole block from here.\u201d", "\u201cYour window's the one that never goes dark.\u201d"]],
-};
-/** How many saved projects there are (they show as tapes on the shelf). */
-const savedProjects = () => loadStore().slots.filter(Boolean).length;
-
-/** What someone makes of a tape, from how it actually goes. */
-function verdict(p: Project): string[] {
-  const t = p.tempo;
-  const says = t < 80 ? "\u201cSlow. Like walking home the long way.\u201d" : t < 100 ? "\u201cThat's a Sunday. That's a whole Sunday.\u201d" : t < 130 ? "\u201cNow my knee's going. Look at it.\u201d" : "\u201cToo fast for me. But I'll allow it.\u201d";
-  const feel = p.swing >= 0.2 ? "\u201cIt limps. The good kind.\u201d" : p.channels.some((c) => c.voice.startsWith("cut:") || c.voice.startsWith("chop:")) ? "\u201cI know that sample from somewhere.\u201d" : null;
-  return feel ? [says, feel] : [says];
-}
 
 export default function Game({ onExit }: { onExit: () => void }) {
   const [phase, setPhase] = useState<Phase>("closing");
@@ -1972,49 +1877,17 @@ export default function Game({ onExit }: { onExit: () => void }) {
     >
       {/* top bar: where you are, what you've found, the way out */}
       <div className={`relative z-40 flex min-h-0 flex-1 flex-col ${phase === "closing" || revealing ? "invisible" : ""}`}>
-      <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-[#1d1b19] px-3 font-lcd text-[20px] leading-none whitespace-nowrap">
-        <span data-testid="game-place" className="truncate">
-          {PLACE_NAMES[place]}
-        </span>
-        <span className="text-amber" data-testid="game-cash" aria-label={`$${Math.floor(save.cash)}, respect ${Math.floor(save.rep)}`}>
-          ${Math.floor(save.cash)}
-          <span className="ml-2 text-[#b9b09e]">★{Math.floor(save.rep)}</span>
-        </span>
-        <span className="hidden text-[#8a8170] lg:inline" aria-label={`${foundCount} of ${FINDABLE.length} sounds found`}>
-          sounds {foundCount}/{FINDABLE.length}
-        </span>
-        {!studio && (
-          <>
-            <button
-              className="ml-auto rounded-[3px] border border-[#3a3733] bg-[#171615] px-2.5 py-1.5 font-sans text-[13px] hover:border-[#6d6558] sm:px-3"
-              onClick={() => !fighting && setMenu({ tab: "you", creator: false })}
-              disabled={fighting}
-              data-testid="game-menu-btn"
-              aria-label="Menu (M)"
-            >
-              <span className="sm:hidden">☰</span>
-              <span className="hidden sm:inline">Menu (M)</span>
-            </button>
-            <button
-              className="rounded-[3px] border border-[#3a3733] bg-[#171615] px-2.5 py-1.5 font-sans text-[13px] hover:border-[#6d6558] sm:px-3"
-              onClick={goToStudio}
-              disabled={fighting}
-              data-testid="game-to-studio"
-            >
-              <span className="sm:hidden">Studio</span>
-              <span className="hidden sm:inline">Go to the studio</span>
-            </button>
-          </>
-        )}
-        <button
-          className={`${studio ? "ml-auto" : ""} flex items-center gap-2 rounded-[3px] border border-[#3a3733] bg-[#171615] px-3 py-1.5 font-sans text-[13px] hover:border-[#6d6558]`}
-          onClick={leave}
-          data-testid="game-exit"
-        >
-          <span className="sm:hidden">Exit</span>
-          <span className="hidden sm:inline">Back to the site</span> <span className="hidden text-[#948b7a] sm:inline">Esc</span>
-        </button>
-      </div>
+      <TopBar
+        place={PLACE_NAMES[place]}
+        cash={save.cash}
+        rep={save.rep}
+        found={foundCount}
+        studio={studio}
+        fighting={fighting}
+        onMenu={() => !fighting && setMenu({ tab: "you", creator: false })}
+        onStudio={goToStudio}
+        onExit={leave}
+      />
 
       <div className="relative flex min-h-0 flex-1 flex-col items-center justify-start overflow-hidden sm:justify-center">
         <canvas
@@ -2026,171 +1899,33 @@ export default function Game({ onExit }: { onExit: () => void }) {
           aria-hidden
         />
 
-        {/* what the thing in front of you does */}
-        {prompt && !dialog && !help && (
-          <p
-            className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-[3px] bg-black/75 px-3 py-1.5 font-lcd text-[20px] leading-none whitespace-nowrap"
-            style={{ top: below ? VIEW_H * scale + 10 : Math.min(VIEW_H * scale - 44, VIEW_H * scale * 0.84) }}
-            data-testid="game-prompt"
-          >
-            {prompt.startsWith("@") ? (
-              prompt.slice(1)
-            ) : (
-              <>
-                <span className="mr-2 text-amber">{touch ? "A" : "E"}</span>
-                {prompt}
-              </>
-            )}
-          </p>
-        )}
-
-        {dialog && (
-          <div
-            className="absolute left-1/2 z-20 w-[min(560px,calc(100%-24px))] -translate-x-1/2 rounded-[3px] border-2 border-[#3a3733] bg-[#0f0e0d]/95 p-3 font-lcd text-[22px] leading-tight"
-            style={{ top: below ? VIEW_H * scale + 10 : Math.max(8, Math.min(VIEW_H * scale - 120, VIEW_H * scale * 0.55)) }}
-            role="dialog"
-            aria-live="polite"
-            data-testid="game-dialog"
-            onClick={() => !showingChoices && advance()}
-          >
-            <p>{dialog.lines[dialog.i]}</p>
-            {showingChoices ? (
-              <div ref={choiceBox} className="mt-2 flex flex-wrap gap-2">
-                {dialog.choices!.map((c) => (
-                  <button
-                    key={c.label}
-                    className="rounded-[2px] border border-[#4a4540] bg-[#1d1b19] px-3 py-1 text-[20px] hover:border-amber focus-visible:border-amber"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDialog(null);
-                      c.run();
-                    }}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-1 text-right text-[16px] text-[#8a8170]">{touch ? "tap" : "E"} ▸</p>
-            )}
-          </div>
-        )}
-
-        {help && phase === "play" && !menu && (
-          <div
-            style={{ top: below ? VIEW_H * scale + 10 : 12 }}
-            className="absolute inset-x-3 z-20 mx-auto max-w-[440px] rounded-[3px] border-2 border-[#3a3733] bg-[#0f0e0d]/95 p-4 font-lcd text-[20px] leading-snug" data-testid="game-help">
-            <p className="text-amber">late, the same night</p>
-            <p className="mt-1">
-              Find sounds around the block, then make a beat with them in the studio at the end of the street.
-            </p>
-            <ul className="mt-2 text-[18px] text-[#b9b09e]">
-              {touch ? (
-                <>
-                  <li>pad: walk · A: use / talk</li>
-                  <li>Back to the site: top right</li>
-                </>
-              ) : (
-                <>
-                  <li>WASD / arrows: walk</li>
-                  <li>E / Space: use, talk</li>
-                  <li>Esc: back to the site</li>
-                </>
-              )}
-            </ul>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                className="rounded-[2px] border border-[#4a4540] bg-[#1d1b19] px-3 py-1 text-[20px] hover:border-amber"
-                onClick={() => {
-                  setHelp(false);
-                  updateSave((s) => ({ ...s, seenHelp: true }));
-                  root.current?.focus();
-                }}
-              >
-                Got it
-              </button>
-              <button className="rounded-[2px] border border-[#4a4540] bg-[#1d1b19] px-3 py-1 text-[20px] hover:border-amber" onClick={goToStudio}>
-                Straight to the studio
-              </button>
-            </div>
-          </div>
-        )}
-
-        {toast && (
-          <p
-            className={`pointer-events-none absolute left-1/2 z-20 w-max max-w-[calc(100%-24px)] -translate-x-1/2 rounded-[3px] bg-[#6e1f18] px-3 py-2 text-center font-lcd text-[19px] leading-tight shadow-lg ${below && !dialog ? "" : "top-3"}`}
-            // phones held upright: in the free space under the picture, clear of the pad (over the picture while someone's talking there)
-            style={below && !dialog ? { bottom: touch ? 206 : 16 } : undefined}
-            role="status"
-            data-testid="game-toast"
-          >
-            {toast}
-          </p>
-        )}
+        <Overlays
+          prompt={prompt}
+          dialog={dialog}
+          help={help}
+          showHelp={help && phase === "play" && !menu}
+          toast={toast}
+          touch={touch}
+          below={below}
+          picture={VIEW_H * scale}
+          showingChoices={showingChoices}
+          choiceBox={choiceBox}
+          onAdvance={advance}
+          onChoose={(c) => {
+            setDialog(null);
+            c.run();
+          }}
+          onGotIt={() => {
+            setHelp(false);
+            updateSave((s) => ({ ...s, seenHelp: true }));
+            root.current?.focus();
+          }}
+          onStudio={goToStudio}
+        />
 
         {/* touch controls */}
         {touch && phase === "play" && !studio && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between p-4 pb-[max(16px,env(safe-area-inset-bottom))]">
-            <div className="pointer-events-auto grid grid-cols-3 grid-rows-3 gap-1" aria-label="Movement pad">
-              {(
-                [
-                  ["up", "▲", "col-start-2 row-start-1"],
-                  ["left", "◀", "col-start-1 row-start-2"],
-                  ["right", "▶", "col-start-3 row-start-2"],
-                  ["down", "▼", "col-start-2 row-start-3"],
-                ] as const
-              ).map(([dir, label, pos]) => (
-                <button
-                  key={dir}
-                  className={`pad-btn h-14 w-14 rounded-[4px] ${pos}`}
-                  data-down={down === dir}
-                  aria-label={`Walk ${dir}`}
-                  onPointerDown={press(dir)}
-                  onPointerUp={release}
-                  onPointerCancel={release}
-                  onContextMenu={(e) => e.preventDefault()}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="pointer-events-auto flex items-end gap-2">
-              {fighting && (
-                <div className="flex flex-col gap-2">
-                  <button
-                    className="pad-btn h-11 w-14 rounded-[4px] text-[16px]"
-                    aria-label="Eat"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      eatSomething();
-                    }}
-                  >
-                    eat
-                  </button>
-                  <button
-                    className="pad-btn h-16 w-16 rounded-full text-[24px]"
-                    aria-label="B: dodge"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      dodge();
-                    }}
-                  >
-                    B
-                  </button>
-                </div>
-              )}
-              <button
-                className="pad-btn h-20 w-20 rounded-full text-[28px]"
-                aria-label={fighting ? "A: swing" : prompt && !prompt.startsWith("@") ? `Use: ${prompt}` : "Use"}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  tryInteract();
-                }}
-              >
-                A
-              </button>
-            </div>
-          </div>
+          <TouchPad down={down} fighting={fighting} prompt={prompt} onPress={press} onRelease={release} onEat={() => eatSomething()} onDodge={dodge} onUse={tryInteract} />
         )}
 
         {menu && (
@@ -2278,19 +2013,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         )}
         {mini?.kind === "shop" && <Shop kind={mini.shop} save={save} onBuy={buy} onClose={closeMini} />}
 
-        {ko > 0 && (
-          <div className="game-fade absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/90 font-lcd text-[24px]" role="alertdialog" aria-label="Knocked out" data-testid="game-ko">
-            {ko === 2 && (
-              <>
-                <p className="text-[34px] text-[#ff7a6a]">Knocked out.</p>
-                <p className="max-w-[420px] px-6 text-center text-[20px] text-[#b9b09e]">The ground comes up fast. Somebody’s going through your pockets. Then nothing.</p>
-                <button className="rounded-[2px] border border-[#4a4540] bg-[#1d1b19] px-4 py-1.5 text-[22px] hover:border-amber" onClick={wake} autoFocus data-testid="game-wake">
-                  Wake up
-                </button>
-              </>
-            )}
-          </div>
-        )}
+        {ko > 0 && <KnockedOut stage={ko} onWake={wake} />}
 
         {studio && studioEngine && (
           <Studio engine={studioEngine} load={sampled} onLoaded={() => setSampled(null)} found={save.found} fresh={save.unseen} onSeen={() => updateSave((s) => ({ ...s, unseen: [] }))} onClose={closeStudio} />

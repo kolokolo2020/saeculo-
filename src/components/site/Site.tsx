@@ -133,7 +133,8 @@ export default function Site({ initialTrackId }: { initialTrackId?: string } = {
           ))}
         </nav>
 
-        <Window id="beats" width={780} height={568} icon={<BeatsIcon size={16} />}>
+        {/* tall enough for the whole tracklist on a big screen; the window keeps to the screen */}
+        <Window id="beats" width={780} height={980} icon={<BeatsIcon size={16} />}>
           <BeatsWindow />
         </Window>
         <Window id="socials" width={400} height={320} icon={<SocialsIcon size={16} />}>

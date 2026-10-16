@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePlayerStore } from "@/components/player/playerStore";
-import analysis from "@/data/trackAnalysis.json";
 import { formatTime } from "@/lib/audio";
 import type { Track } from "@/lib/types";
 
@@ -12,7 +11,28 @@ import type { Track } from "@/lib/types";
 // keys step five seconds. Tracks that haven't been analysed get a plain
 // slider.
 
-const peaksFor = (id: string) => (analysis as Record<string, { peaks?: number[] } | undefined>)[id]?.peaks;
+// The waveforms (src/data/trackWaveforms.json) aren't part of the first
+// download: they load in their own small chunk once the seek bar is on
+// screen. Until then the bar is drawn empty, so nothing jumps.
+type Waveforms = Record<string, number[] | undefined>;
+let waveforms: Waveforms | null = null;
+let loading: Promise<Waveforms> | null = null;
+function loadWaveforms() {
+  loading ??= import("@/data/trackWaveforms.json").then((m) => (waveforms = m.default as Waveforms));
+  return loading;
+}
+function useWaveforms() {
+  const [all, setAll] = useState<Waveforms | null>(waveforms);
+  useEffect(() => {
+    if (all) return;
+    let live = true;
+    loadWaveforms().then((w) => live && setAll(w), () => live && setAll({}));
+    return () => {
+      live = false;
+    };
+  }, [all]);
+  return all;
+}
 
 export default function WaveformSeek({
   track,
@@ -34,12 +54,13 @@ export default function WaveformSeek({
   const canvas = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<number | null>(null);
   const dragging = useRef(false);
-  const peaks = track ? peaksFor(track.id) : undefined;
+  const all = useWaveforms();
+  const peaks = track && all ? (all[track.id] ?? null) : undefined;
   const frac = duration ? Math.min(1, currentTime / duration) : 0;
 
   useEffect(() => {
     const c = canvas.current;
-    if (!c || !peaks) return;
+    if (!c || peaks === null) return;
     const draw = () => {
       const r = c.getBoundingClientRect();
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -51,6 +72,7 @@ export default function WaveformSeek({
       const bw = c.width / bars;
       const mid = c.height / 2;
       g.clearRect(0, 0, c.width, c.height);
+      if (!peaks) return; // still loading: an empty bar
       const played = g.createLinearGradient(0, 0, c.width, 0);
       played.addColorStop(0, accent);
       played.addColorStop(1, accent2);
@@ -78,7 +100,7 @@ export default function WaveformSeek({
     return () => ro.disconnect();
   }, [peaks, frac, accent, accent2, rest, cursor, hover]);
 
-  if (!peaks) {
+  if (peaks === null) {
     return (
       <input
         type="range"

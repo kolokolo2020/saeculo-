@@ -1,5 +1,31 @@
 # The plan (handoff between sessions)
 
+## Now (16 Oct 2026)
+
+Merged: PR #22 (the real address and the old address redirected, even
+loudness, file links that work everywhere, a resized cover, "new" tags, a
+page and share card per beat at `/beat/<id>`, Vercel Web Analytics).
+The branch after it adds: the waveforms loaded after the page, a taller
+Beats window, "lease this" in Beats, `make-cover.mjs` no longer writing
+over the owner's cover, and `Game.tsx` split into smaller files.
+
+Open, for the owner:
+- Switch on Web Analytics in Vercel (saeculo → Analytics → Enable).
+- A YouTube video to feature in Socials (`featuredVideo` in
+  `src/data/profile.ts`).
+- Beats are full, untagged MP3s anyone can download; tagged previews
+  would protect them if leases are sold (needs the tagged files).
+- Lease prices or terms, if they should be on the site.
+- Real-device checks: the intro's sound on an iPhone, the game's touch
+  controls on a phone.
+- Cleanup, only with the owner's OK (never delete files otherwise): the
+  unused `BootIntro.tsx`, `scene.ts`, `sounds.ts`, `intro.module.css`,
+  `Visualizer.tsx`, `wordmark.ts`, `spectrum.ts`, `public/covers/saeculo.svg`.
+
+Everything below is the earlier history, kept for reference.
+
+---
+
 Branch `claude/kind-goldberg-6x74gw`, draft PR #17. Don't merge until the
 owner says "merge". Follow AGENTS.md for every step (checks, screenshots,
 commit + push after each step, extend scripts/verify.mjs).
