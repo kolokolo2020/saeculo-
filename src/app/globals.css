@@ -19,7 +19,11 @@
   --font-lcd: var(--nf-lcd), var(--nf-mono), monospace;
   /* 2007: Segoe where it exists, Plex Sans everywhere else (the intro) */
   --font-vista: "Segoe UI", var(--nf-ui), system-ui, sans-serif;
+}
 
+/* Colours stay variables in the utilities (not inlined), so the night
+   theme below can swap them for the desktop alone. */
+@theme {
   /* the desktop */
   --color-cream: #fbf8f2; /* window paper */
   --color-cream-2: #f3eee4; /* title bars, taskbar, hover */
@@ -37,6 +41,9 @@
   --color-field: #fffdf9; /* text fields */
   --color-field-error: #fdf1ed; /* an invalid field */
   --color-rust: #a3321f; /* errors */
+  --color-on-dusk: #ffffff; /* text on a dusk fill (menu hover, selection) */
+  --color-wall-dot: rgba(42, 38, 34, 0.13); /* the desk's dot screen */
+  --color-icon-hover: rgba(251, 248, 242, 0.45); /* a desk icon under the pointer */
 
   /* depth: the window in front, windows behind, the album cover */
   --shadow-window: 0 1px 2px rgba(42, 32, 18, 0.08), 0 14px 36px -10px rgba(42, 32, 18, 0.32);
@@ -61,6 +68,40 @@
   --color-ok: #2f6b3a;
 }
 
+/* ------------------------------------------------------------------ */
+/* night: the desktop after dark, from the intro's sky. Chosen in the   */
+/* clock menu (or the system's dark mode until then); set on <html>     */
+/* before first paint. Only the desktop changes: the intro and the game */
+/* keep their own look. Text 6:1 or more, borders 3.4:1 or more.        */
+/* ------------------------------------------------------------------ */
+html[data-theme="night"] body,
+html[data-theme="night"] .desktop {
+  --color-cream: #1e1c19;
+  --color-cream-2: #262320;
+  --color-cream-3: #302c27;
+  --color-stone: #0d1020;
+  --color-line: #d9d0c0;
+  --color-rule: #3b3631;
+  --color-edge: #867d6f;
+  --color-ink: #efe9dc;
+  --color-ink-2: #b3aa98;
+  --color-dusk: #93acd9;
+  --color-dusk-dk: #b3c6e8;
+  --color-dusk-wash: #272d3f;
+  --color-lilac: #b1a3e6;
+  --color-wave-rest: #625a4e;
+  --color-field: #161411;
+  --color-field-error: #2e1b16;
+  --color-rust: #ec8a72;
+  --color-on-dusk: #12141c;
+  --color-wall-dot: rgba(239, 233, 220, 0.09);
+  --color-icon-hover: rgba(239, 233, 220, 0.08);
+  --shadow-window: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 36px -10px rgba(0, 0, 0, 0.7);
+  --shadow-window-back: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px -12px rgba(0, 0, 0, 0.55);
+  --shadow-cover: 0 10px 24px -14px rgba(0, 0, 0, 0.8);
+  color-scheme: dark;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -73,7 +114,7 @@
   }
   ::selection {
     background: var(--color-dusk);
-    color: #fff;
+    color: var(--color-on-dusk);
   }
   :focus-visible {
     outline: 2px solid var(--color-amber);
@@ -98,7 +139,7 @@
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(rgba(42, 38, 34, 0.13) 0.7px, transparent 0.9px),
+    radial-gradient(var(--color-wall-dot) 0.7px, transparent 0.9px),
     radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.28), transparent 70%);
   background-size: 4px 4px, 100% 100%;
 }
@@ -139,7 +180,7 @@
   border-radius: 5px;
 }
 .desk-icon:hover {
-  background: rgba(251, 248, 242, 0.45);
+  background: var(--color-icon-hover);
 }
 .desk-icon[aria-pressed="true"] span {
   background: var(--color-line);
@@ -434,7 +475,7 @@
 }
 .menu-item:hover,
 .menu-item:focus-visible {
-  color: #fff;
+  color: var(--color-on-dusk);
   background: var(--color-dusk);
   outline: none;
 }
@@ -451,7 +492,7 @@
 }
 .menu-item:hover .menu-hint,
 .menu-item:focus-visible .menu-hint {
-  color: #fff;
+  color: var(--color-on-dusk);
 }
 
 /* ------------------------------------------------------------------ */
@@ -740,6 +781,40 @@
   border-radius: 4px;
 }
 
+/* "up next" when the player picks the next beat by tempo and key */
+.mp-next {
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-2);
+  border: 1px dashed var(--color-edge);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+/* loop 8 bars: a quiet text toggle between the times */
+.mp-loop {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--color-ink-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+.mp-loop:hover:not(:disabled) {
+  color: var(--color-ink);
+  background: var(--color-cream-3);
+}
+.mp-loop[aria-pressed="true"] {
+  color: var(--color-dusk);
+  background: var(--color-dusk-wash);
+  border-color: var(--color-dusk);
+}
+.mp-loop:disabled {
+  visibility: hidden;
+}
 .eq-bars {
   display: inline-flex;
   align-items: flex-end;

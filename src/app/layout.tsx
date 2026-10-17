@@ -49,8 +49,9 @@ const jsonLd = {
 };
 
 // Runs before first paint: returning visitors, share links and beat pages skip the
-// intro, and the visitor's "calm visuals" choice applies immediately.
-const bootScript = `try{var s=localStorage;if(s.getItem("saeculo-intro-seen")==="1"||/track=/.test(location.hash)||location.pathname.indexOf("/beat/")===0)document.documentElement.dataset.intro="skip";if(s.getItem("saeculo-calm")==="1")document.documentElement.dataset.calm="true"}catch(e){}`;
+// intro, and the visitor's "calm visuals" and day/night choices apply
+// immediately (no choice yet: night follows the system's dark mode).
+const bootScript = `try{var s=localStorage,d=document.documentElement;if(s.getItem("saeculo-intro-seen")==="1"||/track=/.test(location.hash)||location.pathname.indexOf("/beat/")===0)d.dataset.intro="skip";if(s.getItem("saeculo-calm")==="1")d.dataset.calm="true";var t=s.getItem("saeculo-theme");d.dataset.theme=t==="night"||(t!=="day"&&matchMedia("(prefers-color-scheme: dark)").matches)?"night":"day"}catch(e){}`;
 
 export const viewport: Viewport = {
   // the paper of the window title bars and the taskbar

@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { TRACKS, levelFor } from "@/data/tracks";
+import { TRACKS, gridTempo, levelFor } from "@/data/tracks";
 import { getAudioContext } from "@/lib/audioContext";
+import { nextSimilar } from "@/lib/similar";
 
 // One <audio> element lives for the whole visit (see AudioEngine), and
 // everything that plays or shows music (the Beats window, the taskbar's
@@ -17,6 +18,12 @@ interface PlayerState {
   muted: boolean;
   repeatOne: boolean;
   shuffle: boolean;
+  /** After a beat, play the closest one by tempo and key (not the next in the list). */
+  similar: boolean;
+  /** Ids of the beats chosen this visit, oldest first (so "similar" doesn't ping-pong). */
+  played: string[];
+  /** A stretch of the beat playing over and over, in seconds, or null. */
+  loop: { start: number; end: number } | null;
   status: LoadStatus;
   /** Track ids whose file failed to load this visit. */
   failed: string[];
@@ -44,6 +51,13 @@ interface PlayerState {
   toggleMute: () => void;
   toggleRepeat: () => void;
   toggleShuffle: () => void;
+  toggleSimilar: () => void;
+  /** Loop the 8 bars around the playhead (on the beat's own bar grid), or stop looping. */
+  toggleLoop: () => void;
+  /** Where the music goes next: an index, or -1 if that's down to chance (shuffle). */
+  upNext: () => number;
+  /** Seek to `seconds` as soon as the file's length is known (picking up where you left off). */
+  resumeAt: (seconds: number) => void;
   /** The track ended: repeat it, or move on. */
   ended: () => void;
   /** Pause for someone else's sound; remembers whether to resume. */
@@ -63,6 +77,7 @@ interface Prefs {
   muted: boolean;
   repeatOne: boolean;
   shuffle: boolean;
+  similar: boolean;
 }
 
 function savePrefs(p: Prefs) {
@@ -77,13 +92,45 @@ function loadPrefs(): Prefs | null {
   try {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "null");
     if (saved && typeof saved.volume === "number" && saved.volume >= 0 && saved.volume <= 1) {
-      return { volume: saved.volume, muted: saved.muted === true, repeatOne: saved.repeatOne === true, shuffle: saved.shuffle === true };
+      return {
+        volume: saved.volume,
+        muted: saved.muted === true,
+        repeatOne: saved.repeatOne === true,
+        shuffle: saved.shuffle === true,
+        similar: saved.similar === true && saved.shuffle !== true,
+      };
     }
   } catch {
     // corrupted or blocked storage: keep the defaults
   }
   return null;
 }
+
+// Where the visitor left off (beat and second), picked up on the next visit.
+const POSITION_KEY = "saeculo-position";
+export function savePosition() {
+  const { audio, trackIndex } = usePlayerStore.getState();
+  const track = TRACKS[trackIndex];
+  if (!audio || !track) return;
+  try {
+    localStorage.setItem(POSITION_KEY, JSON.stringify({ id: track.id, t: Math.floor(audio.currentTime) }));
+  } catch {
+    // not remembered
+  }
+}
+export function readPosition(): { index: number; t: number } | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(POSITION_KEY) ?? "null");
+    const index = TRACKS.findIndex((t) => t.id === saved?.id);
+    if (index < 0) return null;
+    return { index, t: typeof saved.t === "number" && saved.t > 0 ? saved.t : 0 };
+  } catch {
+    return null;
+  }
+}
+
+/** Bars in a loop. */
+export const LOOP_BARS = 8;
 
 // The intro plays the music as if it leaked from someone's headphones:
 // low-passed and quieter. 0 = clear, 1 = fully muffled. It lives in the
@@ -178,6 +225,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     muted: false,
     repeatOne: false,
     shuffle: false,
+    similar: false,
+    played: [],
+    loop: null,
     status: "idle",
     failed: [],
     heldBy: null,
@@ -194,7 +244,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       if (!el.getAttribute("src") && TRACKS[get().trackIndex]) el.src = TRACKS[get().trackIndex].src;
       el.volume = volume;
       el.muted = muted;
-      set({ audio: el, volume, muted, repeatOne: prefs?.repeatOne ?? false, shuffle: prefs?.shuffle ?? false });
+      set({ audio: el, volume, muted, repeatOne: prefs?.repeatOne ?? false, shuffle: prefs?.shuffle ?? false, similar: prefs?.similar ?? false });
     },
     detach: (el) => {
       if (get().audio === el) set({ audio: null });
@@ -232,25 +282,42 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     selectTrack: (index, autoplay = true) => {
       const { audio } = get();
       if (!TRACKS[index]) return;
-      set({ trackIndex: index, currentTime: 0, duration: 0, status: "loading" });
+      set((s) => ({
+        trackIndex: index,
+        currentTime: 0,
+        duration: 0,
+        status: "loading",
+        loop: null,
+        played: [...s.played.filter((id) => id !== TRACKS[index].id), TRACKS[index].id].slice(-50),
+      }));
       if (!audio) return;
       load(audio, index);
       if (autoplay && get().heldBy) set({ resumeOnRelease: true });
       else if (autoplay) startPlayback(audio);
     },
+    upNext: () => {
+      const { shuffle, similar, trackIndex, played } = get();
+      if (TRACKS.length < 2) return trackIndex;
+      if (shuffle) return -1;
+      if (similar) return nextSimilar(TRACKS, trackIndex, played);
+      return (trackIndex + 1) % TRACKS.length;
+    },
     next: () => {
       if (!TRACKS.length) return;
       const { shuffle, trackIndex } = get();
-      if (shuffle && TRACKS.length > 1) {
+      const up = get().upNext();
+      if (!shuffle && up >= 0) get().selectTrack(up);
+      else if (shuffle && TRACKS.length > 1) {
         // anything but the one that's playing
         const pick = Math.floor(Math.random() * (TRACKS.length - 1));
         get().selectTrack(pick >= trackIndex ? pick + 1 : pick);
       } else get().selectTrack((trackIndex + 1) % TRACKS.length);
     },
     ended: () => {
-      const { repeatOne, audio } = get();
-      if (repeatOne && audio) {
-        audio.currentTime = 0;
+      const { repeatOne, audio, loop } = get();
+      // a loop that runs to the very end goes round again too
+      if ((repeatOne || loop) && audio) {
+        audio.currentTime = loop?.start ?? 0;
         startPlayback(audio);
       } else get().next();
     },
@@ -271,7 +338,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       if (!audio || !Number.isFinite(audio.duration)) return;
       const t = Math.min(Math.max(0, seconds), audio.duration);
       audio.currentTime = t;
-      set({ currentTime: t });
+      // going somewhere else in the beat lets go of the loop
+      const { loop } = get();
+      set({ currentTime: t, loop: loop && (t < loop.start - 0.05 || t > loop.end) ? null : loop });
     },
     setVolume: (volume) => {
       const { audio } = get();
@@ -295,8 +364,39 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       savePrefs(pick(get()));
     },
     toggleShuffle: () => {
-      set({ shuffle: !get().shuffle });
+      const shuffle = !get().shuffle;
+      set({ shuffle, similar: shuffle ? false : get().similar });
       savePrefs(pick(get()));
+    },
+    toggleSimilar: () => {
+      const similar = !get().similar;
+      set({ similar, shuffle: similar ? false : get().shuffle });
+      savePrefs(pick(get()));
+    },
+    toggleLoop: () => {
+      const { audio, loop, trackIndex } = get();
+      if (loop) return set({ loop: null });
+      const track = TRACKS[trackIndex];
+      if (!audio || !track || !Number.isFinite(audio.duration)) return;
+      // whole bars on the beat's own grid, starting with the bar the playhead is in
+      const bar = (4 * 60) / gridTempo(track);
+      const offset = track.beatOffset ?? 0;
+      const start = Math.max(0, offset + Math.floor((audio.currentTime - offset) / bar) * bar);
+      const end = Math.min(audio.duration, start + LOOP_BARS * bar);
+      if (end - start < bar) return;
+      set({ loop: { start, end } });
+    },
+    resumeAt: (seconds) => {
+      const { audio } = get();
+      if (!audio || seconds <= 0) return;
+      const go = () => {
+        // a beat left in its last seconds starts over
+        if (!Number.isFinite(audio.duration) || seconds >= audio.duration - 5) return;
+        audio.currentTime = seconds;
+        set({ currentTime: seconds });
+      };
+      if (audio.readyState >= 1) go();
+      else audio.addEventListener("loadedmetadata", go, { once: true });
     },
     hold: (owner) => {
       const { audio, heldBy } = get();
@@ -315,7 +415,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 });
 
 function pick(s: PlayerState): Prefs {
-  return { volume: s.volume, muted: s.muted, repeatOne: s.repeatOne, shuffle: s.shuffle };
+  return { volume: s.volume, muted: s.muted, repeatOne: s.repeatOne, shuffle: s.shuffle, similar: s.similar };
 }
 
 export function useCurrentTrack() {

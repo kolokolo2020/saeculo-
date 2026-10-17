@@ -1250,6 +1250,86 @@ try {
     await ctx.close();
   }
 
+  // ---------------------------------------------------- night, similar, loop, left off
+  {
+    // night: from the system's dark mode until chosen, then remembered
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 800 }, colorScheme: "dark" });
+    await ctx.addInitScript(() => localStorage.setItem("saeculo-intro-seen", "1"));
+    let page = await ctx.newPage();
+    page.on("pageerror", (e) => errors.push(String(e)));
+    await page.goto(BASE + "/", { waitUntil: "networkidle" });
+    await page.waitForTimeout(400);
+    const look = () =>
+      page.evaluate(() => ({
+        theme: document.documentElement.dataset.theme,
+        paper: getComputedStyle(document.querySelector(".mp")).backgroundColor,
+        meta: document.querySelector('meta[name="theme-color"]')?.getAttribute("content"),
+      }));
+    let l = await look();
+    check("night: follows the system's dark mode at first", l.theme === "night" && l.paper === "rgb(30, 28, 25)" && l.meta === "#262320", JSON.stringify(l));
+    await page.getByRole("button", { name: "Clock and settings" }).click();
+    await page.getByRole("menuitemcheckbox", { name: /Night/ }).click();
+    l = await look();
+    check("night: the clock menu turns it off (day paper)", l.theme === "day" && l.paper === "rgb(251, 248, 242)");
+    await page.keyboard.press("Escape");
+    await page.reload({ waitUntil: "networkidle" });
+    check("night: the choice is remembered over the system's", (await page.evaluate(() => document.documentElement.dataset.theme)) === "day");
+    await page.keyboard.press("n");
+    check("night: N switches it", (await page.evaluate(() => document.documentElement.dataset.theme)) === "night");
+    if (axeSource) {
+      await page.addScriptTag({ content: axeSource });
+      const v = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+      check("axe: no violations at night", v.length === 0, v.join(", "));
+    }
+    await ctx.close();
+  }
+  {
+    // play similar next: the up-next row is the closest beat, and next goes there
+    const { ctx, page } = await open();
+    await page.getByTestId("similar").click();
+    const upNextTitle = await page.getByTestId("up-next").locator("xpath=..").innerText();
+    check("similar: one row says up next", (await page.getByTestId("up-next").count()) === 1, upNextTitle);
+    const prefs = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-player")));
+    check("similar: remembered, and it turns shuffle off", prefs.similar === true && prefs.shuffle === false);
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await page.waitForTimeout(400);
+    const now = await page.getByTestId("lcd").innerText();
+    check("similar: next goes to the up-next beat", now.includes(upNextTitle.split("\n")[0].trim()), upNextTitle.split("\n")[0]);
+    await page.getByRole("button", { name: "Shuffle" }).click();
+    check("similar: shuffle turns it off", (await page.getByTestId("similar").getAttribute("aria-pressed")) === "false" && (await page.getByTestId("up-next").count()) === 0);
+    await page.getByRole("button", { name: "Shuffle" }).click();
+
+    // loop 8 bars: a band on the waveform, and the music goes round
+    if ((await audio(page)).paused) await page.getByTestId("deck-play").click();
+    await page.waitForTimeout(600);
+    await seekTo(page, 30);
+    await page.waitForTimeout(300);
+    await page.getByTestId("loop").click();
+    const label = await page.getByTestId("loop").innerText();
+    check("loop: the button says what's looping", /^looping \d+:\d\d–\d+:\d\d$/.test(label), label);
+    const [a, b] = label.replace("looping ", "").split("–").map((x) => x.split(":").reduce((m, s) => m * 60 + Number(s), 0));
+    check("loop: 8 bars on the beat's grid, from the bar the playhead is in", a <= 30 && b > 30 && b - a >= 10, `${a}–${b}`);
+    // jump to just before the end of the loop and see it come round
+    await page.evaluate((t) => (document.querySelector("audio").currentTime = t), b - 0.4);
+    await page.waitForTimeout(1500);
+    const t = (await audio(page)).t;
+    check("loop: playback goes round to the start", t >= a - 0.5 && t < a + 2, t.toFixed(2));
+    await page.keyboard.press("l");
+    check("loop: L lets go of it", (await page.getByTestId("loop").getAttribute("aria-pressed")) === "false");
+
+    // left off: the next visit opens on the same beat, at the same moment
+    await page.getByTestId("deck-play").click();
+    await page.waitForTimeout(300);
+    const where = await audio(page);
+    const title = await page.getByTestId("lcd").innerText();
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(1200);
+    const back = await audio(page);
+    const title2 = await page.getByTestId("lcd").innerText();
+    check("left off: same beat, same moment, paused", title2.split("\n")[1] === title.split("\n")[1] && Math.abs(back.t - Math.floor(where.t)) < 1.5 && back.paused, `${where.t.toFixed(1)} → ${back.t.toFixed(1)}`);
+    await ctx.close();
+  }
+
   // ---------------------------------------------------------------- accessibility
   if (axeSource) {
     const { ctx, page } = await open();

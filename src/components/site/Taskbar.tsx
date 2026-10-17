@@ -51,6 +51,8 @@ function Clock({ onReplayIntro }: { onReplayIntro: () => void }) {
   const [open, setOpen] = useState(false);
   const calm = useSiteStore((s) => s.calm);
   const setCalm = useSiteStore((s) => s.setCalm);
+  const night = useSiteStore((s) => s.night);
+  const setNight = useSiteStore((s) => s.setNight);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -106,6 +108,15 @@ function Clock({ onReplayIntro }: { onReplayIntro: () => void }) {
               {calm ? "✓" : ""}
             </span>
             Still visuals
+          </button>
+          <button role="menuitemcheckbox" aria-checked={night} className="menu-item" onClick={() => setNight(!night)} data-testid="night">
+            <span className="menu-check" aria-hidden>
+              {night ? "✓" : ""}
+            </span>
+            Night
+            <span className="menu-hint" aria-hidden>
+              N
+            </span>
           </button>
           <div className="mx-2 my-1 h-px bg-rule" role="separator" />
           <button

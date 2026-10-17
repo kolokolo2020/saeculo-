@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { ALBUM } from "@/data/tracks";
-import { usePlayerStore, useCurrentTrack } from "./playerStore";
+import { savePosition, usePlayerStore, useCurrentTrack } from "./playerStore";
 
 // The session's single <audio> element. Mounted once by the site and
 // never unmounted, so playback survives every window opening and closing.
@@ -12,7 +12,9 @@ import { usePlayerStore, useCurrentTrack } from "./playerStore";
 export default function AudioEngine() {
   const ref = useRef<HTMLAudioElement>(null);
   const playing = usePlayerStore((s) => s.playing);
+  const loop = usePlayerStore((s) => s.loop);
   const track = useCurrentTrack();
+  const lastSave = useRef(0);
 
   useEffect(() => {
     const el = ref.current;
@@ -68,6 +70,26 @@ export default function AudioEngine() {
     };
   }, []);
 
+  // A loop jumps back on time: checked every frame while it plays (timeupdate
+  // only fires a few times a second), and on timeupdate in a background tab.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !loop || !playing) return;
+    let id = 0;
+    const tick = () => {
+      if (el.currentTime >= loop.end) el.currentTime = loop.start;
+      id = requestAnimationFrame(tick);
+    };
+    id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(id);
+  }, [loop, playing]);
+
+  // where you left off: saved every few seconds, on pause and on leaving
+  useEffect(() => {
+    window.addEventListener("pagehide", savePosition);
+    return () => window.removeEventListener("pagehide", savePosition);
+  }, []);
+
   const sync = usePlayerStore((s) => s.sync);
 
   return (
@@ -82,13 +104,25 @@ export default function AudioEngine() {
           usePlayerStore.setState({ resumeOnRelease: true });
         } else sync({ playing: true });
       }}
-      onPause={() => sync({ playing: false })}
+      onPause={() => {
+        sync({ playing: false });
+        savePosition();
+      }}
       onLoadStart={() => sync({ status: "loading" })}
       onWaiting={() => sync({ status: "loading" })}
       onCanPlay={() => sync({ status: "ready" })}
       onPlaying={() => sync({ status: "ready" })}
       onError={() => usePlayerStore.getState().markFailed()}
-      onTimeUpdate={(e) => sync({ currentTime: e.currentTarget.currentTime })}
+      onTimeUpdate={(e) => {
+        const el = e.currentTarget;
+        const { loop: l } = usePlayerStore.getState();
+        if (l && el.currentTime >= l.end) el.currentTime = l.start;
+        sync({ currentTime: el.currentTime });
+        if (Date.now() - lastSave.current > 5000) {
+          lastSave.current = Date.now();
+          savePosition();
+        }
+      }}
       onLoadedMetadata={(e) => sync({ duration: e.currentTarget.duration, status: "ready" })}
       onEnded={() => usePlayerStore.getState().ended()}
     />

@@ -13,6 +13,8 @@ export const SHORTCUTS: [string, string][] = [
   ["← →", "back / forward 5 seconds"],
   ["Shift + ← →", "previous / next beat"],
   ["M", "mute"],
+  ["L", "loop 8 bars / stop looping"],
+  ["N", "night / day"],
   ["1 2 3 4", "Beats, Socials, Contact, Game"],
   ["?", "these shortcuts"],
 ];
@@ -40,6 +42,10 @@ export function useShortcuts() {
         else player.seek(player.currentTime + dir * 5);
       } else if (e.key === "m" || e.key === "M") {
         player.toggleMute();
+      } else if (e.key === "l" || e.key === "L") {
+        player.toggleLoop();
+      } else if (e.key === "n" || e.key === "N") {
+        site.setNight(!site.night);
       } else if (["1", "2", "3", "4"].includes(e.key)) {
         const id = PLACES[Number(e.key) - 1];
         if (id === "game") site.setGameOpen(true);
