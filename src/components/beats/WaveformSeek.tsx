@@ -7,7 +7,8 @@ import type { Track } from "@/lib/types";
 
 // The seek bar drawn as the track's own waveform (measured by
 // scripts/analyze-tracks.mjs), in thin rounded bars. Played audio fills in
-// the player's accent; hover shows the time; click or drag to seek; arrow
+// the player's accent (the dusk blue of the theme easing into the lilac of
+// the cover's rays, read from the colour tokens in globals.css); hover shows the time; click or drag to seek; arrow
 // keys step five seconds. Tracks that haven't been analysed get a plain
 // slider.
 
@@ -34,20 +35,7 @@ function useWaveforms() {
   return all;
 }
 
-export default function WaveformSeek({
-  track,
-  accent,
-  accent2 = accent,
-  rest = "#d3ccbe",
-  cursor = "#2a2622",
-}: {
-  track: Track | undefined;
-  accent: string;
-  accent2?: string;
-  rest?: string;
-  /** The hover line. */
-  cursor?: string;
-}) {
+export default function WaveformSeek({ track }: { track: Track | undefined }) {
   const currentTime = usePlayerStore((s) => s.currentTime);
   const duration = usePlayerStore((s) => s.duration);
   const seek = usePlayerStore((s) => s.seek);
@@ -73,6 +61,9 @@ export default function WaveformSeek({
       const mid = c.height / 2;
       g.clearRect(0, 0, c.width, c.height);
       if (!peaks) return; // still loading: an empty bar
+      const css = getComputedStyle(c);
+      const color = (name: string) => css.getPropertyValue(name).trim();
+      const [accent, accent2, rest, cursor] = ["--color-dusk", "--color-lilac", "--color-wave-rest", "--color-line"].map(color);
       const played = g.createLinearGradient(0, 0, c.width, 0);
       played.addColorStop(0, accent);
       played.addColorStop(1, accent2);
@@ -98,7 +89,7 @@ export default function WaveformSeek({
     const ro = new ResizeObserver(draw);
     ro.observe(c);
     return () => ro.disconnect();
-  }, [peaks, frac, accent, accent2, rest, cursor, hover]);
+  }, [peaks, frac, hover]);
 
   if (peaks === null) {
     return (
