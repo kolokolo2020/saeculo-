@@ -15,10 +15,6 @@ import WaveformSeek from "./WaveformSeek";
 // what's playing, the waveform seek bar, the transport and the tracklist,
 // on the desktop's paper. Nothing animates but the playing row's bars.
 
-// the dusk blue of the theme, easing into the lilac of the cover's rays
-const ACCENT = "#3d5a8a";
-const ACCENT_2 = "#6c5fa6";
-const REST = "#c9c0ae";
 const measured = analysis as Record<string, { duration?: number } | undefined>;
 
 // Lengths for the tracklist: measured ones first, the rest read from each
@@ -215,7 +211,7 @@ export default function BeatsWindow() {
   };
 
   return (
-    <div className="mp flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ ["--accent" as string]: ACCENT }}>
+    <div className="mp flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ ["--accent" as string]: "var(--color-dusk)" }}>
       <div className="mp-hero flex shrink-0 flex-col items-center gap-4 px-4 pt-5 pb-4 sm:flex-row sm:items-stretch sm:gap-6 sm:p-5">
         <div className="mp-cover">
           {/* Next serves it resized for the size it's shown at (globals.css .mp-cover)
@@ -237,7 +233,7 @@ export default function BeatsWindow() {
           <NowPlaying />
           <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-1.5">
-              <WaveformSeek track={track} accent={ACCENT} accent2={ACCENT_2} rest={REST} />
+              <WaveformSeek track={track} />
               <Times />
             </div>
             <Transport />

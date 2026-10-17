@@ -487,6 +487,15 @@ try {
       return false;
     });
     check("first load: the waveforms load on their own, and get drawn", waveChunk && drawn);
+    // the unplayed bars are drawn in the --color-wave-rest token, dark enough to read on paper
+    const rest = await page.getByTestId("waveform").evaluate((c) => {
+      const hex = getComputedStyle(c).getPropertyValue("--color-wave-rest").trim();
+      const want = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] === 255 && want.every((v, k) => Math.abs(d[i + k] - v) <= 2)) return hex;
+      return "";
+    });
+    check("Beats: the unplayed waveform is drawn in --color-wave-rest", rest === "#a39a89", rest);
     const html = await (await page.request.get(BASE + "/")).text();
     check("first load: the page itself carries no waveform data", !html.includes('"peaks"') && !/\[0\.\d+,0\.\d+,0\.\d+,0\.\d+,0\.\d+,0\.\d+,0\.\d+,0\.\d+/.test(html));
     // the tracklist: how many rows are wholly in view without scrolling
