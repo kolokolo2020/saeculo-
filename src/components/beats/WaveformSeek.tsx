@@ -39,6 +39,7 @@ export default function WaveformSeek({ track }: { track: Track | undefined }) {
   const currentTime = usePlayerStore((s) => s.currentTime);
   const duration = usePlayerStore((s) => s.duration);
   const seek = usePlayerStore((s) => s.seek);
+  const loop = usePlayerStore((s) => s.loop);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [hover, setHover] = useState<number | null>(null);
   const dragging = useRef(false);
@@ -63,7 +64,17 @@ export default function WaveformSeek({ track }: { track: Track | undefined }) {
       if (!peaks) return; // still loading: an empty bar
       const css = getComputedStyle(c);
       const color = (name: string) => css.getPropertyValue(name).trim();
-      const [accent, accent2, rest, cursor] = ["--color-dusk", "--color-lilac", "--color-wave-rest", "--color-line"].map(color);
+      const [accent, accent2, rest, cursor, wash] = ["--color-dusk", "--color-lilac", "--color-wave-rest", "--color-line", "--color-dusk-wash"].map(color);
+      // the loop: a band behind the bars, edged in the accent
+      if (loop && duration) {
+        const x0 = (loop.start / duration) * c.width;
+        const x1 = (loop.end / duration) * c.width;
+        g.fillStyle = wash;
+        g.fillRect(x0, 0, x1 - x0, c.height);
+        g.fillStyle = accent;
+        g.fillRect(x0, 0, dpr, c.height);
+        g.fillRect(x1 - dpr, 0, dpr, c.height);
+      }
       const played = g.createLinearGradient(0, 0, c.width, 0);
       played.addColorStop(0, accent);
       played.addColorStop(1, accent2);
@@ -89,7 +100,7 @@ export default function WaveformSeek({ track }: { track: Track | undefined }) {
     const ro = new ResizeObserver(draw);
     ro.observe(c);
     return () => ro.disconnect();
-  }, [peaks, frac, hover]);
+  }, [peaks, frac, hover, loop, duration]);
 
   if (peaks === null) {
     return (

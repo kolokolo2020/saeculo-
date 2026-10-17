@@ -3,14 +3,14 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import AudioEngine from "@/components/player/AudioEngine";
-import { usePlayerStore } from "@/components/player/playerStore";
+import { readPosition, usePlayerStore } from "@/components/player/playerStore";
 import BeatsWindow from "@/components/beats/BeatsWindow";
 import { TRACKS } from "@/data/tracks";
 import { trackIndexFromHash } from "@/lib/trackLink";
 import ContactWindow from "./ContactWindow";
 import { BeatsIcon, ContactIcon, GameIcon, SocialsIcon } from "./Icons";
 import ShortcutsCard from "./ShortcutsCard";
-import { readCalm, restoreSitePrefs, useSiteStore, type WindowId } from "./siteStore";
+import { applyTheme, readCalm, readTheme, restoreSitePrefs, useSiteStore, type WindowId } from "./siteStore";
 import SocialsWindow from "./SocialsWindow";
 import Taskbar from "./Taskbar";
 import { useShortcuts } from "./useShortcuts";
@@ -64,15 +64,38 @@ export default function Site({ initialTrackId }: { initialTrackId?: string } = {
       calm: readCalm() || window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     });
     restoreSitePrefs();
-    // a #track= link wins over the page's own beat
+    // a #track= link wins over the page's own beat; with neither, the beat
+    // and the moment the visitor left off at last time
     const fromHash = trackIndexFromHash(window.location.hash);
     const fromPage = initialTrackId ? TRACKS.findIndex((t) => t.id === initialTrackId) : -1;
     const fromLink = fromHash >= 0 ? fromHash : fromPage;
-    if (fromLink >= 0) usePlayerStore.getState().selectTrack(fromLink, false);
+    const player = usePlayerStore.getState();
+    if (fromLink >= 0) player.selectTrack(fromLink, false);
+    else {
+      const left = readPosition();
+      if (left) {
+        if (left.index !== player.trackIndex) player.selectTrack(left.index, false);
+        player.resumeAt(left.t);
+      }
+    }
     const site = useSiteStore.getState();
     if (document.documentElement.dataset.intro === "skip") site.openWindow("beats");
     else site.setIntroOpen(true);
   }, [initialTrackId]);
+
+  // day or night: the visitor's choice, else the system's, following it live
+  useEffect(() => {
+    const dark = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const night = readTheme() ?? dark.matches;
+      applyTheme(night);
+      useSiteStore.setState({ night });
+    };
+    apply();
+    const onChange = () => readTheme() === null && apply();
+    dark.addEventListener("change", onChange);
+    return () => dark.removeEventListener("change", onChange);
+  }, []);
 
   // a share link followed while the site is already open
   useEffect(() => {

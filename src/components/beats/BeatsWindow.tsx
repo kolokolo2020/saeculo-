@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
+import { LOOP_BARS, usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
-import { NextGlyph, PauseGlyph, PlayGlyph, PrevGlyph, RepeatGlyph, ShuffleGlyph, VolumeGlyph } from "@/components/site/Icons";
+import { NextGlyph, PauseGlyph, PlayGlyph, PrevGlyph, RepeatGlyph, ShuffleGlyph, SimilarGlyph, VolumeGlyph } from "@/components/site/Icons";
 import { ALBUM, TRACKS, isNew } from "@/data/tracks";
 import analysis from "@/data/trackAnalysis.json";
 import { formatTime } from "@/lib/audio";
@@ -80,11 +80,27 @@ function NowPlaying() {
 function Times() {
   const currentTime = usePlayerStore((s) => s.currentTime);
   const duration = usePlayerStore((s) => s.duration);
+  const loop = usePlayerStore((s) => s.loop);
+  const toggleLoop = usePlayerStore((s) => s.toggleLoop);
   return (
-    <p className="mp-time flex justify-between tabular-nums" aria-hidden>
-      <span>{formatTime(currentTime)}</span>
-      <span className="text-ink-2">{duration ? formatTime(duration) : "–:––"}</span>
-    </p>
+    <div className="flex items-center justify-between gap-3">
+      <span className="mp-time tabular-nums" aria-hidden>
+        {formatTime(currentTime)}
+      </span>
+      <button
+        className="mp-loop"
+        aria-pressed={!!loop}
+        onClick={toggleLoop}
+        disabled={!duration}
+        title={loop ? "Stop looping (L)" : `Loop the ${LOOP_BARS} bars from here (L)`}
+        data-testid="loop"
+      >
+        {loop ? `looping ${formatTime(loop.start)}–${formatTime(loop.end)}` : `loop ${LOOP_BARS} bars`}
+      </button>
+      <span className="mp-time text-ink-2 tabular-nums" aria-hidden>
+        {duration ? formatTime(duration) : "–:––"}
+      </span>
+    </div>
   );
 }
 
@@ -94,7 +110,8 @@ function Transport() {
   const muted = usePlayerStore((s) => s.muted);
   const repeatOne = usePlayerStore((s) => s.repeatOne);
   const shuffle = usePlayerStore((s) => s.shuffle);
-  const { toggle, prev, next, setVolume, toggleMute, toggleRepeat, toggleShuffle } = usePlayerStore.getState();
+  const similar = usePlayerStore((s) => s.similar);
+  const { toggle, prev, next, setVolume, toggleMute, toggleRepeat, toggleShuffle, toggleSimilar } = usePlayerStore.getState();
   const vol = muted ? 0 : volume;
   const empty = TRACKS.length === 0;
   return (
@@ -103,8 +120,15 @@ function Transport() {
         <button className="mp-icon" aria-label="Shuffle" aria-pressed={shuffle} onClick={toggleShuffle} title="Shuffle">
           <ShuffleGlyph size={16} />
         </button>
-        <button className="mp-icon" aria-label="Repeat this beat" aria-pressed={repeatOne} onClick={toggleRepeat} title="Repeat this beat">
-          <RepeatGlyph size={16} />
+        <button
+          className="mp-icon"
+          aria-label="Play similar next"
+          aria-pressed={similar}
+          onClick={toggleSimilar}
+          title="Play similar next: the closest beat by tempo and key"
+          data-testid="similar"
+        >
+          <SimilarGlyph size={16} />
         </button>
       </div>
       <div className="flex items-center gap-2">
@@ -119,6 +143,9 @@ function Transport() {
         </button>
       </div>
       <div className="flex min-w-0 items-center justify-end gap-1">
+        <button className="mp-icon" aria-label="Repeat this beat" aria-pressed={repeatOne} onClick={toggleRepeat} title="Repeat this beat">
+          <RepeatGlyph size={16} />
+        </button>
         <button className="mp-icon" aria-label={muted ? "Unmute" : "Mute"} onClick={toggleMute}>
           <VolumeGlyph muted={muted || volume === 0} size={16} />
         </button>
@@ -144,6 +171,8 @@ function Tracklist({ lengthOf }: { lengthOf: (id: string) => number | undefined 
   const failed = usePlayerStore((s) => s.failed);
   const selectTrack = usePlayerStore((s) => s.selectTrack);
   const toggle = usePlayerStore((s) => s.toggle);
+  // with "play similar next" on, the row it will go to says so
+  const upNext = usePlayerStore((s) => (s.similar && !s.repeatOne ? s.upNext() : -1));
 
   if (!TRACKS.length) {
     return (
@@ -180,6 +209,11 @@ function Tracklist({ lengthOf }: { lengthOf: (id: string) => number | undefined 
                 <span className={`truncate text-[14.5px] ${current ? "font-medium" : ""}`}>{t.title}</span>
                 {current && <span className="sr-only">{playing ? ", playing" : ", selected"}</span>}
                 {isNew(t) && <span className="mp-new">new</span>}
+                {i === upNext && (
+                  <span className="mp-next" data-testid="up-next">
+                    up next
+                  </span>
+                )}
               </span>
               <span className={`hidden truncate text-[12.5px] sm:block ${bad ? "text-rust" : "text-ink-2"}`}>{bad ? "file unavailable" : t.key ?? ""}</span>
               <span className={`text-right text-[12.5px] sm:hidden ${bad ? "text-rust" : "text-ink-2"}`}>{bad ? "unavailable" : t.bpm ? `${t.bpm} bpm` : ""}</span>

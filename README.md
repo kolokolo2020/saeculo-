@@ -47,6 +47,24 @@ play button, next, volume) and the tracklist with key, bpm and length.
 There's no visualizer. The playing row has three small bars, which stand
 still with reduced motion or still visuals.
 
+**Play similar next** (the two waves, next to shuffle): after a beat, the
+player goes to the closest one by tempo (half and double time count as the
+same groove) and key (round the circle of fifths, a minor key standing in
+for its relative major), skipping the ones heard lately this visit, so two
+close beats don't just swap back and forth. The row it'll go to says "up
+next". It and shuffle turn each other off; both are remembered
+(`src/lib/similar.ts`).
+
+**loop 8 bars** (between the times, or L): loops the 8 bars from the bar the
+playhead is in, on the beat's own grid (measured tempo and first beat), shown
+as a band on the waveform. Seeking outside it, changing beat or L again lets
+go.
+
+**Where you left off**: the beat and the second you were at are saved every
+few seconds and on leaving, and the next visit opens Beats there, paused.
+Share links and beat pages win over it; a beat left in its last seconds
+starts over.
+
 **lease this** (in the status bar) opens Contact about the beat playing:
 the beat shows at the top of the form and goes in the email's subject
 ("Leasing “joy4us”"). No prices or terms are on the site.
@@ -97,10 +115,20 @@ cached for a few hours.
 ## Keyboard
 
 On the desktop: Space play/pause, ←/→ five seconds back/forward,
-Shift+←/→ previous/next beat, M mute, 1–4 open Beats / Socials / Contact /
+Shift+←/→ previous/next beat, M mute, L loop 8 bars, N night/day, 1–4 open Beats / Socials / Contact /
 Game, ? lists them (also in the clock menu). They never fire while typing
 or while the intro or the game is open. Double-click a title bar (or use
 □) to maximise a window; windows reopen where you left them.
+
+## Night
+
+The clock menu's **Night** (or N) puts the desktop in its night colours,
+taken from the intro's sky: a navy desk, warm dark windows, cream text and a
+lighter dusk blue. Until a visitor picks, it follows their system's dark
+mode (live). The choice is set on `<html data-theme>` before first paint and
+only touches the desktop: the intro and the game keep their own look. The
+colours are Tailwind theme variables (`@theme` in `globals.css`, not inlined),
+redefined under `html[data-theme="night"]`.
 
 ## Socials
 

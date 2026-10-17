@@ -251,6 +251,12 @@ export const ShuffleGlyph = (p: P) => (
     <path d="M2.25 4.75h2.2c1 0 1.9.5 2.45 1.3l2.2 3.9c.55.8 1.45 1.3 2.45 1.3h2.2M12 9.5l1.75 1.75L12 13M2.25 11.25h2.2c.8 0 1.5-.3 2-.85M9.55 5.6c.5-.55 1.2-.85 2-.85h2.2M12 3l1.75 1.75L12 6.5" />
   </L>
 );
+/** "Play similar next": two close waves. */
+export const SimilarGlyph = (p: P) => (
+  <L {...p}>
+    <path d="M2.25 6c1.4-1.5 2.85-1.5 4.25 0s2.85 1.5 4.25 0 2.85-1.5 3 0M2.25 10.5c1.4-1.5 2.85-1.5 4.25 0s2.85 1.5 4.25 0 2.85-1.5 3 0" />
+  </L>
+);
 export const StopGlyph = (p: P) => (
   <G {...p}>
     <rect x="3.5" y="3.5" width="9" height="9" />

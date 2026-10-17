@@ -27,6 +27,8 @@ interface SiteState {
   introOpen: boolean;
   /** "Still visuals": no animation anywhere (also on with reduced motion). */
   calm: boolean;
+  /** The night theme: chosen in the clock menu, else the system's dark mode. */
+  night: boolean;
   shortcutsOpen: boolean;
   /** "Sample this": a track and a moment, waiting for the studio to pick it up. */
   sample: { trackId: string; at: number } | null;
@@ -39,6 +41,8 @@ interface SiteState {
   setGameOpen: (open: boolean) => void;
   setIntroOpen: (open: boolean) => void;
   setCalm: (calm: boolean) => void;
+  /** Choose day or night (remembered: the system setting stops applying). */
+  setNight: (night: boolean) => void;
   toggleMaximize: (id: WindowId) => void;
   /** Remember where the windows sit, for the next visit. */
   rememberPositions: () => void;
@@ -55,6 +59,10 @@ const CALM_KEY = "saeculo-calm";
 /** The old visualizer's look; no longer used, cleared on the next visit. */
 const OLD_VIS_KEY = "saeculo-vis";
 const POS_KEY = "saeculo-windows";
+/** "night" or "day" once chosen; absent: follow the system. */
+export const THEME_KEY = "saeculo-theme";
+/** The browser bar's colour per theme: the title bars' paper. */
+const THEME_COLORS = { day: "#f3eee4", night: "#262320" };
 
 const initialWindows: Record<WindowId, WinState> = {
   beats: { open: false, minimized: false, maximized: false, x: -1, y: -1 },
@@ -68,6 +76,7 @@ export const useSiteStore = create<SiteState>((set, get) => ({
   gameOpen: false,
   introOpen: false,
   calm: false,
+  night: false,
   shortcutsOpen: false,
   sample: null,
   contactBeat: null,
@@ -107,6 +116,15 @@ export const useSiteStore = create<SiteState>((set, get) => ({
     }
     document.documentElement.dataset.calm = String(calm);
     set({ calm });
+  },
+  setNight: (night) => {
+    try {
+      localStorage.setItem(THEME_KEY, night ? "night" : "day");
+    } catch {
+      // not remembered
+    }
+    applyTheme(night);
+    set({ night });
   },
   toggleMaximize: (id) => set((s) => ({ windows: { ...s.windows, [id]: { ...s.windows[id], maximized: !s.windows[id].maximized, minimized: false } } })),
   rememberPositions: () => {
@@ -161,4 +179,20 @@ export function readCalm(): boolean {
   } catch {
     return false;
   }
+}
+
+/** The saved theme choice, or null when the visitor hasn't picked one. */
+export function readTheme(): boolean | null {
+  try {
+    const v = localStorage.getItem(THEME_KEY);
+    return v === "night" ? true : v === "day" ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Put the theme on the page (the boot script in layout.tsx does this before first paint). */
+export function applyTheme(night: boolean) {
+  document.documentElement.dataset.theme = night ? "night" : "day";
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", night ? THEME_COLORS.night : THEME_COLORS.day);
 }
