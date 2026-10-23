@@ -160,7 +160,7 @@ export default function Site({ initialTrackId }: { initialTrackId?: string } = {
         <Window id="beats" width={780} height={980} icon={<BeatsIcon size={16} />}>
           <BeatsWindow />
         </Window>
-        <Window id="socials" width={400} height={320} icon={<SocialsIcon size={16} />}>
+        <Window id="socials" width={400} height={480} icon={<SocialsIcon size={16} />}>
           <SocialsWindow />
         </Window>
         <Window id="contact" width={440} height={430} icon={<ContactIcon size={16} />}>

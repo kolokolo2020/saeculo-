@@ -12,9 +12,9 @@ const audioFile = (name: string) => `/audio/${encodeURIComponent(name)}`;
 // The beats, as one album under one cover (the owner's artwork,
 // public/covers/saeculo.jpg). To add a beat:
 //   1. put the MP3 in public/audio/
-//   2. add an entry below (newest first; only id, title and src are required).
+//   2. add an entry below (top of the list plays first; only id, title and src are required).
 //      `src` is the file name exactly as it is in public/audio/, inside
-//      audioFile(...), e.g. src: audioFile("joy4us (21.09.26).mp3").
+//      audioFile(...), e.g. src: audioFile("growin & slowin (24.09.26).mp3").
 //      `added` ("YYYY-MM-DD") shows a "new" tag for 30 days.
 //   3. optional: `node scripts/analyze-tracks.mjs` measures the exact tempo,
 //      first beat, loudness and waveform so the seek bar lines up and every
@@ -31,28 +31,18 @@ export const ALBUM = {
 
 export const TRACKS: Track[] = [
   {
+    id: "care4me",
+    title: "care4me",
+    bpm: 143,
+    key: "F major",
+    src: audioFile("care4me (21.07.26).mp3"),
+  },
+  {
     id: "growin-and-slowin",
     title: "growin & slowin",
-    added: "2026-09-24",
     bpm: 101,
     key: "E♭ major",
     src: audioFile("growin & slowin (24.09.26).mp3"),
-  },
-  {
-    id: "kiss-me-miss-ya",
-    title: "kiss me, miss ya",
-    added: "2026-09-23",
-    bpm: 97,
-    key: "F♯ major",
-    src: audioFile("kiss me, miss ya (23.09.26).mp3"),
-  },
-  {
-    id: "joy4us",
-    title: "joy4us",
-    added: "2026-09-21",
-    bpm: 96,
-    key: "B major",
-    src: audioFile("joy4us (21.09.26).mp3"),
   },
   {
     id: "beauty-fangs",
@@ -67,13 +57,6 @@ export const TRACKS: Track[] = [
     bpm: 138,
     key: "F♯ minor",
     src: audioFile("nite2die 4 (23.07.26).mp3"),
-  },
-  {
-    id: "care4me",
-    title: "care4me",
-    bpm: 143,
-    key: "F major",
-    src: audioFile("care4me (21.07.26).mp3"),
   },
   {
     id: "interview",

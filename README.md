@@ -67,7 +67,7 @@ starts over.
 
 **lease this** (in the status bar) opens Contact about the beat playing:
 the beat shows at the top of the form and goes in the email's subject
-("Leasing “joy4us”"). No prices or terms are on the site.
+("Leasing “care4me”"). No prices or terms are on the site.
 
 **sample this** (in the status bar) takes the two bars playing right now
 into the game's studio: cut into four two-beat pieces at the track's own
@@ -96,9 +96,9 @@ headers.
 ### Adding a beat
 
 1. Put the MP3 in `public/audio/`.
-2. Add an entry at the top of `TRACKS` in `src/data/tracks.ts`. Only `id`,
+2. Add an entry to `TRACKS` (the top one plays first) in `src/data/tracks.ts`. Only `id`,
    `title` and `src` are required. `src` is the file name exactly as it is
-   on disk, in `audioFile(…)`: `src: audioFile("joy4us (21.09.26).mp3")`.
+   on disk, in `audioFile(…)`: `src: audioFile("care4me (21.07.26).mp3")`.
    `bpm`, `key` and `added` (`"YYYY-MM-DD"`, shows a "new" tag for 30
    days) are optional.
 3. Optional: `node scripts/analyze-tracks.mjs` (needs
@@ -122,7 +122,8 @@ or while the intro or the game is open. Double-click a title bar (or use
 
 ## Night
 
-The clock menu's **Night** (or N) puts the desktop in its night colours,
+The day/night switch in the taskbar (next to the clock), the clock menu's
+**Night**, or N puts the desktop in its night colours,
 taken from the intro's sky: a navy desk, warm dark windows, cream text and a
 lighter dusk blue. Until a visitor picks, it follows their system's dark
 mode (live). The choice is set on `<html data-theme>` before first paint and
