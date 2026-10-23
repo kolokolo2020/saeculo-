@@ -1377,6 +1377,270 @@ try {
     await ctx.close();
   }
 
+  // ---------------------------------------------------------------- the career: your page, artists, songs, the people who want a cut
+  {
+    const SAVE = { found: ["rain"], seenHelp: true, unseen: [], cash: 500, rep: 10, profile: { name: "Tester", skin: 2, hair: "short", hairColor: 0, body: "slim", top: { id: "hoodie", color: 0 }, pants: { id: "jeans", color: 0 }, shoes: { id: "sneakers", color: 0 }, hat: null, extra: null }, settings: { sfx: 0, music: 0, shake: false, hints: true, difficulty: "chill" } };
+    const { ctx, page } = await open({ init: { "saeculo-game": JSON.stringify(SAVE) } });
+    await page.getByTestId("icon-game").click();
+    await page.waitForTimeout(1600);
+    const g = (fn, ...a) => page.evaluate(([fn, a]) => window.__game[fn](...a), [fn, a]);
+    const career = () => g("career");
+    const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-game")));
+    const shut = async () => {
+      for (let i = 0; i < 8 && (await page.getByTestId("game-dialog").count()); i++) {
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(120);
+      }
+    };
+    const choose = async (name) => {
+      for (let i = 0; i < 8 && !(await page.getByTestId("game-dialog").getByRole("button", { name }).count()); i++) {
+        await page.keyboard.press("e");
+        await page.waitForTimeout(150);
+      }
+      const b = page.getByTestId("game-dialog").getByRole("button", { name });
+      if (await b.count()) await b.first().click();
+      await page.waitForTimeout(200);
+    };
+    const winFight = async (place) => {
+      await g("weaken");
+      for (let i = 0; i < 50 && (await g("fight"))?.outcome === ""; i++) {
+        const f = await g("fight");
+        const foe = f.foes.find((x) => x.state !== "down" && x.state !== "flee");
+        if (foe) await page.evaluate(([p, x, y]) => window.__game.teleport(p, (x - 9) / 16, y / 16, "right"), [place, foe.x, foe.y]);
+        await page.keyboard.press("e");
+        await page.waitForTimeout(380);
+      }
+      await page.waitForTimeout(700);
+    };
+    const meetCrew = async (crew) => {
+      await g("crew", crew);
+      for (let i = 0; i < 40 && !(await page.getByTestId("game-dialog").count()); i++) await page.waitForTimeout(250);
+    };
+    await g("peace");
+
+    check("career: followers in the top bar", (await page.getByTestId("game-fans").textContent()).includes("12"));
+    await page.keyboard.press("p");
+    await page.waitForTimeout(300);
+    check("phone: P opens your page", await page.getByTestId("phone").isVisible());
+    check("phone: your followers on it", (await page.getByTestId("phone-fans").textContent()).trim() === "12");
+    check("phone: nothing to post before you've made a beat", await page.getByTestId("phone-post-beat").isDisabled());
+    await page.getByTestId("phone-tab-money").click();
+    check("phone: the money tab", await page.getByTestId("phone-money").isVisible());
+    if (axeSource) {
+      await page.addScriptTag({ content: axeSource });
+      const pv = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length}): ${x.nodes.map((n) => n.target).join(" ")}`));
+      check("axe: no violations on the phone", pv.length === 0, pv.join(", "));
+    }
+    await page.keyboard.press("p");
+    await page.waitForTimeout(200);
+    check("phone: P puts it away", (await page.getByTestId("phone").count()) === 0);
+
+    // an artist: Lil Brick outside the store buys a beat, swaps numbers, makes a song
+    await g("makeTape", "first tape");
+    await g("teleport", "street", 23.4, 5.25, "up");
+    await page.waitForTimeout(300);
+    check("artist: Lil Brick's outside the store", (await page.getByTestId("game-prompt").textContent()).includes("Lil Brick"));
+    const cash0 = (await saved()).cash;
+    await page.keyboard.press("e");
+    await choose(/Sell them “first tape”/);
+    let c = await career();
+    check("artist: sell him a beat: paid, followers, a post", c.leases.brick?.includes("first tape") && (await saved()).cash > cash0 && c.fans > 12 && c.posts === 1, `${cash0} → ${(await saved()).cash}, ${c.fans} followers`);
+    await shut();
+    await page.keyboard.press("e");
+    check("artist: he won't buy the same tape twice", (await page.getByTestId("game-dialog").textContent()).length > 0 && !(await page.getByTestId("game-dialog").getByRole("button", { name: /Sell them/ }).count()));
+    await choose("Swap numbers");
+    check("artist: swap numbers: he's in your phone", (await career()).contacts.includes("brick"));
+    await shut();
+    await page.keyboard.press("e");
+    await choose(/Make a song/);
+    check("session: the recording session opens", await page.getByTestId("session").isVisible());
+    await page.getByTestId("session-start").click();
+    for (let i = 0; i < 8; i++) {
+      await page.waitForTimeout(260);
+      await page.keyboard.press("Space");
+    }
+    await page.waitForTimeout(200);
+    await page.getByTestId("session-bounce").click();
+    c = await career();
+    check("session: a song comes out of it, with a score", (await page.getByTestId("session-score").isVisible()) && c.collabs.length === 1 && c.collabs[0].artist === "brick", JSON.stringify(c.collabs[0] ?? {}).slice(0, 120));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // the catalogue earns on its own
+    const before = await saved();
+    await g("payOut", 5);
+    const after = await saved();
+    check("royalties: songs earn while you're out", after.stats.royalties > 0 && after.cash > before.cash && after.collabs[0].streams > 0, `+$${(after.cash - before.cash).toFixed(2)}`);
+
+    // posting: a beat (once per tape), a fit pic
+    await g("phone", "page");
+    await page.waitForTimeout(200);
+    const f0 = (await career()).fans;
+    await page.getByTestId("phone-post-beat").click();
+    await page.waitForTimeout(200);
+    check("phone: post your beat: followers, and it goes up on your beat store", (await career()).fans > f0 && (await career()).posted.includes("first tape") && (await page.getByTestId("phone-post-beat").isDisabled()));
+    const f1 = (await career()).fans;
+    await page.getByTestId("phone-post-fit").click();
+    await page.waitForTimeout(200);
+    check("phone: post a fit: followers, then a wait before the next", (await career()).fans > f1 && (await page.getByTestId("phone-post-fit").isDisabled()));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // going up: artists write in
+    await g("fans", 600);
+    await page.waitForTimeout(300);
+    c = await career();
+    check("fame: going up brings artists into your messages", c.tier === 2 && c.inbox.some((m) => m.act === "link") && (await page.getByTestId("game-phone-btn").getAttribute("aria-label")).includes("new"), `${c.fans} followers, ${c.inbox.length} messages`);
+    await g("phone", "dms");
+    await page.waitForTimeout(200);
+    await page.getByTestId("phone-dms").getByRole("button", { name: "link up" }).first().click();
+    await page.waitForTimeout(200);
+    check("phone: link up from a message", (await career()).contacts.length >= 2);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // trouble on your own street, once people know your face
+    check("fame: people who know you can find you on your own street", (await g("odds", "street")).ambush > 0);
+
+    // the Block Kings: they come asking, you say no, they come for you
+    await g("fans", 1000);
+    await page.waitForTimeout(300);
+    check("kings: they've noticed you're getting money", (await career()).mob.kings.stage === "asked");
+    await shut();
+    await g("teleport", "alley", 12, 6, "right");
+    await page.waitForTimeout(300);
+    await meetCrew("envoy-kings");
+    check("kings: Rook comes to talk", (await page.getByTestId("game-dialog").textContent()).length > 0 && (await g("crewNow")) === "envoy-kings");
+    await choose("No.");
+    check("kings: say no and they're after you", (await career()).mob.kings.stage === "hunted");
+    await shut();
+    await g("peace");
+    await page.waitForTimeout(1500);
+    await meetCrew("gang");
+    await choose("Fight");
+    check("kings: a crew of theirs, in a fight", (await g("fight"))?.foes.length === 3);
+    await winFight("alley");
+    check("kings: see one off and it counts", (await career()).mob.kings.squads === 1, JSON.stringify((await career()).mob.kings));
+    await shut();
+    await g("give", { mob: { ...(await saved()).mob, kings: { stage: "hunted", squads: 3, paid: 0 } } });
+    await g("peace");
+    await page.waitForTimeout(1500);
+    await meetCrew("heavy-kings");
+    await choose("Fight");
+    check("kings: then Rook himself", (await g("fight"))?.boss === true);
+    await winFight("alley");
+    const done = await saved();
+    check("kings: beat Rook: done with them, his bat, the goal", done.mob.kings.stage === "done" && done.weapons.includes("spiked") && done.goals.includes("kings"));
+    await shut();
+
+    // robbers want what you've got on
+    await g("give", { owned: [...(await saved()).owned, "chain"], profile: { ...(await saved()).profile, neck: { id: "chain", color: 0 } } });
+    await g("peace");
+    await page.waitForTimeout(1500);
+    await meetCrew("robbers");
+    await choose(/Hand over the chain/);
+    const robbed = await saved();
+    check("robbers: they know your face and take your chain", !robbed.owned.includes("chain") && robbed.profile.neck === null);
+    await shut();
+
+    // Smokey's coat: weapons for sale
+    await g("teleport", "alley", 21.2, 6.2, "right");
+    await page.waitForTimeout(300);
+    await page.keyboard.press("e");
+    await choose("See what's in the coat");
+    check("smokey: his coat opens like a shop", await page.getByTestId("shop").isVisible());
+    await page.getByTestId("buy-pipe").getByRole("button").click();
+    await page.waitForTimeout(200);
+    const armed = await saved();
+    check("smokey: buy a lead pipe, it's in your hand", armed.weapons.includes("pipe") && armed.weapon === "pipe");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // a taser stuns
+    await g("give", { weapons: [...(await saved()).weapons, "taser"], weapon: "taser" });
+    await g("peace");
+    await page.waitForTimeout(1500);
+    await meetCrew("drunks");
+    await choose("Fight");
+    await page.waitForTimeout(300);
+    let stunned = false;
+    for (let i = 0; i < 12 && !stunned; i++) {
+      const f = await g("fight");
+      const foe = f.foes.find((x) => x.state !== "down" && x.state !== "flee");
+      if (!foe) break;
+      await page.evaluate(([x, y]) => window.__game.teleport("alley", (x - 9) / 16, y / 16, "right"), [foe.x, foe.y]);
+      await page.keyboard.press("e");
+      await page.waitForTimeout(120);
+      stunned = (await g("fight")).foes.some((x) => x.state === "stagger");
+      await page.waitForTimeout(700);
+    }
+    check("taser: it leaves them reeling", stunned);
+    await winFight("alley");
+    await shut();
+
+    // Maison, at the end of the avenue
+    await g("teleport", "avenue", 42.5, 3.3, "up");
+    await page.waitForTimeout(200);
+    await page.keyboard.down("ArrowUp");
+    await page.waitForTimeout(500);
+    await page.keyboard.up("ArrowUp");
+    await page.waitForTimeout(700);
+    check("maison: a door at the end of the avenue", (await page.getByTestId("game").getAttribute("data-place")) === "boutique");
+    await g("mini", { kind: "shop", shop: "maison" });
+    await page.waitForTimeout(300);
+    check("maison: some pieces are only for people with a following", await page.getByTestId("buy-iced").getByRole("button").isDisabled());
+    await page.getByTestId("buy-logo-tee").getByRole("button").click();
+    await page.waitForTimeout(200);
+    check("maison: buy a designer tee", (await saved()).owned.includes("logo-tee"));
+    if (axeSource) {
+      const mv = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length}): ${x.nodes.map((n) => n.target).join(" ")}`));
+      check("axe: no violations at Maison", mv.length === 0, mv.join(", "));
+    }
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // the cups
+    await g("mini", { kind: "monte" });
+    await page.waitForTimeout(300);
+    const m0 = (await saved()).cash;
+    await page.getByTestId("monte-go").click();
+    for (let i = 0; i < 40 && !(await page.getByTestId("monte-cup-1").isEnabled()); i++) await page.waitForTimeout(200);
+    await page.getByTestId("monte-cup-1").click();
+    await page.waitForTimeout(200);
+    check("cups: find the ball (or don't): five dollars either way", Math.abs((await saved()).cash - m0) === 5, `${m0} → ${(await saved()).cash}`);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // Tank's fight night
+    await g("give", { seen: [...(await saved()).seen, "tank-beaten"] });
+    await g("teleport", "underpass", 17.5, 8.6, "right");
+    await page.waitForTimeout(300);
+    await g("ring");
+    await page.waitForTimeout(200);
+    await shut();
+    check("fight night: round one", (await g("ringRound")) === 1 && (await g("fight"))?.foes.length === 2);
+    await winFight("underpass");
+    const r0 = (await saved()).cash;
+    await choose(/Take \$40 and go/);
+    check("fight night: take the money after a round", (await saved()).cash === r0 + 40);
+    await shut();
+    await ctx.close();
+  }
+
+  // ---------------------------------------------------------------- the phone on a phone
+  {
+    const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, mobile: true, init: { "saeculo-game": JSON.stringify({ found: [], seenHelp: true, unseen: [], profile: { name: "R", skin: 1, hair: "short", hairColor: 0, body: "slim" }, fans: 3000 }) } });
+    await page.getByRole("button", { name: "Close Beats" }).tap();
+    await page.getByTestId("icon-game").tap();
+    await page.waitForTimeout(1600);
+    await page.getByTestId("game-phone-btn").tap();
+    await page.waitForTimeout(300);
+    const box = await page.getByTestId("phone").boundingBox();
+    check("phone on a phone: fits the screen", box && box.width <= 390 && (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+    check("phone on a phone: the top bar shows followers", (await page.getByTestId("game-fans").textContent()).includes("3K"));
+    await ctx.close();
+  }
+
   // ---------------------------------------------------------------- accessibility
   if (axeSource) {
     const { ctx, page } = await open();

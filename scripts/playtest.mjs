@@ -1,6 +1,8 @@
 // Screenshots of every place, the menu, the mini-games and a fight, on a
 // desktop and a phone, for looking at by eye (and Vee's battle, Dre's tape
-// lost in a knockout, the alley cat following you). Run against a dev server:
+// lost in a knockout, the alley cat following you; the career: the phone,
+// the artists, a session, the cups, Maison, Smokey, the Block Kings, fight
+// night). Run against a dev server:
 //   node scripts/playtest.mjs [outdir]
 import { chromium } from "playwright-core";
 import { mkdirSync } from "fs";
@@ -18,9 +20,9 @@ const SAVE = {
 const PLACES = [
   ["bedroom", 10, 6, "down"], ["street", 18, 5, "down"], ["store", 10.5, 5.6, "up"], ["studio", 8, 5, "down"],
   ["park", 14, 5, "down"], ["rooftop", 10, 5, "down"], ["avenue", 20, 5, "down"], ["alley", 12, 7, "up"],
-  ["records", 8, 7, "up"], ["thrift", 7, 6, "up"], ["club", 12, 9, "up"], ["subway", 6, 4, "down"], ["underpass", 14, 6.5, "right"],
+  ["records", 8, 7, "up"], ["thrift", 7, 6, "up"], ["club", 12, 9, "up"], ["subway", 6, 4, "down"], ["underpass", 14, 6.5, "right"], ["boutique", 8, 7, "up"],
 ];
-const MINIS = [["cypher", { kind: "rhythm", mode: "cypher" }], ["dj", { kind: "rhythm", mode: "dj" }], ["dice", { kind: "dice" }], ["crates", { kind: "crates" }], ["hoops", { kind: "hoops" }], ["tag", { kind: "tag" }], ["shop-store", { kind: "shop", shop: "store" }], ["shop-thrift", { kind: "shop", shop: "thrift" }], ["shop-bar", { kind: "shop", shop: "bar" }]];
+const MINIS = [["cypher", { kind: "rhythm", mode: "cypher" }], ["dj", { kind: "rhythm", mode: "dj" }], ["dice", { kind: "dice" }], ["crates", { kind: "crates" }], ["hoops", { kind: "hoops" }], ["tag", { kind: "tag" }], ["shop-store", { kind: "shop", shop: "store" }], ["shop-thrift", { kind: "shop", shop: "thrift" }], ["shop-bar", { kind: "shop", shop: "bar" }], ["shop-maison", { kind: "shop", shop: "maison" }], ["shop-smokey", { kind: "shop", shop: "smokey" }], ["monte", { kind: "monte" }]];
 const TABS = ["you", "wardrobe", "fight", "goals", "settings"];
 
 const browser = await chromium.launch({ executablePath: CHROME, args: ["--autoplay-policy=no-user-gesture-required"] });
@@ -160,6 +162,71 @@ for (const [dev, opts] of [["desk", { viewport: { width: 1366, height: 800 } }],
   await g("trouble");
   await page.waitForTimeout(700);
   await snap("cat-scared");
+  await clear();
+  await g("peace");
+
+  // the career: a tape, Lil Brick, the phone, a session, the Kings, fight night
+  await g("teleport", "street", 18, 5, "down");
+  await page.waitForTimeout(300);
+  await clear();
+  await g("makeTape", "late tape");
+  await g("teleport", "street", 23.4, 5.25, "up");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("e");
+  await page.waitForTimeout(200);
+  await snap("career-0-brick");
+  await clear();
+  await g("session", "brick", 78);
+  await g("fans", 2400);
+  await page.waitForTimeout(300);
+  await g("payOut", 3);
+  for (const t of ["page", "dms", "money"]) {
+    await g("phone", t);
+    await page.waitForTimeout(300);
+    await snap(`phone-${t}`);
+  }
+  await g("phone", null);
+  await g("mini", { kind: "session", artist: "kaya" });
+  await page.waitForTimeout(300);
+  await page.getByTestId("session-start").click();
+  await page.waitForTimeout(700);
+  await snap("mini-session");
+  await g("mini", null);
+  await clear();
+  await g("teleport", "alley", 12, 6, "right");
+  await page.waitForTimeout(300);
+  await g("crew", "envoy-kings");
+  for (let i = 0; i < 30 && !(await dialog.count()); i++) await page.waitForTimeout(200);
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("e");
+    await page.waitForTimeout(150);
+  }
+  await snap("career-1-rook");
+  await clear();
+  await g("peace");
+  await g("give", { weapons: ["fists", "taser", "machete"], weapon: "machete", profile: { name: "Tester", skin: 2, hair: "braids", hairColor: 0, body: "regular", top: { id: "fur", color: 0 }, pants: { id: "leather-pants", color: 0 }, shoes: { id: "red-soles", color: 0 }, hat: null, neck: { id: "iced", color: 0 }, extra: { id: "grillz", color: 0 } } });
+  await page.waitForTimeout(1600);
+  await g("crew", "gang");
+  for (let i = 0; i < 30 && !(await fightBtn.count()); i++) {
+    if (await dialog.count()) await page.keyboard.press("e");
+    await page.waitForTimeout(200);
+  }
+  await fightBtn.click().catch(() => {});
+  await page.waitForTimeout(1500);
+  await snap("career-2-kings-fight");
+  await clear();
+  await g("menu", "wardrobe");
+  await page.waitForTimeout(300);
+  await snap("career-3-drip");
+  await g("menu", null);
+  await g("teleport", "underpass", 17.5, 8.6, "right");
+  await page.waitForTimeout(300);
+  await g("give", { seen: ["tank-beaten"] });
+  await g("ring");
+  await page.waitForTimeout(400);
+  await clear();
+  await page.waitForTimeout(1200);
+  await snap("career-4-ring");
   await ctx.close();
 }
 await browser.close();

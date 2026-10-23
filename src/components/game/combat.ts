@@ -13,7 +13,9 @@ import type { Weapon } from "./weapons";
 // wake up at home with less in your pockets. Leaving through a door is
 // always an option.
 
-export type FoeKind = "drunk" | "rowdy" | "boss" | "goon";
+export type FoeKind = "drunk" | "rowdy" | "boss" | "goon" | "robber" | "gang" | "suit" | "rook" | "kade" | "boxer" | "champ";
+/** The big ones: a wide health bar, hard to shove, slow to stagger. */
+export const isBig = (k: FoeKind) => k === "boss" || k === "rook" || k === "kade" || k === "champ";
 export type FoeState = "approach" | "windup" | "strike" | "recover" | "stagger" | "down" | "flee";
 
 export interface Fighter {
@@ -36,6 +38,8 @@ export interface Fighter {
   purse: number;
   /** After a stagger they shrug hits off for a moment (no stun-locking). */
   guard: number;
+  /** Stunned (a taser, spray) recently: it won't take again for a bit. */
+  stunned: number;
 }
 
 export interface Me {
@@ -66,11 +70,18 @@ export interface FightEvents {
   shake: (amount: number) => void;
 }
 
-const STATS: Record<FoeKind, Omit<Fighter, "kind" | "state" | "timer" | "cd" | "flash" | "kvx" | "kvy" | "seed" | "purse" | "guard">> = {
+const STATS: Record<FoeKind, Omit<Fighter, "kind" | "state" | "timer" | "cd" | "flash" | "kvx" | "kvy" | "seed" | "purse" | "guard" | "stunned">> = {
   drunk: { hp: 36, maxHp: 36, dmg: 11, speed: 34, reach: 12, windup: 0.58 },
   rowdy: { hp: 52, maxHp: 52, dmg: 13, speed: 42, reach: 12, windup: 0.48 },
   goon: { hp: 60, maxHp: 60, dmg: 13, speed: 42, reach: 13, windup: 0.45 },
   boss: { hp: 190, maxHp: 190, dmg: 19, speed: 38, reach: 16, windup: 0.6 },
+  robber: { hp: 44, maxHp: 44, dmg: 13, speed: 46, reach: 13, windup: 0.44 },
+  gang: { hp: 58, maxHp: 58, dmg: 14, speed: 44, reach: 14, windup: 0.42 },
+  suit: { hp: 72, maxHp: 72, dmg: 17, speed: 40, reach: 15, windup: 0.4 },
+  boxer: { hp: 64, maxHp: 64, dmg: 14, speed: 48, reach: 13, windup: 0.36 },
+  rook: { hp: 230, maxHp: 230, dmg: 21, speed: 42, reach: 17, windup: 0.52 },
+  kade: { hp: 300, maxHp: 300, dmg: 24, speed: 44, reach: 18, windup: 0.46 },
+  champ: { hp: 210, maxHp: 210, dmg: 19, speed: 46, reach: 15, windup: 0.44 },
 };
 /** How much harder (or softer) each setting makes them. */
 export const TUNING: Record<Difficulty, { dmg: number; hp: number; windup: number; rest: number }> = {
@@ -79,7 +90,7 @@ export const TUNING: Record<Difficulty, { dmg: number; hp: number; windup: numbe
   hard: { dmg: 1.3, hp: 1.2, windup: 0.82, rest: 0.7 },
 };
 /** How long each kind shrugs off hits after being staggered. */
-const GUARD: Record<FoeKind, number> = { drunk: 1.5, rowdy: 1.9, goon: 2, boss: 2.6 };
+const GUARD: Record<FoeKind, number> = { drunk: 1.5, rowdy: 1.9, goon: 2, boss: 2.6, robber: 1.7, gang: 2, suit: 2.2, boxer: 2.1, rook: 2.6, kade: 2.8, champ: 2.5 };
 
 const LOOKS: Look[] = [
   { skin: "#e0b193", hair: "#6b3a1c", top: "#5a2a3a", pants: "#23252e", style: "short", body: "broad" },
@@ -90,6 +101,53 @@ const LOOKS: Look[] = [
   { skin: "#6b4431", hair: "#0f0b08", top: "#26262b", pants: "#3a3a40", style: "buzz", body: "slim" },
 ];
 const TANK: Look = { skin: "#7a4a32", hair: "#0d0a08", top: "#141418", trim: "#d8b35a", topStyle: "leather", pants: "#1c1f26", style: "buzz", body: "broad", extra: "chain", extraColor: "#d8b35a" };
+// the Block Kings wear red; the Syndicate wear suits
+const KINGS: Look[] = [
+  { skin: "#8d5a3b", hair: "#120d0a", top: "#7a2020", topStyle: "hoodie", trim: "#111216", pants: "#111216", style: "short", hat: "bandana", hatColor: "#b33a3a", hatShade: "#7a2020", body: "broad" },
+  { skin: "#c99a7c", hair: "#151010", top: "#111216", topStyle: "puffer", pants: "#1c1f26", style: "buzz", hat: "bandana", hatColor: "#b33a3a", hatShade: "#7a2020" },
+  { skin: "#5c3a26", hair: "#0d0a08", top: "#b33a3a", topStyle: "track", trim: "#111216", pants: "#111216", pantsStyle: "track", pantsTrim: "#b33a3a", style: "braids" },
+];
+const ROOK: Look = { skin: "#6b4431", hair: "#0d0a08", top: "#111216", topStyle: "leather", trim: "#b33a3a", pants: "#111216", pantsStyle: "cargo", style: "braids", body: "broad", hat: "bandana", hatColor: "#b33a3a", hatShade: "#7a2020", extra: "grillz", extraColor: "#f0c850", neck: "cuban", neckColor: "#f0c850" };
+const SUITS: Look[] = [
+  { skin: "#e0b193", hair: "#151010", top: "#111216", topStyle: "jacket", trim: "#e8e0cf", pants: "#111216", style: "short", extra: "shades", body: "broad" },
+  { skin: "#8d5a3b", hair: "#0d0a08", top: "#1d1e24", topStyle: "jacket", trim: "#c9c2b3", pants: "#1d1e24", style: "bald", extra: "shades", body: "broad" },
+  { skin: "#d2a58a", hair: "#8a8a86", top: "#26262b", topStyle: "jacket", trim: "#e8e0cf", pants: "#26262b", style: "short", extra: "shades" },
+];
+const KADE: Look = { skin: "#f1d2bd", hair: "#d8b35a", top: "#e8e0cf", topStyle: "jacket", trim: "#111216", pants: "#e8e0cf", style: "short", body: "broad", extra: "shades", neck: "chain", neckColor: "#f0c850" };
+const ROBBERS: Look[] = [
+  { skin: "#c99a7c", hair: "#151010", top: "#26262b", topStyle: "hoodie", pants: "#1c1f26", style: "hood", hat: "ski", hatColor: "#111216", hatShade: "#26262b" },
+  { skin: "#6b4431", hair: "#0d0a08", top: "#3a3a40", topStyle: "puffer", pants: "#26262b", style: "cap", accent: "#111216" },
+  { skin: "#e8c0a4", hair: "#3a2416", top: "#2a4a2a", topStyle: "fleece", trim: "#111216", pants: "#111216", style: "short", hat: "ski", hatColor: "#26262b", hatShade: "#111216" },
+];
+const BOXERS: Look[] = [
+  { skin: "#4e3020", hair: "#0d0a08", top: "#c9c2b3", topStyle: "jersey", trim: "#b33a3a", pants: "#b33a3a", style: "buzz", body: "broad" },
+  { skin: "#e0b193", hair: "#6b3a1c", top: "#2a4a7a", topStyle: "jersey", trim: "#e8e0cf", pants: "#2a4a7a", style: "short", body: "broad" },
+];
+const CHAMP: Look = { skin: "#7a4a32", hair: "#0d0a08", top: "#d0a020", topStyle: "jersey", trim: "#111216", pants: "#111216", style: "bald", body: "broad", neck: "chain", neckColor: "#f0c850" };
+const pickLook = (xs: Look[]) => xs[Math.floor(Math.random() * xs.length)];
+const LOOK_OF: Partial<Record<FoeKind, () => Look>> = {
+  boss: () => TANK,
+  gang: () => pickLook(KINGS),
+  rook: () => ROOK,
+  suit: () => pickLook(SUITS),
+  kade: () => KADE,
+  robber: () => pickLook(ROBBERS),
+  boxer: () => pickLook(BOXERS),
+  champ: () => CHAMP,
+};
+const PURSE: Record<FoeKind, () => number> = {
+  drunk: () => 6 + Math.floor(Math.random() * 8),
+  rowdy: () => 10 + Math.floor(Math.random() * 10),
+  goon: () => 14,
+  boss: () => 60,
+  robber: () => 18 + Math.floor(Math.random() * 20),
+  gang: () => 30 + Math.floor(Math.random() * 30),
+  suit: () => 80 + Math.floor(Math.random() * 80),
+  boxer: () => 0,
+  rook: () => 400,
+  kade: () => 1500,
+  champ: () => 0,
+};
 
 let seq = 0;
 
@@ -105,7 +163,7 @@ export function makeFoe(kind: FoeKind, place: Actor["place"], x: number, y: numb
     x,
     y,
     dir: "left",
-    look: look ?? (kind === "boss" ? TANK : LOOKS[Math.floor(Math.random() * LOOKS.length)]),
+    look: look ?? LOOK_OF[kind]?.() ?? LOOKS[Math.floor(Math.random() * LOOKS.length)],
     pose: "stand",
     item: kind === "drunk" && Math.random() < 0.6 ? "bottle" : undefined,
     solid: false,
@@ -120,8 +178,9 @@ export function makeFoe(kind: FoeKind, place: Actor["place"], x: number, y: numb
       kvx: 0,
       kvy: 0,
       seed: Math.random() * 10,
-      purse: kind === "boss" ? 60 : kind === "goon" ? 14 : kind === "rowdy" ? 10 + Math.floor(Math.random() * 10) : 6 + Math.floor(Math.random() * 8),
+      purse: PURSE[kind](),
       guard: 0,
+      stunned: 0,
     },
   };
 }
@@ -142,6 +201,7 @@ export function updateFoes(foes: Actor[], me: Me, dt: number, scene: Scene, diff
     f.flash = Math.max(0, f.flash - dt);
     f.cd = Math.max(0, f.cd - dt);
     f.guard = Math.max(0, f.guard - dt);
+    f.stunned = Math.max(0, f.stunned - dt);
     // being shoved
     if (Math.abs(f.kvx) + Math.abs(f.kvy) > 1) {
       move(a, a.x + f.kvx * dt, a.y + f.kvy * dt, scene);
@@ -211,10 +271,10 @@ export function updateFoes(foes: Actor[], me: Me, dt: number, scene: Scene, diff
             me.hp = Math.max(0, me.hp - dmg);
             me.iframes = 0.55;
             me.flash = 0.18;
-            me.kvx = facing * (f.kind === "boss" ? 170 : 110);
+            me.kvx = facing * (isBig(f.kind) ? 170 : 110);
             ev.hurt();
-            ev.hit(f.kind === "boss");
-            ev.shake(f.kind === "boss" ? 4 : 2.5);
+            ev.hit(isBig(f.kind));
+            ev.shake(isBig(f.kind) ? 4 : 2.5);
           } else ev.whoosh();
         }
         break;
@@ -222,14 +282,14 @@ export function updateFoes(foes: Actor[], me: Me, dt: number, scene: Scene, diff
         f.timer -= dt;
         if (f.timer <= 0) {
           f.state = "recover";
-          f.timer = f.kind === "boss" ? 0.5 : 0.65;
+          f.timer = isBig(f.kind) ? 0.5 : 0.65;
         }
         break;
       case "recover":
         f.timer -= dt;
         if (f.timer <= 0) {
           f.state = "approach";
-          f.cd = ((f.kind === "boss" ? 0.45 : 0.4) + Math.random() * 0.7) * TUNING[difficulty].rest;
+          f.cd = ((isBig(f.kind) ? 0.45 : 0.4) + Math.random() * 0.7) * TUNING[difficulty].rest;
         }
         break;
     }
@@ -275,7 +335,7 @@ export function swing(foes: Actor[], me: Me, w: Weapon, ev: FightEvents): { hits
     f.hp = Math.max(0, f.hp - dmg);
     f.flash = 0.14;
     // while they're shrugging hits off, they barely move
-    const k = w.knock * (f.kind === "boss" ? 0.35 : 1) * (f.guard > 0 && !crit ? 0.35 : 1);
+    const k = w.knock * (isBig(f.kind) ? 0.35 : 1) * (f.guard > 0 && !crit ? 0.35 : 1);
     f.kvx = (fx || Math.sign(a.x - me.x) || 1) * k;
     f.kvy = fy * k;
     if (f.hp <= 0) {
@@ -283,7 +343,13 @@ export function swing(foes: Actor[], me: Me, w: Weapon, ev: FightEvents): { hits
       f.timer = 1.6;
       downed.push(a);
       ev.down();
-    } else if (crit || (f.guard <= 0 && (interrupt || f.kind !== "boss"))) {
+    } else if (w.stun && f.stunned <= 0) {
+      // a taser or a face full of spray: they reel, whatever their guard (the big ones shake it off quicker)
+      f.state = "stagger";
+      f.timer = w.stun * (isBig(f.kind) ? 0.5 : 1);
+      f.stunned = f.timer + 2.5;
+      f.guard = f.timer + 0.4;
+    } else if (crit || (f.guard <= 0 && (interrupt || !isBig(f.kind)))) {
       // a stagger, then a moment where hits land but don't stop them
       f.state = "stagger";
       f.timer = interrupt ? 0.55 : 0.25;
@@ -345,6 +411,16 @@ const FOE_LINES = [
 ];
 /** What they say when they reach you. */
 export const foeLines = () => FOE_LINES[Math.floor(Math.random() * FOE_LINES.length)];
+
+/** People who know your face from your page and want what's on you. */
+export const robberLines = (handle: string, item: string | null) => {
+  const ls = [
+    [`“Hold on. You're @${handle}. From the videos.”`, item ? `“That ${item}. Take it off. Slowly.”` : "“Famous people carry cash. Empty them.”"],
+    [`“@${handle}! Big fan, big fan.”`, `“So you won't mind sharing.”${item ? ` One of them is looking at your ${item}.` : ""}`],
+    ["“Seen you on my feed, flexing.”", item ? `“The ${item}'s ours now.”` : "“Run your pockets, superstar.”"],
+  ];
+  return ls[Math.floor(Math.random() * ls.length)];
+};
 
 /** They stop in front of you and square up. */
 export function faceOff(foes: Actor[], x: number) {

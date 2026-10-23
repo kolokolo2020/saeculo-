@@ -284,3 +284,99 @@ export const CLUB: Scene = {
   front: frontClub,
   liveLights: lightsClub,
 };
+
+// ------------------------------------------------------------ Maison
+
+function paintBoutique(g: G, s: Scene) {
+  s.tiles.forEach((row, ty) =>
+    [...row].forEach((ch, tx) => {
+      const x = tx * TILE;
+      const y = ty * TILE;
+      if (ch === "#") r(g, x, y, TILE, TILE, "#0d0c10");
+      else if (ch === "w") {
+        r(g, x, y, TILE, TILE, "#d8d2c4");
+        if (ty === 2) r(g, x, y + 13, TILE, 3, "#b8b0a0");
+      } else {
+        // marble, pale, with a vein now and then
+        r(g, x, y, TILE, TILE, (tx + ty) % 2 ? "#e6e2da" : "#dedad1");
+        const n = hash(tx + 3, ty + 11);
+        if (n > 0.55) for (let k = 0; k < 6; k++) r(g, x + 2 + k * 2, y + 4 + Math.round(Math.sin(k + n * 9) * 2), 2, 1, "#c8c2b6");
+      }
+    }),
+  );
+  // a gold line round the walls, the name in the middle
+  r(g, TILE, 2 * TILE + 10, 14 * TILE, 1, "#c9a050");
+  r(g, TILE, TILE + 2, 14 * TILE, 1, "#c9a050");
+  sign(g, "MAISON", 6.3 * TILE, TILE + 6, "#8a6a30", undefined, 8);
+  // the rails on the left wall: jackets, hoodies, all spaced out like art
+  r(g, TILE + 4, TILE + 12, 4 * TILE, 2, "#c9a050");
+  for (let k = 0; k < 7; k++) {
+    const c = ["#111216", "#5a3a22", "#e8e0cf", "#b33a3a", "#2a2c33", "#5a2a8a", "#3a2a1e"][k];
+    r(g, TILE + 6 + k * 8, TILE + 14, 6, 13 - (k % 2) * 2, c);
+    r(g, TILE + 8 + k * 8, TILE + 13, 2, 1, "#8a8d94");
+  }
+  // the shoe wall on the right: lit shelves
+  r(g, 11 * TILE, TILE + 6, 4 * TILE, 2 * TILE - 6, "#2a2420");
+  for (let k = 0; k < 3; k++) {
+    r(g, 11 * TILE + 2, TILE + 14 + k * 8, 4 * TILE - 4, 1, "#c9a050");
+    for (let j = 0; j < 5; j++) r(g, 11 * TILE + 5 + j * 12, TILE + 10 + k * 8, 7, 3, ["#e8e0cf", "#b33a3a", "#111216", "#c9a050", "#3a5ab3"][(j + k) % 5]);
+  }
+  // plinths in the middle of the floor, a piece on each
+  for (const [px, c] of [
+    [4, "#f0c850"],
+    [7.5, "#e8f4ff"],
+  ] as [number, string][]) {
+    r(g, px * TILE, 5 * TILE, 18, 10, "#f4f1ea");
+    r(g, px * TILE, 5 * TILE + 10, 18, 3, "#c8c2b6");
+    r(g, px * TILE + 5, 5 * TILE - 4, 8, 5, c);
+  }
+  // the glass counter and the till
+  r(g, 11 * TILE, 4 * TILE - 2, 4 * TILE, 14, "#9ab0c4");
+  r(g, 11 * TILE, 4 * TILE - 4, 4 * TILE, 3, "#c8d8e8");
+  r(g, 11 * TILE + 4, 4 * TILE + 2, 4 * TILE - 8, 6, "#7a90a4");
+  r(g, 14 * TILE - 6, 4 * TILE - 12, 10, 8, "#111216");
+  // the VIP corner: a rope and a velvet couch
+  r(g, 8 * TILE, 6.6 * TILE, 2, 12, "#c9a050");
+  r(g, 12 * TILE, 6.6 * TILE, 2, 12, "#c9a050");
+  r(g, 8 * TILE, 6.6 * TILE + 2, 4 * TILE, 1, "#7a2030");
+  r(g, 9 * TILE, 8 * TILE - 2, 3 * TILE, 12, "#5a1a2a");
+  r(g, 9 * TILE + 2, 8 * TILE, 3 * TILE - 4, 6, "#7a2a3a");
+  // a long mirror by the door
+  r(g, 2 * TILE - 2, 6 * TILE, 10, 2 * TILE, "#c9a050");
+  r(g, 2 * TILE, 6 * TILE + 2, 6, 2 * TILE - 4, "#c8d8e8");
+  r(g, 7 * TILE, 9 * TILE, 2 * TILE, TILE, "#2a2420");
+}
+
+function fxBoutique(g: G, f: Fx) {
+  // a glint off the pieces on the plinths
+  if (f.reduced) return;
+  const k = Math.floor(f.t * 2) % 7;
+  if (k < 2) r(g, (k ? 7.5 : 4) * TILE + 10, 5 * TILE - 3, 1, 1, "#ffffff");
+}
+
+export const BOUTIQUE: Scene = {
+  id: "boutique",
+  name: "Maison",
+  tiles: ["################", "#wwwwwwwwwwwwww#", "#wwwwwwwwwwwwww#", "#mmmmmmmmmmmmmm#", "#mmmmmmmmmmmmmm#", "#mmmmmmmmmmmmmm#", "#mmmmmmmmmmmmmm#", "#mmmmmmmmmmmmmm#", "#mmmmmmmmmmmmmm#", "#######DD#######"],
+  solid: "#w",
+  surface: () => "tile",
+  things: [
+    { id: "maison-rail", zone: T(1, 3, 4, 1) },
+    { id: "maison-shoes", zone: T(11, 3, 4, 0.6) },
+    { id: "plinth", body: { x: 4 * TILE, y: 5 * TILE + 2, w: 18, h: 10 }, zone: T(3.6, 5.8, 1.8, 0.8) },
+    { id: "plinth", body: { x: 7.5 * TILE, y: 5 * TILE + 2, w: 18, h: 10 }, zone: T(7.1, 5.8, 1.8, 0.8) },
+    { id: "maison-counter", body: T(11, 3.6, 4, 0.8), zone: T(11, 4.4, 4, 0.8) },
+    { id: "mirror", body: { x: 2 * TILE - 2, y: 7 * TILE, w: 10, h: TILE }, zone: T(2.4, 6.2, 1.2, 1.6) },
+    { id: "vip-couch", body: { x: 9 * TILE, y: 8 * TILE - 2, w: 3 * TILE, h: 12 } },
+  ],
+  doors: [{ zone: T(7, 9, 2, 1), to: "avenue", label: "↓ the avenue", spawn: { x: 42.5 * TILE, y: 3.7 * TILE, dir: "down" } }],
+  lights: [
+    { x: 3 * TILE, y: 2 * TILE, r: 80, color: "rgba(255,240,210,0.5)" },
+    { x: 13 * TILE, y: 2.4 * TILE, r: 80, color: "rgba(255,230,190,0.5)" },
+    { x: 6 * TILE, y: 5 * TILE, r: 90, color: "rgba(255,250,235,0.4)" },
+    { x: 10.5 * TILE, y: 8 * TILE, r: 60, color: "rgba(255,120,150,0.3)" },
+  ],
+  darkness: 0.22,
+  paint: paintBoutique,
+  fx: fxBoutique,
+};

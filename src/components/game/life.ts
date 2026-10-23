@@ -1,3 +1,4 @@
+import { ARTISTS } from "./career";
 import type { Fighter } from "./combat";
 import type { Hair, Look, Pose } from "./people";
 import type { Place } from "./sfx";
@@ -218,6 +219,14 @@ export function makeLife(): Actor[] {
       [5.2, 8.8],
       [31, 8.4],
     ]),
+
+    // Smokey, in the alley in a long coat; Slick and his cups outside the laundromat
+    person("smokey", "alley", 22.4, 6.2, { skin: "#9a6446", hair: "#3a3a40", top: "#3a3028", topStyle: "jacket", trim: "#5a4a3a", pants: "#1c1f26", style: "short", hat: "bucket", hatColor: "#2a2a30", body: "broad" }, { dir: "left", item: "joint", talk: "talk to Smokey" }),
+    person("slick", "avenue", 27.6, 4.3, { skin: "#c99a7c", hair: "#151010", top: "#2a4a7a", topStyle: "track", trim: "#e8e0cf", pants: "#111216", style: "cap", accent: "#d0a020", neck: "chain", neckColor: "#d8b35a" }, { pose: "crouch", talk: "the cups" }),
+    // Maison: the woman behind the counter, and someone very famous in the VIP corner
+    person("attendant", "boutique", 12.5, 3.55, { skin: "#e8c0a4", hair: "#111216", top: "#111216", topStyle: "jacket", trim: "#c9a050", pants: "#111216", style: "bun", body: "slim" }, { talk: "talk to her", solid: false }),
+    // the artists round the block (Game.tsx shows the big ones once you're big enough)
+    ...ARTISTS.map((a) => person(`artist-${a.id}`, a.place, a.at[0], a.at[1], a.look, { talk: `talk to ${a.name}`, bob: true, item: a.id === "kaya" ? "phone" : undefined, hidden: a.show > 0 })),
   ];
 }
 

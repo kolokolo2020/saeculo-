@@ -158,7 +158,8 @@ neighbourhood:
   round the boombox.
 - **The avenue** (off the end of your street): the thrift shop (clothes,
   a mirror), the alley, the record shop, a laundromat, the club (a queue
-  and a bouncer who wants 30 respect or 6 style), and the subway stairs.
+  and a bouncer who wants 30 respect, 6 style or 2,000 followers), Maison
+  (designer), and the subway stairs.
 - **The alley**: a fire in a barrel, street dice with Jay, a wall for
   your name. **The record shop**: dig the crates, a listening station,
   an owner who buys tapes. **The club**: the floor, the bar, the decks.
@@ -207,8 +208,57 @@ crowbar at 10) and the leather jacket; Tank at the underpass gives up a mic
 stand. After trouble the block leaves you alone for a minute or so. Go down and you wake
 up at home with a quarter of your cash gone. A door is always a way out.
 
-**The menu** (M, or the button up top): you, your wardrobe (25 pieces,
-most bought or earned), weapons and food, goals (18, each pays out),
+**Your career**: you start with a dozen followers. Selling beats, making
+songs, a good set, a fight someone films, a post: they all bring people to
+your page. Your **phone** (P, or the button up top) is that page: followers,
+the level you're at (nobody yet, local, buzzing, rising, hot right now,
+famous, a star), your posts as a grid, **post a beat** (your newest tape,
+once; it then sells leases from your page on its own) and **post a fit**
+(better clothes, more followers), each with a short wait before the next;
+**messages** (fans, artists who want to link up, brands with a deal, and
+people who want a cut); and **money** (what your songs and the beat store
+bring in a minute, every song with its streams, your contacts, protection).
+
+- **The artists**: Lil Brick outside the corner store, Kaya in the park, Mo
+  Dread in the alley, Juno Vale in the club, Saint Ojay under the bridge;
+  Big Halo (on your roof) and Nova Reign (at Maison) only turn up once
+  you're big. Each works with people above a number of followers; below it
+  they brush you off. Sell them your newest tape (each buys a tape once; the
+  more famous you are, the more it's worth), swap numbers, and once they've
+  bought from you, **make a song**: a recording session (punch in their
+  takes when the level's in the green, then mix three faders by ear). The
+  song pays something up front, brings their fans to you, and keeps earning
+  while you walk about, fading but never to nothing. Going up a level brings
+  messages from the next artists, and brand deals at 10K and 50K.
+- **Being known**: from 500 followers people know your face anywhere outside
+  (not on your own roof), and some of the trouble is people after what
+  you've got on (the more it cost, the more often). Take a picture with them
+  (it works more the more famous you are), pay, hand over the chain, fight
+  or walk. Lose to them and they take more, and the priciest thing you had
+  on. People shout your name across the road.
+- **The Block Kings** (at 1,500 followers) and **the Syndicate** (at 25,000)
+  come and ask for a share of what your music makes, 15% and 25%: pay and
+  the wrong people mostly leave you alone; say no and their crews come for
+  you, everywhere outside, more often. See off three crews and the heavy
+  comes himself (Rook, Kade); beat him and they're done with you for good
+  (and his weapon's yours). You can stop paying, or buy peace, on your phone.
+- **Tank's fight night** (once you've beaten him): $25 in, three rounds back
+  to back, $150 if you're standing at the end; take what you've got after
+  any round. Lose and it's just the concrete, not your pockets.
+- **Smokey** in the alley sells weapons out of his coat: pepper spray and a
+  taser (they stun, whatever their guard), a lead pipe, a switchblade (fast),
+  a golf club (long), nunchucks, a machete, a sledgehammer (slow, huge).
+- **Maison**, the boutique at the end of the avenue: designer tees, jerseys,
+  tech fleece, shark hoodies, a monogram jacket, a fur coat, camo and
+  stacked jeans, leather pants, retro high-tops, red-sole sneakers, a ski
+  mask, bandanas, grillz, an iced watch, a crossbody bag, and round your
+  neck (its own slot now) a cuban link and an iced-out chain. Some of it is
+  only sold to people with a following.
+- **The cups**: Slick outside the laundromat; find the ball, even money,
+  faster hands the more you bet.
+
+**The menu** (M, or the button up top): you, your wardrobe (48 pieces,
+most bought or earned), weapons and food, goals (32, each pays out),
 settings (sound and music levels, fight difficulty, shake, hints, start
 over). Cash, respect, health and everything else save in the browser.
 
@@ -219,8 +269,8 @@ the cypher and in the queue outside the club; the station chime and a
 voice through a bad speaker as each train comes in (captioned on screen
 the first time each visit).
 
-Controls: WASD or arrows, E / Space to use and talk, M for the menu, Esc
-back to the site. On touch screens, a pad, A (and B and eat in a fight).
+Controls: WASD or arrows, E / Space to use and talk, M for the menu, P for
+your phone, Esc back to the site. On touch screens, a pad, A (and B and eat in a fight).
 Reduced motion (or still visuals) turns off the rain, flicker, haze, shake
 and the lightning flash.
 
@@ -231,7 +281,9 @@ knocked-out screen), `tuning.ts` (speed, keys, place names, trouble odds),
 `world.ts` and `places/` (the maps, the subway ride), `life.ts` (people,
 traffic, the cat), `actors.ts` (drawing them), `people.ts` (sprites), `character.ts` (looks, clothes), `combat.ts`, `weapons.ts`,
 `goals.ts`, `scripts.ts` (what the newer places' people say and do),
-`Menu.tsx`, `minigames/`, `render.ts`, `sfx.ts`, `save.ts`, `studio/`.
+`career.ts` (followers, artists, songs, posts, messages, the mobs, what the
+catalogue earns), `Phone.tsx`, `Menu.tsx`, `minigames/` (including the
+session and the cups), `render.ts`, `sfx.ts`, `save.ts`, `studio/`.
 
 ### The studio
 

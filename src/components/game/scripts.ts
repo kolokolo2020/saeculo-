@@ -1,4 +1,5 @@
-import { styleOf } from "./character";
+import { blingOf, styleOf } from "./character";
+import { ARTISTS, artistPrice, fameMult, fmtFans, priceOf, saleFans, tierOf, type Artist, type PostKind } from "./career";
 import type { Actor } from "./life";
 import type { MenuTab } from "./Menu";
 import { BATTLE_BEATS, type RhythmMode } from "./minigames/Rhythm";
@@ -16,7 +17,15 @@ export interface Choice {
   label: string;
   run: () => void;
 }
-export type Mini = { kind: "rhythm"; mode: RhythmMode; rival?: { name: string; score: number; stake: number; beat: string } } | { kind: "dice" } | { kind: "crates" } | { kind: "hoops" } | { kind: "tag" } | { kind: "shop"; shop: ShopKind };
+export type Mini =
+  | { kind: "rhythm"; mode: RhythmMode; rival?: { name: string; score: number; stake: number; beat: string } }
+  | { kind: "dice" }
+  | { kind: "crates" }
+  | { kind: "hoops" }
+  | { kind: "tag" }
+  | { kind: "shop"; shop: ShopKind }
+  | { kind: "session"; artist: string }
+  | { kind: "monte" };
 
 export interface Api {
   say: (lines: string[], choices?: Choice[]) => void;
@@ -49,19 +58,18 @@ export interface Api {
   ride: (to: "street" | "avenue") => void;
   /** Per-visit memory: things that can happen once a visit. */
   visit: Record<string, number>;
+  /** Money your music makes: whoever you pay takes their cut first. Returns what you keep. */
+  music: (n: number) => number;
+  /** New followers, and the post that brought them (if any). */
+  fans: (n: number, post?: { kind: PostKind; text: string }) => void;
+  /** Tank's fight night: three rounds back to back. */
+  ring: () => void;
 }
 
-/** Let in at the club: once in, always in. */
-export const clubOk = (s: SaveData) => s.places.includes("club") || s.rep >= 30 || (!!s.profile && styleOf(s.profile) >= 6);
+/** Let in at the club: once in, always in (and anyone with a following walks straight in). */
+export const clubOk = (s: SaveData) => s.places.includes("club") || s.rep >= 30 || s.fans >= 2000 || (!!s.profile && styleOf(s.profile) >= 6);
 
-/** What a beat's worth to someone who buys beats. */
-export function priceOf(p: Project): number {
-  const chans = p.channels.length;
-  const patterns = p.patterns.filter((pt) => Object.values(pt.steps).some((st) => st.some((v) => v > 0)) || Object.values(pt.notes).some((n) => n.length)).length;
-  const song = p.song.filter((x) => x >= 0).length;
-  const found = p.channels.filter((c) => /^(rain|bottle|phone|lighter|basketball|chimes|spray|dice|scratch|train|crowd|mic)$/.test(c.voice)).length;
-  return Math.min(90, 12 + chans * 3 + patterns * 4 + Math.min(song, 8) + found * 4);
-}
+export { priceOf };
 
 const LINES: Record<string, string[][]> = {
   "queue-1": [["“We've been out here forty minutes.”"], ["“He let a guy in a puffer straight in. A puffer.”"]],
@@ -103,14 +111,16 @@ function sellTape(api: Api, who: "dre" | "owner") {
     api.say(who === "dre" ? [`“I already got ‘${tape.name}’. Make me a new one.”`] : [`“‘${tape.name}’'s already in the rack. Something new?”`]);
     return;
   }
-  const price = Math.round(priceOf(tape) * (who === "dre" ? 1 : 0.7));
+  // a name of your own makes a beat worth more, even to Dre (he only goes so far)
+  const price = Math.round(priceOf(tape) * (who === "dre" ? 1 : 0.7) * Math.min(2.5, fameMult(api.save().fans)));
   api.say(who === "dre" ? [`You hand Dre ‘${tape.name}’. He puts one earbud in.`, "He listens to the whole loop twice. Doesn't say anything.", `“$${price}. That's the price.”`] : [`The owner puts ‘${tape.name}’ on the shop turntable and turns it up.`, `A kid by the bins looks round. “$${price}, for a shop copy.”`], [
     {
       label: `Sell it for $${price}`,
       run: () => {
-        api.update((s) => ({ ...s, sold: [...s.sold, tape.name], stats: { ...s.stats, beatsSold: s.stats.beatsSold + 1, earned: s.stats.earned + price } }));
-        api.earn(price);
+        api.update((s) => ({ ...s, sold: [...s.sold, tape.name], stats: { ...s.stats, beatsSold: s.stats.beatsSold + 1 } }));
+        api.music(price);
         api.addRep(who === "dre" ? 4 : 2);
+        api.fans(who === "dre" ? 6 : 4, { kind: "sale", text: who === "dre" ? `sold “${tape.name}” under the bridge` : `“${tape.name}” in the local section` });
         api.sfx.coins();
         api.say(who === "dre" ? ["He counts it out on the speaker.", "“My guy's going to kill this.”"] : ["“It'll be in the local section. Right at the front.”"]);
       },
@@ -165,6 +175,14 @@ export function promptFor(id: string, api: Api): string | null | undefined {
       return trainAt(api.t()).open ? "get on the train" : trainAt(api.t()).here ? "the train" : "the edge of the platform";
     case "speaker":
       return "the cypher";
+    case "maison-window":
+      return "the window";
+    case "maison-rail":
+    case "maison-shoes":
+    case "maison-counter":
+      return "look at the pieces";
+    case "plinth":
+      return "the piece on the plinth";
   }
   return undefined;
 }
@@ -283,8 +301,82 @@ export function operate(id: string, api: Api): boolean {
     case "speaker":
       cypher(api);
       return true;
+    case "maison-window":
+      api.say(["One coat on a stand, lit like it's in a museum. No price on it.", "If you have to ask, the window says, you can't."]);
+      return true;
+    case "maison-rail":
+    case "maison-shoes":
+    case "maison-counter":
+      api.open({ kind: "shop", shop: "maison" });
+      return true;
+    case "plinth":
+      api.say([Math.random() < 0.5 ? "A cuban link on a velvet neck. It's heavier than it looks, apparently. You're not allowed to touch it." : "An iced-out chain under its own little light. The light's the only thing in here you could afford."], [
+        { label: "Ask about it", run: () => api.open({ kind: "shop", shop: "maison" }) },
+        { label: "Leave it", run: api.close },
+      ]);
+      return true;
   }
   return false;
+}
+
+/** An artist round the block: a beat to sell them, numbers to swap, a song to make. */
+function artistTalk(a: Artist, api: Api) {
+  const s = api.save();
+  if (s.fans < a.fans) {
+    api.say([...a.cold, `(${a.name} works with people who have ${fmtFans(a.fans)} followers. You've got ${fmtFans(s.fans)}.)`]);
+    return;
+  }
+  const tape = api.tape();
+  const linked = s.contacts.includes(a.id);
+  const rel = s.rel[a.id] ?? 0;
+  const bought = !!tape && (s.leases[a.id] ?? []).includes(tape.name);
+  const wait = Math.ceil(((s.cd[`song-${a.id}`] ?? 0) - Date.now()) / 1000);
+  const price = tape ? artistPrice(tape, a, s.fans) : 0;
+  const hello = rel ? a.warm[rel % a.warm.length] : [`${a.name}, ${a.kind}. ${["“So you're the producer.”", "“I've heard of you. Go on then.”", "“Took you long enough.”"][tierOf(s.fans) % 3]}`];
+  const lines = [...hello, ...(tape && bought ? [`“I've already got ‘${tape.name}’. Make me something new.”`] : [])];
+  const choices = [
+    ...(tape && !bought
+      ? [
+          {
+            label: `Sell them “${tape.name}” ($${price})`,
+            run: () => {
+              api.update((x) => ({ ...x, leases: { ...x.leases, [a.id]: [...(x.leases[a.id] ?? []), tape.name] }, rel: { ...x.rel, [a.id]: (x.rel[a.id] ?? 0) + 1 }, stats: { ...x.stats, leases: x.stats.leases + 1 } }));
+              const kept = api.music(price);
+              api.addRep(3);
+              api.fans(saleFans(tape, a), { kind: "sale", text: `${a.name} picked up “${tape.name}”` });
+              api.sfx.coins();
+              api.say([`${a.name} listens through once with their eyes shut.`, rel ? "“Yeah. Same as always. Send it over.”" : "“Done. I'm putting this out.”", kept < price ? `(+$${kept} after the cut)` : `(+$${price})`]);
+            },
+          },
+        ]
+      : []),
+    ...(!linked
+      ? [
+          {
+            label: "Swap numbers",
+            run: () => {
+              api.update((x) => ({ ...x, contacts: [...x.contacts, a.id] }));
+              api.fans(Math.round(a.reach / 3), { kind: "news", text: `linked with @${a.handle}` });
+              api.say([`${a.name} follows you back while you're standing there. Their people notice.`, "“Hit me when you've got something.” (they're in your phone now)"]);
+            },
+          },
+        ]
+      : []),
+    ...(linked && rel > 0 && tape
+      ? [
+          {
+            label: wait > 0 ? `Make a song (in ${wait}s)` : `Make a song on “${tape.name}”`,
+            run: () => {
+              if (wait > 0) return api.say([`“Give it a minute. I'm still on the last one.” (${wait}s)`]);
+              api.open({ kind: "session", artist: a.id });
+            },
+          },
+        ]
+      : []),
+    { label: "Later", run: api.close },
+  ];
+  api.say(lines.length ? lines : ["…"], choices);
+  if (!tape) api.toast("Make a beat in the studio to sell it to them.", 3000);
 }
 
 function cypher(api: Api) {
@@ -410,18 +502,50 @@ export function talk(a: Actor, api: Api): boolean {
     api.say([...(JOB_HANDOVER[a.id] ?? ["You hand it over."]), "(take it back to Dre)"]);
     return true;
   }
+  if (a.id.startsWith("artist-")) {
+    const artist = ARTISTS.find((x) => `artist-${x.id}` === a.id);
+    if (artist) artistTalk(artist, api);
+    return true;
+  }
   switch (a.id) {
+    case "smokey":
+      api.say(api.happened("smokey") ? [["“Back again. You're a good customer. Too good.”"], ["He opens the coat a little. Things glint."], ["“The pipe's popular. The taser's quiet. The sledge isn't.”"]][Math.floor(api.t()) % 3] : ["A man in a coat far too warm for the weather looks you up and down.", "“You've got a face people are starting to know. That's a problem, round here.”", "“I can help with problems.” He opens the coat."], [
+        {
+          label: "See what's in the coat",
+          run: () => {
+            api.markSeen("smokey");
+            api.open({ kind: "shop", shop: "smokey" });
+          },
+        },
+        { label: "No thanks", run: () => api.say(["“I'm here when you change your mind. Everyone does.”"]) },
+      ]);
+      return true;
+    case "slick":
+      api.say(["“Three cups, one ball. Keep your eye on it.” He's already shuffling."], [
+        { label: "Play the cups", run: () => api.open({ kind: "monte" }) },
+        { label: "Walk on", run: () => api.say(["“Scared money don't make money.”"]) },
+      ]);
+      return true;
+    case "attendant": {
+      const big = s.fans >= 10000;
+      const fresh = s.profile ? blingOf(s.profile) >= 1000 : false;
+      api.say(big ? ["She's out from behind the counter before you're through the door.", "“We've put some things aside for you.”"] : fresh ? ["She clocks what you've got on. Her smile gets a bit more real.", "“Can I show you anything?”"] : ["She looks at your shoes, then your face, then your shoes again.", "“Browsing?”"], [
+        { label: "Show me everything", run: () => api.open({ kind: "shop", shop: "maison" }) },
+        { label: "Just looking", run: api.close },
+      ]);
+      return true;
+    }
     case "vee":
       battle(api);
       return true;
     case "bouncer": {
       if (clubOk(s)) {
         a.x = 36.9 * 16;
-        api.say(s.places.includes("club") ? ["He lifts the rope without looking at you."] : ["He looks you up and down. Takes his time.", "“Go on.” He lifts the rope."]);
+        api.say(s.fans >= 10000 ? ["He's already got the rope up. “VIP's ready for you.”", "Someone in the queue films you going in."] : s.fans >= 2000 && !s.places.includes("club") ? ["He looks at his phone, then at you. “You're the producer.”", "“Go on.” He lifts the rope."] : s.places.includes("club") ? ["He lifts the rope without looking at you."] : ["He looks you up and down. Takes his time.", "“Go on.” He lifts the rope."]);
         return true;
       }
       const style = s.profile ? styleOf(s.profile) : 0;
-      api.say(["“Not tonight.”", "“Come back when people know your name. Or when you look like you mean it.”", `(respect ${Math.floor(s.rep)}/30, or style ${style}/6)`]);
+      api.say(["“Not tonight.”", "“Come back when people know your name. Or when you look like you mean it.”", `(respect ${Math.floor(s.rep)}/30, style ${style}/6, or ${fmtFans(s.fans)}/2K followers)`]);
       return true;
     }
     case "cd-guy":
@@ -526,7 +650,17 @@ export function talk(a: Actor, api: Api): boolean {
     }
     case "tank":
       if (api.happened("tank-beaten")) {
-        api.say([["“Respect.”"], ["“The stand still working? Good.”"], ["“People know you now. That's a weight. Carry it.”"]][Math.floor(api.t()) % 3]);
+        const champ = s.stats.ringWins > 0;
+        api.say([...[["“Respect.”"], ["“The stand still working? Good.”"], ["“People know you now. That's a weight. Carry it.”"]][Math.floor(api.t()) % 3], champ ? `“Fight night again? You've won it ${s.stats.ringWins} ${s.stats.ringWins === 1 ? "time" : "times"}. They're queueing to take it off you.”` : "“Fight night. Three rounds, back to back, under the bridge. $25 to get in, $150 if you're standing at the end.”"], [
+          {
+            label: "Fight night ($25)",
+            run: () => {
+              if (!api.spend(25)) return api.say(["“Twenty-five to get in. Everybody pays. Even you.”"]);
+              api.ring();
+            },
+          },
+          { label: "Not tonight", run: api.close },
+        ]);
         return true;
       }
       if (s.stats.wins < 3) {

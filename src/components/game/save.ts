@@ -2,12 +2,14 @@ import { fromOldTape, loadStore, saveStore } from "./studio/project";
 import { ITEMS, sanitizeProfile, STARTERS, type Profile } from "./character";
 import { FINDABLE } from "./studio/voices";
 import { WEAPONS } from "./weapons";
+import { ARTISTS, freshMob, MOB_IDS, type MobId, type MobState, type Msg, type Post, type Song } from "./career";
 
 // What the game remembers between visits, in this browser only: who you
 // are and what you wear, your cash and respect, your health, what you've
 // unlocked, the sounds you've found, who you've played your beats for, the
-// goals you've reached, the small things that only happen once, and the
-// settings. Beats you make live in the studio's own store (studio/project.ts).
+// goals you've reached, the small things that only happen once, your
+// career (followers, posts, messages, songs, who you've sold to, who wants a
+// cut) and the settings. Beats you make live in the studio's own store (studio/project.ts).
 
 export const MAX_HP = 100;
 export type Difficulty = "chill" | "normal" | "hard";
@@ -39,6 +41,14 @@ export interface Stats {
   battleLosses: number;
   jobs: number;
   rides: number;
+  /** What songs and the beat store have paid, all told. */
+  royalties: number;
+  /** Beats sold to artists. */
+  leases: number;
+  songs: number;
+  /** Fight nights won, and rounds. */
+  ringWins: number;
+  monteWon: number;
 }
 
 /** A job from Dre: a tape to take somewhere, then back to him for the money (or to tell him it's gone). */
@@ -81,13 +91,31 @@ export interface SaveData {
   tag: { color: string } | null;
   /** The job you're on, if any. */
   job: Job | null;
+  /** Followers on your page. */
+  fans: number;
+  /** Newest first. */
+  posts: Post[];
+  /** Newest first. */
+  inbox: Msg[];
+  /** Artists you've linked up with. */
+  contacts: string[];
+  /** How well each artist knows you (beats bought, songs made). */
+  rel: Record<string, number>;
+  /** Tapes each artist has bought from you (each buys a tape once). */
+  leases: Record<string, string[]>;
+  collabs: Song[];
+  /** Tapes up on your page's beat store. */
+  posted: string[];
+  mob: Record<MobId, MobState>;
+  /** When things can happen again (wall-clock ms). */
+  cd: Record<string, number>;
   settings: Settings;
 }
 
 const KEY = "saeculo-game";
 
 export const DEFAULT_SETTINGS: Settings = { sfx: 0.8, music: 0.8, shake: true, hints: true, difficulty: "normal" };
-const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0, battleWins: 0, battleLosses: 0, jobs: 0, rides: 0 };
+const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0, battleWins: 0, battleLosses: 0, jobs: 0, rides: 0, royalties: 0, leases: 0, songs: 0, ringWins: 0, monteWon: 0 };
 
 export function freshSave(): SaveData {
   return {
@@ -110,12 +138,61 @@ export function freshSave(): SaveData {
     places: ["bedroom"],
     tag: null,
     job: null,
+    fans: 12,
+    posts: [],
+    inbox: [],
+    contacts: [],
+    rel: {},
+    leases: {},
+    collabs: [],
+    posted: [],
+    mob: { kings: freshMob(), syndicate: freshMob() },
+    cd: {},
     settings: { ...DEFAULT_SETTINGS },
   };
 }
 
 const strings = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === "string") : []);
 const num = (x: unknown, lo: number, hi: number, fallback: number) => (typeof x === "number" && Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : fallback);
+const obj = (x: unknown): Record<string, unknown> => (x && typeof x === "object" && !Array.isArray(x) ? (x as Record<string, unknown>) : {});
+const str = (x: unknown, max = 200) => (typeof x === "string" ? x.slice(0, max) : "");
+const POST_KINDS = ["beat", "sale", "song", "fit", "fight", "show", "news"];
+const MSG_KINDS = ["fan", "artist", "mob", "offer", "news"];
+const STAGES = ["none", "asked", "paying", "hunted", "done"];
+
+function loadPosts(x: unknown): Post[] {
+  return (Array.isArray(x) ? x : []).slice(0, 40).flatMap((p): Post[] => {
+    const o = obj(p);
+    return POST_KINDS.includes(o.kind as string) ? [{ kind: o.kind as Post["kind"], text: str(o.text), likes: num(o.likes, 0, 1e9, 0), hue: num(o.hue, 0, 360, 0) }] : [];
+  });
+}
+function loadInbox(x: unknown): Msg[] {
+  return (Array.isArray(x) ? x : []).slice(0, 40).flatMap((m): Msg[] => {
+    const o = obj(m);
+    if (!MSG_KINDS.includes(o.kind as string) || typeof o.id !== "string") return [];
+    const a = obj(o.act);
+    const act: Msg["act"] =
+      a.type === "link" && ARTISTS.some((x) => x.id === a.artist) ? { type: "link", artist: a.artist as string } : a.type === "mob" && MOB_IDS.includes(a.mob as MobId) ? { type: "mob", mob: a.mob as MobId } : a.type === "sponsor" ? { type: "sponsor", pay: num(a.pay, 0, 1e6, 0) } : undefined;
+    return [{ id: o.id, from: str(o.from, 40), kind: o.kind as Msg["kind"], text: str(o.text, 400), read: o.read === true, act, done: o.done === true }];
+  });
+}
+function loadSongs(x: unknown): Song[] {
+  return (Array.isArray(x) ? x : []).slice(0, 60).flatMap((v): Song[] => {
+    const o = obj(v);
+    if (!ARTISTS.some((a) => a.id === o.artist)) return [];
+    return [{ title: str(o.title, 40), artist: o.artist as string, q: num(o.q, 0, 100, 50), streams: num(o.streams, 0, 1e12, 0), earned: num(o.earned, 0, 1e9, 0), rate: num(o.rate, 0, 1e5, 1), floor: num(o.floor, 0, 1e5, 0.5) }];
+  });
+}
+function loadMob(x: unknown): Record<MobId, MobState> {
+  const o = obj(x);
+  const one = (v: unknown): MobState => {
+    const m = obj(v);
+    return { stage: STAGES.includes(m.stage as string) ? (m.stage as MobState["stage"]) : "none", squads: num(m.squads, 0, 99, 0), paid: num(m.paid, 0, 1e9, 0) };
+  };
+  return { kings: one(o.kings), syndicate: one(o.syndicate) };
+}
+const lists = (x: unknown): Record<string, string[]> => Object.fromEntries(Object.entries(obj(x)).map(([k, v]) => [k, strings(v)]));
+const nums = (x: unknown, hi: number): Record<string, number> => Object.fromEntries(Object.entries(obj(x)).flatMap(([k, v]) => (typeof v === "number" && Number.isFinite(v) ? [[k, Math.max(0, Math.min(hi, v))]] : [])));
 
 export function loadSave(): SaveData {
   const base = freshSave();
@@ -129,7 +206,7 @@ export function loadSave(): SaveData {
     const items: Record<string, number> = {};
     if (raw.items && typeof raw.items === "object") for (const [k, v] of Object.entries(raw.items)) if (typeof v === "number" && v > 0) items[k] = Math.min(99, Math.floor(v));
     const stats = { ...ZERO };
-    if (raw.stats && typeof raw.stats === "object") for (const k of Object.keys(ZERO) as (keyof Stats)[]) stats[k] = num(raw.stats[k], 0, 1e7, 0);
+    if (raw.stats && typeof raw.stats === "object") for (const k of Object.keys(ZERO) as (keyof Stats)[]) stats[k] = num(raw.stats[k], 0, 1e9, 0);
     const st = raw.settings ?? {};
     const weapons = strings(raw.weapons).filter((w) => WEAPONS.some((x) => x.id === w));
     if (!weapons.includes("fists")) weapons.unshift("fists");
@@ -153,6 +230,16 @@ export function loadSave(): SaveData {
       places: [...new Set(["bedroom", ...strings(raw.places)])],
       tag: raw.tag && typeof raw.tag.color === "string" ? { color: raw.tag.color } : null,
       job: raw.job && typeof raw.job.to === "string" && (raw.job.stage === "carry" || raw.job.stage === "back" || raw.job.stage === "lost") ? { to: raw.job.to, stage: raw.job.stage, pay: num(raw.job.pay, 0, 500, 25) } : null,
+      fans: num(raw.fans, 0, 1e9, base.fans),
+      posts: loadPosts(raw.posts),
+      inbox: loadInbox(raw.inbox),
+      contacts: strings(raw.contacts).filter((id) => ARTISTS.some((a) => a.id === id)),
+      rel: nums(raw.rel, 999),
+      leases: lists(raw.leases),
+      collabs: loadSongs(raw.collabs),
+      posted: strings(raw.posted),
+      mob: loadMob(raw.mob),
+      cd: nums(raw.cd, 1e15),
       settings: {
         sfx: num(st.sfx, 0, 1, DEFAULT_SETTINGS.sfx),
         music: num(st.music, 0, 1, DEFAULT_SETTINGS.music),

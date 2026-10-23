@@ -4,7 +4,7 @@ import { ensureLoaded, playVoice, trackTiming } from "./studio/voices";
 // The neighbourhood's sound: a room tone per place (rain, a fridge hum, a
 // quiet studio), footsteps, and small cues. One bus, torn down on exit.
 
-export const PLACES = ["bedroom", "street", "store", "studio", "park", "rooftop", "avenue", "alley", "records", "thrift", "club", "subway", "underpass"] as const;
+export const PLACES = ["bedroom", "street", "store", "studio", "park", "rooftop", "avenue", "alley", "records", "thrift", "club", "subway", "underpass", "boutique"] as const;
 export type Place = (typeof PLACES)[number];
 /** What your feet are on: each has its own step. */
 export type Surface = "wood" | "stone" | "tile" | "carpet" | "wet" | "grit" | "metal" | "floor" | "concrete";
@@ -217,8 +217,8 @@ export function stopGameAudio() {
 export function setPlace(place: Place, windowOpen = false) {
   const c = ctx();
   const at = c.currentTime;
-  const rain: Record<Place, number> = { bedroom: windowOpen ? 0.3 : 0.1, street: 0.34, store: 0.03, studio: 0, park: 0.26, rooftop: 0.4, avenue: 0.32, alley: 0.3, records: 0.02, thrift: 0.02, club: 0, subway: 0, underpass: 0.12 };
-  const hum: Record<Place, number> = { bedroom: 0.004, street: 0, store: 0.02, studio: 0.006, park: 0, rooftop: 0, avenue: 0, alley: 0.003, records: 0.006, thrift: 0.008, club: 0.004, subway: 0.016, underpass: 0 };
+  const rain: Record<Place, number> = { bedroom: windowOpen ? 0.3 : 0.1, street: 0.34, store: 0.03, studio: 0, park: 0.26, rooftop: 0.4, avenue: 0.32, alley: 0.3, records: 0.02, thrift: 0.02, club: 0, subway: 0, underpass: 0.12, boutique: 0.01 };
+  const hum: Record<Place, number> = { bedroom: 0.004, street: 0, store: 0.02, studio: 0.006, park: 0, rooftop: 0, avenue: 0, alley: 0.003, records: 0.006, thrift: 0.008, club: 0.004, subway: 0.016, underpass: 0, boutique: 0.006 };
   rainGain?.gain.setTargetAtTime(rain[place], at, 0.3);
   humGain?.gain.setTargetAtTime(hum[place], at, 0.3);
 }

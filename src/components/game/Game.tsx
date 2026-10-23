@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePlayerStore } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
-import { DEFAULT_PROFILE, ITEMS, lookOf, randomProfile, type Profile } from "./character";
-import { faceOff, foeLines, freshMe, isUp, makeFoe, moveMe, standDown, startDodge, swing, updateFoes, type FightEvents, type Me } from "./combat";
+import { blingOf, DEFAULT_PROFILE, ITEMS, itemById, lookOf, randomProfile, styleOf, takeable, type Profile } from "./character";
+import { accrue, ARTISTS, artistById, cutOf, fanDm, fmtFans, huntedBy, makePost, makeSong, MOB_IDS, MOBS, mobDue, now, priceOf, recognised, roll, tierOf, TIERS, type MobId, type Msg, type PostKind } from "./career";
+import { faceOff, foeLines, freshMe, isUp, makeFoe, moveMe, robberLines, standDown, startDodge, swing, updateFoes, type FightEvents, type FoeKind, type Me } from "./combat";
+import Phone, { type PhoneTab } from "./Phone";
+import Monte from "./minigames/Monte";
+import Session from "./minigames/Session";
 import { newlyDone } from "./goals";
 import Menu, { type MenuTab } from "./Menu";
 import Crates, { type DigResult } from "./minigames/Crates";
@@ -19,10 +23,10 @@ import { camera, draw, VIEW_H, VIEW_W } from "./render";
 import { loadSave, MAX_HP, migrateOldTapes, resetSave, writeSave, type SaveData, type Settings } from "./save";
 import { battle, clubOk, operate, promptFor as promptMore, talk as talkMore, veeBeat, type Api, type Mini } from "./scripts";
 import { duck, setCrowd, setPlace, setRing, setRumble, setSfxVolume, sfx, startGameAudio, stopGameAudio, type Place } from "./sfx";
-import { CONSUMABLES, consumableById, unlockedByWins, weaponById } from "./weapons";
+import { CONSUMABLES, consumableById, unlockedByWins, weaponById, WEAPONS } from "./weapons";
 import { Engine } from "./studio/engine";
 import { PRESETS } from "./studio/presets";
-import { loadStore } from "./studio/project";
+import { loadStore, saveStore } from "./studio/project";
 import Studio from "./studio/Studio";
 import { FINDABLE, playVoice, voiceById, VOICES } from "./studio/voices";
 import { clearSmoke } from "./actors";
@@ -32,7 +36,7 @@ import { sampleProject } from "./studio/sample";
 import { TRACKS } from "@/data/tracks";
 import { formatTime } from "@/lib/audio";
 import { blocked, inside, SCENES, START, tileAt, TILE, type Dir, type Door } from "./world";
-import { ambushOdds, BOOMBOX, BREATHER, CARRY_SOONER, carrying, CAT_PETS, HINT_AT, KEYMAP, PLACE_NAMES, ROUGH, SPEED, tapeLines } from "./tuning";
+import { ambushOdds, BOOMBOX, BREATHER, carrying, CAT_PETS, HINT_AT, KEYMAP, PLACE_NAMES, ROUGH, SPEED, tapeLines, troubleHere, troublePace } from "./tuning";
 import { LINES, savedProjects, verdict } from "./lines";
 import { KnockedOut, Overlays, TopBar, TouchPad, type Choice, type Dialog } from "./hud";
 
@@ -43,6 +47,13 @@ import { KnockedOut, Overlays, TopBar, TouchPad, type Choice, type Dialog } from
 // and find it on your shelf later.
 
 type Phase = "closing" | "play" | "leaving";
+/**
+ * Who's walked up to you: drunks (the old trouble), people who know your face
+ * from your page, a crew from whoever you said no to, the one sent to ask for
+ * a cut, the heavy who comes once you've seen off enough of them, Tank's ring.
+ */
+type Crew = "drunks" | "robbers" | "gang" | "suits" | "envoy-kings" | "envoy-syndicate" | "heavy-kings" | "heavy-syndicate" | "ring" | "tank";
+const mobOf = (c: Crew): MobId | null => (c === "gang" || c.endsWith("kings") ? "kings" : c === "suits" || c.endsWith("syndicate") ? "syndicate" : null);
 
 export default function Game({ onExit }: { onExit: () => void }) {
   const [phase, setPhase] = useState<Phase>("closing");
@@ -62,6 +73,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
   // the menu (and, the first time, the mirror), a mini-game, being knocked out
   const [menu, setMenu] = useState<{ tab: MenuTab; creator: boolean } | null>(null);
   const [mini, setMini] = useState<Mini | null>(null);
+  const [phone, setPhone] = useState<PhoneTab | null>(null);
   const [ko, setKo] = useState<0 | 1 | 2>(0);
   const [fighting, setFighting] = useState(false);
   const [touch, setTouch] = useState(() => window.matchMedia("(pointer: coarse)").matches);
@@ -122,7 +134,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
     counterVisits: 0,
     // trouble: a group walking up to you, a fight in progress
     pending: null as Actor[] | null,
-    fight: null as null | { foes: Actor[]; me: Me; boss: boolean; over: number; outcome: "" | "won" | "lost" },
+    pendingCrew: "drunks" as Crew,
+    fight: null as null | { foes: Actor[]; me: Me; boss: boolean; over: number; outcome: "" | "won" | "lost"; crew: Crew },
+    // Tank's fight night: which round you're on
+    ring: 0,
+    // money coming in on its own: seconds since the last pay-out, and what's come in since the last notice
+    payAcc: 0,
+    paidSince: 0,
+    payTicks: 0,
     encounterIn: 95,
     shake: 0,
     fx: { beats: 0, diceRoll: 0 } as Record<string, number>,
@@ -143,14 +162,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
   // the payphone playing your beat back down the line
   const call = useRef<{ engine: Engine; until: number } | null>(null);
   // the latest UI state, for the loop and key handlers
-  const ui = useRef({ dialog, studio, help, phase, menu, mini, ko });
+  const ui = useRef({ dialog, studio, help, phase, menu, mini, ko, phone });
   const view = useRef({ scale, below });
   useLayoutEffect(() => {
     view.current = { scale, below };
   }, [scale, below]);
   useLayoutEffect(() => {
-    ui.current = { dialog, studio, help, phase, menu, mini, ko };
-  }, [dialog, studio, help, phase, menu, mini, ko]);
+    ui.current = { dialog, studio, help, phase, menu, mini, ko, phone };
+  }, [dialog, studio, help, phase, menu, mini, ko, phone]);
 
   const updateSave = useCallback((fn: (s: SaveData) => SaveData) => {
     let next = fn(saveRef.current);
@@ -195,6 +214,175 @@ export default function Game({ onExit }: { onExit: () => void }) {
     return true;
   };
   const addRep = (n: number) => updateSave((v) => ({ ...v, rep: Math.max(0, v.rep + n) }));
+
+  // ------------------------------------------------------------ the career
+
+  /** Money your music makes: whoever you pay takes their share first. Returns what you keep. */
+  const earnMusic = (n: number) => {
+    const v = saveRef.current;
+    const cut = cutOf(v);
+    const taken = n * cut;
+    const kept = n - taken;
+    updateSave((x) => ({
+      ...x,
+      cash: x.cash + kept,
+      stats: { ...x.stats, earned: x.stats.earned + kept },
+      mob: cut ? (Object.fromEntries(MOB_IDS.map((id) => [id, x.mob[id].stage === "paying" ? { ...x.mob[id], paid: x.mob[id].paid + (n * MOBS[id].cut) } : x.mob[id]])) as SaveData["mob"]) : x.mob,
+    }));
+    return Math.round(kept);
+  };
+
+  /** A message on your phone. */
+  const message = (m: Msg, note = true) => {
+    updateSave((v) => ({ ...v, inbox: [m, ...v.inbox].slice(0, 30) }));
+    sfx.select();
+    if (note) showToast(`New message from @${m.from} (phone: P)`, 3200);
+  };
+
+  /** Followers, and the post that brought them; going up a level brings messages. */
+  const addFans = (n: number, post?: { kind: PostKind; text: string }) => {
+    const before = saveRef.current.fans;
+    const gain = Math.max(0, Math.round(n));
+    updateSave((v) => ({ ...v, fans: v.fans + gain, posts: post ? [makePost(post.kind, post.text, v.fans), ...v.posts].slice(0, 30) : v.posts }));
+    const after = before + gain;
+    const t0 = tierOf(before);
+    const t1 = tierOf(after);
+    if (t1 > t0) window.setTimeout(() => showToast(`You're ${TIERS[t1].name} now: ${fmtFans(after)} followers. More people want to work with you, and more people know your face.`, 5600), 600);
+    careerCheck();
+  };
+
+  /** What your following brings round: artists who want to link, brands, and people who want a cut. */
+  const careerCheck = () => {
+    const v = saveRef.current;
+    for (const a of ARTISTS) {
+      if (a.fans === 0 || v.fans < a.fans || v.contacts.includes(a.id) || v.seen.includes(`dm-${a.id}`)) continue;
+      markSeen(`dm-${a.id}`);
+      const where = { street: "outside the corner store", park: "in the park", alley: "in the alley", club: "in the club", underpass: "under the bridge", rooftop: "on your roof, shooting a video", boutique: "at Maison" }[a.place as string] ?? "around";
+      message({ id: `dm-${a.id}`, from: a.handle, kind: "artist", text: `been hearing your stuff everywhere. let's link. I'm ${where} most nights.`, read: false, act: { type: "link", artist: a.id } }, false);
+      showToast(`@${a.handle} messaged you (phone: P)`, 3600);
+      // the big ones turn up once they've heard of you
+      const actor = life.current.find((x) => x.id === `artist-${a.id}`);
+      if (actor) actor.hidden = false;
+    }
+    for (const [fans, pay, brand] of [
+      [10000, 800, "a sneaker brand"],
+      [50000, 4000, "a headphone company"],
+    ] as [number, number, string][]) {
+      if (v.fans < fans || v.seen.includes(`sponsor-${fans}`)) continue;
+      markSeen(`sponsor-${fans}`);
+      message({ id: `sponsor-${fans}`, from: brand.replace(/ /g, "."), kind: "offer", text: `we love what you're doing. $${pay} for one post with our stuff in it. interested?`, read: false, act: { type: "sponsor", pay } });
+    }
+    // someone's noticed you're getting money
+    const due = mobDue(v);
+    if (due && v.mob[due].stage === "none") {
+      const mob = MOBS[due];
+      updateSave((x) => ({ ...x, mob: { ...x.mob, [due]: { ...x.mob[due], stage: "asked" } } }));
+      message({ id: `mob-${due}`, from: due === "kings" ? "rook.kings" : "unknown number", kind: "mob", text: due === "kings" ? "heard ur getting money now. we look after people round here. we'll come find u" : `${mob.boss} would like a word about your earnings. Someone will find you.`, read: false, act: { type: "mob", mob: due } });
+      st.current.encounterIn = Math.min(st.current.encounterIn, 20);
+    }
+  };
+
+  /** Some minutes of your songs and beat store earning (and fans writing in). */
+  const payOut = (minutes: number) => {
+    const s = st.current;
+    const v = saveRef.current;
+    const { songs, songCash, storeCash } = accrue(v, minutes);
+    const total = songCash + storeCash;
+    if (total > 0) {
+      updateSave((x) => ({ ...x, collabs: songs, stats: { ...x.stats, royalties: x.stats.royalties + total } }));
+      s.paidSince += earnMusic(total);
+    }
+    s.payTicks++;
+    // a note every couple of minutes, not every half a minute
+    if (s.payTicks % 4 === 0 && s.paidSince >= 1) {
+      showToast(`Streams and leases: +$${Math.floor(s.paidSince)}${cutOf(v) ? " (after the cut)" : ""}`, 3000);
+      s.paidSince = 0;
+    }
+    if (tierOf(v.fans) >= 1 && roll() < 0.22) message(fanDm(v.inbox.length + Math.floor(roll() * 8)), false);
+    // out and about, people know you now
+    const handle = (v.profile?.name || "producer").toLowerCase().replace(/[^a-z0-9._]/g, "") || "producer";
+    if (tierOf(v.fans) >= 2 && SCENES[s.place].outdoors && !s.fight && !s.pending && roll() < 0.3) {
+      const shouts = [`Someone across the road shouts “@${handle}!” and waves both arms.`, "Two kids stop and whisper. One of them holds a phone up, not very subtly.", `A car slows down. “Yo! ${v.profile?.name || "producer"}! Drop the tape!”`, "Somebody's playing your beat out of their phone as they walk past. They don't know you heard."];
+      showToast(shouts[Math.floor(roll() * shouts.length)], 3800);
+    }
+    // the beat store and the songs bring a few people over on their own
+    if (v.posted.length || v.collabs.length) {
+      const drift = Math.round((v.posted.length * 0.6 + v.collabs.reduce((n, x) => n + x.q / 60, 0)) * (1 + Math.sqrt(v.fans) / 40) * minutes);
+      if (drift) addFans(drift);
+    }
+  };
+
+  // ------------------------------------------------------------ the phone
+
+  const postBeat = () => {
+    const v = saveRef.current;
+    const tape = latestTape();
+    if (!tape || v.posted.includes(tape.name) || (v.cd.post ?? 0) > now()) return;
+    const viral = roll() < 0.08 + Math.min(0.1, priceOf(tape) / 900);
+    const gain = Math.round((6 + priceOf(tape) / 2) * (1 + Math.sqrt(v.fans) / 12) * (viral ? 5 : 1));
+    updateSave((x) => ({ ...x, posted: [...x.posted, tape.name], cd: { ...x.cd, post: now() + 90_000 } }));
+    addFans(gain, { kind: "beat", text: viral ? `“${tape.name}” 🔥 (it's everywhere)` : `new beat: “${tape.name}”` });
+    sfx.select();
+    showToast(viral ? `“${tape.name}” is going viral: +${fmtFans(gain)} followers!` : `Posted “${tape.name}”: +${fmtFans(gain)} followers. It sells leases from your page now.`, 4200);
+  };
+  const postFit = () => {
+    const v = saveRef.current;
+    if (!v.profile || (v.cd.fit ?? 0) > now()) return;
+    const style = styleOf(v.profile);
+    const gain = Math.round((2 + style * 1.5) * (1 + Math.sqrt(v.fans) / 20) * (1 + blingOf(v.profile) / 3000));
+    updateSave((x) => ({ ...x, cd: { ...x.cd, fit: Date.now() + 120_000 } }));
+    addFans(gain, { kind: "fit", text: style >= 15 ? `fit check. no notes. (style ${style})` : `fit check (style ${style})` });
+    sfx.select();
+    showToast(`Fit pic up: +${fmtFans(gain)} followers.${style < 6 ? " Better clothes, better numbers." : ""}`, 3200);
+  };
+  const answer = (m: Msg, yes: boolean) => {
+    updateSave((x) => ({ ...x, inbox: x.inbox.map((y) => (y.id === m.id ? { ...y, done: true, read: true } : y)) }));
+    if (!yes || !m.act) return;
+    if (m.act.type === "link") {
+      const a = artistById(m.act.artist);
+      if (!a || saveRef.current.contacts.includes(a.id)) return;
+      updateSave((x) => ({ ...x, contacts: [...x.contacts, a.id] }));
+      addFans(Math.round(a.reach / 3), { kind: "news", text: `linked with @${a.handle}` });
+      const actor = life.current.find((x) => x.id === `artist-${a.id}`);
+      if (actor) actor.hidden = false;
+      showToast(`Linked with ${a.name}. Find them in person to sell a beat or make a song.`, 4200);
+    } else if (m.act.type === "sponsor") {
+      const pay = m.act.pay;
+      earn(pay);
+      addFans(Math.round(pay / 4), { kind: "news", text: "#ad (they sent a lot of free stuff)" });
+      sfx.coins();
+      showToast(`+$${pay}. The free stuff arrives in a very big box.`, 3600);
+    }
+  };
+  const mobCall = (id: MobId, what: "stop" | "peace") => {
+    const v = saveRef.current;
+    const mob = MOBS[id];
+    if (what === "stop" && v.mob[id].stage === "paying") {
+      updateSave((x) => ({ ...x, mob: { ...x.mob, [id]: { ...x.mob[id], stage: "hunted" } } }));
+      message({ id: `stop-${id}-${now()}`, from: id === "kings" ? "rook.kings" : "unknown number", kind: "mob", text: id === "kings" ? "so ur done paying. ok. see u outside" : "Mr. Vance noticed the payments stopped.", read: false }, false);
+      showToast(`You've stopped paying ${mob.name}. Watch yourself outside.`, 4200);
+    } else if (what === "peace" && v.mob[id].stage === "hunted") {
+      const cost = mob.peace(v);
+      if (!spend(cost)) return;
+      updateSave((x) => ({ ...x, mob: { ...x.mob, [id]: { ...x.mob[id], stage: "paying", paid: x.mob[id].paid + cost } } }));
+      showToast(`$${cost} to ${mob.name}. They call it off, and take ${Math.round(mob.cut * 100)}% from now on.`, 4600);
+    }
+  };
+
+  // ------------------------------------------------------------ a song with someone
+
+  const sessionDone = (artistId: string, q: number) => {
+    const a = artistById(artistId);
+    const tape = latestTape();
+    const v = saveRef.current;
+    if (!a || !tape) return;
+    const { song, upfront, gain } = makeSong(a, tape, q, v.fans);
+    updateSave((x) => ({ ...x, collabs: [song, ...x.collabs].slice(0, 40), rel: { ...x.rel, [a.id]: (x.rel[a.id] ?? 0) + 1 }, stats: { ...x.stats, songs: x.stats.songs + 1 }, cd: { ...x.cd, [`song-${a.id}`]: Date.now() + 4 * 60_000 } }));
+    const kept = earnMusic(upfront);
+    addFans(gain, { kind: "song", text: `“${song.title}” ft. ${a.name}, out now` });
+    sfx.coins();
+    showToast(`“${song.title}” with ${a.name} is out: +$${kept}, +${fmtFans(gain)} followers. It keeps earning (phone → money).`, 5600);
+  };
   const heal = (n: number) => {
     const f = st.current.fight;
     if (f) f.me.hp = Math.min(MAX_HP, f.me.hp + n);
@@ -359,35 +547,65 @@ export default function Game({ onExit }: { onExit: () => void }) {
     st.current.pending = null;
   };
 
-  const startFight = (foes: Actor[], boss = false) => {
+  const startFight = (foes: Actor[], boss = false, crew: Crew = st.current.pendingCrew) => {
     const s = st.current;
     s.pending = null;
     for (const f of foes) Object.assign(f.fighter!, { state: "approach", cd: 0.25 + Math.random() * 0.6 });
-    s.fight = { foes, me: freshMe(s.x, s.y, s.dir, saveRef.current.hp), boss, over: 0, outcome: "" };
+    s.fight = { foes, me: freshMe(s.x, s.y, s.dir, saveRef.current.hp), boss, over: 0, outcome: "", crew };
     s.sitting = false;
     keys.current = [];
     setFighting(true);
     showToast(window.matchMedia("(pointer: coarse)").matches ? "A: swing · B: dodge · watch for the “!”" : "E / Space: swing · Shift: dodge · Q: eat · watch for the “!”", 3400);
   };
 
+  /** Who comes for you, as things stand. */
+  const pickCrew = (): Crew => {
+    const s = st.current;
+    const v = saveRef.current;
+    const asked = MOB_IDS.find((id) => v.mob[id].stage === "asked");
+    if (asked && s.t - (s.fx.envoyAt ?? -1e9) > 90) return `envoy-${asked}`;
+    const hunted = huntedBy(v);
+    if (hunted && Math.random() < 0.8) return v.mob[hunted].squads >= MOBS[hunted].squadsToHeavy ? `heavy-${hunted}` : hunted === "kings" ? "gang" : "suits";
+    // the shinier you are, the more often it's someone after what you've got on
+    const bling = v.profile ? Math.min(0.2, blingOf(v.profile) / 15000) : 0;
+    if (Math.random() < recognised(v) + bling) return "robbers";
+    // away from the rough places, it's only ever people who know you
+    return ROUGH[s.place] === undefined || ROUGH[s.place] === 0 ? (tierOf(v.fans) >= 2 ? "robbers" : "drunks") : "drunks";
+  };
+
   /** A group comes up the street at you. */
-  const spawnTrouble = () => {
+  const spawnTrouble = (want?: Crew) => {
     const s = st.current;
     const v = saveRef.current;
     const scene = SCENES[s.place];
     const w = scene.tiles[0].length * TILE;
-    const n = v.stats.wins >= 3 && Math.random() < 0.5 ? 3 : 2;
+    const crew = want ?? pickCrew();
+    const diff = v.settings.difficulty;
+    const kinds: FoeKind[] =
+      crew === "robbers"
+        ? tierOf(v.fans) >= 4 ? ["robber", "robber", "robber"] : ["robber", "robber"]
+        : crew === "gang"
+          ? ["gang", "gang", "gang"]
+          : crew === "suits"
+            ? Math.random() < 0.5 ? ["suit", "suit", "suit"] : ["suit", "suit"]
+            : crew === "envoy-kings" || crew === "heavy-kings"
+              ? ["rook", "gang", "gang"]
+              : crew === "envoy-syndicate" || crew === "heavy-syndicate"
+                ? ["kade", "suit", "suit"]
+                : Array.from({ length: v.stats.wins >= 3 && Math.random() < 0.5 ? 3 : 2 }, (_, i) => (i === 0 && v.stats.wins >= 4 && Math.random() < 0.6 ? "rowdy" : "drunk"));
+    const n = kinds.length;
     const side = s.x > w / 2 ? -1 : 1;
     const x0 = Math.max(14, Math.min(w - 14, s.x + side * 120));
     const foes: Actor[] = [];
     for (let i = 0; i < n; i++) {
       let y = s.y + (i - (n - 1) / 2) * 12;
       if (blocked(scene, { x: x0 - 4, y: y - 3, w: 8, h: 4 })) y = s.y;
-      const kind = i === 0 && v.stats.wins >= 4 && Math.random() < 0.6 ? "rowdy" : "drunk";
-      foes.push(makeFoe(kind, s.place, x0 + side * i * 8, y, undefined, v.settings.difficulty));
+      foes.push(makeFoe(kinds[i], s.place, x0 + side * i * 8, y, undefined, diff));
     }
+    if (crew.startsWith("envoy")) s.fx.envoyAt = s.t;
     life.current.push(...foes);
     s.pending = foes;
+    s.pendingCrew = crew;
     // the cat wants no part of it
     const cat = life.current.find((a) => a.kind === "cat" && a.place === s.place && a.trail);
     if (cat) catHome(cat, true);
@@ -401,6 +619,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
     faceOff(foes, s.x);
     s.dir = foes[0].x < s.x ? "left" : "right";
     keys.current = [];
+    const crew = s.pendingCrew;
+    if (crew !== "drunks") return confrontCrew(foes, crew);
     const toll = Math.min(15, Math.max(5, Math.floor(v.cash * 0.3)));
     const mine = latestTape();
     // they can tell when you're carrying Dre's tape (lose the fight and it goes with them)
@@ -462,6 +682,178 @@ export default function Game({ onExit }: { onExit: () => void }) {
     ]);
   };
 
+  /** The newer trouble: people who know your face, and the ones who want a cut. */
+  const confrontCrew = (foes: Actor[], crew: Crew) => {
+    const v = saveRef.current;
+    const handle = (v.profile?.name || "producer").toLowerCase().replace(/[^a-z0-9._]/g, "") || "producer";
+    const mobId = mobOf(crew);
+    const mob = mobId ? MOBS[mobId] : null;
+    const setStage = (id: MobId, stage: SaveData["mob"]["kings"]["stage"]) => updateSave((x) => ({ ...x, mob: { ...x.mob, [id]: { ...x.mob[id], stage } } }));
+    const fight = () => startFight(foes, crew.startsWith("envoy") || crew.startsWith("heavy"), crew);
+    if (crew === "robbers") {
+      const item = v.profile ? takeable(v.profile) : null;
+      const toll = Math.max(20, Math.floor(v.cash * 0.3));
+      const selfie = Math.min(0.85, 0.25 + tierOf(v.fans) * 0.1);
+      say(robberLines(handle, item?.name ?? null), [
+        { label: "Fight", run: fight },
+        ...(item
+          ? [
+              {
+                label: `Hand over the ${item.name}`,
+                run: () => {
+                  loseItem(item.id);
+                  walkOff(foes);
+                  addRep(-3);
+                  say([`You take off the ${item.name} and hold it out. One of them snatches it.`, "“Appreciate you. Big fan.” They're gone round the corner."]);
+                },
+              },
+            ]
+          : []),
+        ...(v.cash >= toll
+          ? [
+              {
+                label: `Give them $${toll}`,
+                run: () => {
+                  spend(toll);
+                  addRep(-2);
+                  walkOff(foes);
+                  say(["They count it in front of you, slowly, and go.", "Somebody across the road was filming. Great."]);
+                },
+              },
+            ]
+          : []),
+        {
+          label: "Take a picture with them",
+          run: () => {
+            if (Math.random() < selfie) {
+              walkOff(foes);
+              addFans(8 + tierOf(v.fans) * 6, { kind: "news", text: "met some fans on the block" });
+              say(["You pull your phone out first. “Picture? For the page.”", "They look at each other. One of them fixes his hair.", "Three photos later they're shaking your hand. They forget what they came for."]);
+            } else {
+              say(["“Picture? For the page?”", "“We're not fans, superstar.”"]);
+              startFight(foes, false, crew);
+            }
+          },
+        },
+        {
+          label: "Walk away",
+          run: () => {
+            if (Math.random() < 0.35) {
+              walkOff(foes);
+              say(["You keep your head down and keep moving. They shout your name after you. It's worse, somehow."]);
+            } else {
+              say(["You turn to go. One of them steps in front of you.", "“Nah. Not you. Not today.”"]);
+              startFight(foes, false, crew);
+            }
+          },
+        },
+      ]);
+      return;
+    }
+    if (!mobId || !mob) return startFight(foes, false, crew);
+    const peace = mob.peace(v);
+    const payNow = {
+      label: `Pay what they want ($${peace})`,
+      run: () => {
+        if (!spend(peace)) return;
+        updateSave((x) => ({ ...x, mob: { ...x.mob, [mobId]: { ...x.mob[mobId], stage: "paying", paid: x.mob[mobId].paid + peace } } }));
+        walkOff(foes);
+        say([`They take the money and count it twice.`, `“${mob.boss} says you're one of ours now. ${Math.round(mob.cut * 100)}% of what your music makes. Every time.”`]);
+      },
+    };
+    if (crew.startsWith("envoy")) {
+      const boss = mob.boss;
+      say(
+        mobId === "kings"
+          ? ["Three of them, red bandanas. The one in front has gold teeth and a cuban link.", "“I'm Rook. These are my streets. You're making money on my streets.”", `“${Math.round(mob.cut * 100)}% of what your music makes, and nobody touches you round here. Simple.”`]
+          : ["A man in a white suit, two more in black behind him. He doesn't take his shades off.", `“Kade. I work for ${boss}. He's been watching your numbers go up.”`, `“A quarter of everything. In return, the city's a lot friendlier. Think about how unfriendly it could be.”`],
+        [
+          {
+            label: `Pay the ${Math.round(mob.cut * 100)}%`,
+            run: () => {
+              setStage(mobId, "paying");
+              walkOff(foes);
+              say([mobId === "kings" ? "Rook grins. Gold. “Smart. Nobody's going to bother you now. Not much, anyway.”" : "“Mr. Vance will be pleased.” They're back in the car before you've said anything else.", `(${Math.round(mob.cut * 100)}% of what your music makes goes to ${mob.name}. You can stop on your phone.)`]);
+            },
+          },
+          {
+            label: "No.",
+            run: () => {
+              setStage(mobId, "hunted");
+              walkOff(foes);
+              message({ id: `threat-${mobId}-${Date.now()}`, from: mobId === "kings" ? "rook.kings" : "unknown number", kind: "mob", text: mobId === "kings" ? "ok. remember u said no" : "Mr. Vance is disappointed. Watch yourself.", read: false });
+              say(mobId === "kings" ? ["Rook laughs. Nobody else does.", "“Okay. Okay, producer. We'll see you around. All of us.”"] : ["Kade nods slowly, like he expected that.", "“Then the city's going to get a lot smaller for you.”"]);
+            },
+          },
+          {
+            label: "Let me think about it",
+            run: () => {
+              walkOff(foes);
+              say(["“Think quick.” They go, and you can feel them watching all the way down the block."]);
+            },
+          },
+          { label: "Fight them here", run: fight },
+        ],
+      );
+      return;
+    }
+    say(
+      crew.startsWith("heavy")
+        ? mobId === "kings"
+          ? ["Rook himself this time, with a bat with nails in it.", "“You've been embarrassing my people. That stops tonight.”"]
+          : ["The white suit again. Kade's got a cane with a gold top, and he's not leaning on it.", "“Mr. Vance doesn't send people a fourth time. He sends me.”"]
+        : mobId === "kings"
+          ? [["“Rook says hi.” Red bandanas, three of them."], ["“You should've paid.”"], ["“Kings run this block. You knew that.”"]][Math.floor(roll() * 3)]
+          : [["Two men in suits get out of a car that doesn't stop running.", "“Mr. Vance sends his regards.”"], ["“Nothing personal. It's business.”"]][Math.floor(roll() * 2)],
+      [{ label: "Fight", run: fight }, ...(v.cash >= peace ? [payNow] : []), ...(crew.startsWith("heavy") ? [] : [{ label: "Run", run: () => (Math.random() < 0.4 ? (walkOff(foes), say(["You run. You don't stop till the next block."])) : (say(["You run. They're faster."]), startFight(foes, false, crew))) }])],
+    );
+  };
+
+  /** Esc while they're in your face: the one sent to ask goes off to let you think; anyone else doesn't let you leave. */
+  const turnAway = () => {
+    const s = st.current;
+    const foes = s.pending;
+    if (!foes) return setDialog(null);
+    if (s.pendingCrew.startsWith("envoy")) {
+      walkOff(foes);
+      say(["“Think quick.” They go, and you can feel them watching all the way down the block."]);
+    } else if (s.pendingCrew === "drunks" && Math.random() < 0.5) {
+      walkOff(foes);
+      say(["You keep walking. They laugh, but they don't follow."]);
+    } else {
+      say(["You try to walk off. One of them steps in front of you.", "No getting out of this one."]);
+      startFight(foes, s.pendingCrew.startsWith("heavy"), s.pendingCrew);
+    }
+  };
+
+  /** Something you had on, gone (unequipped, out of your wardrobe). */
+  const loseItem = (id: string) => {
+    const it = itemById(id);
+    if (!it) return;
+    updateSave((x) => ({ ...x, owned: x.owned.filter((o) => o !== id), profile: x.profile && x.profile[it.slot]?.id === id ? { ...x.profile, [it.slot]: it.slot === "top" ? { id: "tee", color: 0 } : it.slot === "shoes" ? { id: "sneakers", color: 0 } : it.slot === "pants" ? { id: "jeans", color: 0 } : null } : x.profile }));
+  };
+
+  /** Tank's fight night: a round at a time, in the middle of the underpass. */
+  const ringRound = (round: number) => {
+    const s = st.current;
+    const v = saveRef.current;
+    s.ring = round;
+    const diff = v.settings.difficulty;
+    const kinds: FoeKind[] = round === 1 ? ["boxer", "boxer"] : round === 2 ? ["boxer", "boxer", "boxer"] : ["champ"];
+    const foes = kinds.map((k, i) => makeFoe(k, "underpass", s.x + 60 + i * 10, s.y + (i - (kinds.length - 1) / 2) * 12, undefined, diff));
+    life.current.push(...foes);
+    say(round === 3 ? ["Round three. The crowd parts for a man in a gold jersey.", "“Champ,” somebody says. Not to you."] : [`Round ${round}.`, round === 1 ? "Tank holds his arm out between you and them, then drops it." : "No break. They're already coming."]);
+    startFight(foes, round === 3, "ring");
+    s.encounterIn = Math.max(s.encounterIn, 90);
+  };
+  const ringStart = () => {
+    const s = st.current;
+    if (s.place !== "underpass") return;
+    Object.assign(s, { x: 17.5 * TILE, y: 8.6 * TILE, dir: "right", sitting: false });
+    cheerFor(life.current, (a) => a.place === "underpass" && a.kind === "person" && !a.fighter);
+    ringRound(1);
+  };
+
   const bossFight = () => {
     const s = st.current;
     const tank = life.current.find((a) => a.id === "tank");
@@ -474,7 +866,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const foes = [boss, ...(goon ? [makeFoe("goon", "underpass", goon.x, goon.y, goon.look, diff)] : [])];
     life.current.push(...foes);
     say(["The cypher stops. Everyone steps back.", "Tank rolls his shoulders. His friend cracks his knuckles."]);
-    startFight(foes, true);
+    startFight(foes, true, "tank");
     s.encounterIn = Math.max(s.encounterIn, 60);
   };
 
@@ -484,10 +876,52 @@ export default function Game({ onExit }: { onExit: () => void }) {
     f.outcome = "won";
     setFighting(false);
     const v = saveRef.current;
+    const crew = f.crew;
+    // the ring: on to the next round, or the purse
+    if (crew === "ring") {
+      const round = s.ring;
+      updateSave((x) => ({ ...x, hp: Math.min(MAX_HP, f.me.hp + 25) }));
+      sfx.cheer();
+      cheerFor(life.current, (a) => a.place === "underpass" && a.kind === "person" && !a.fighter);
+      if (round < 3) {
+        const purse = round * 40;
+        window.setTimeout(
+          () =>
+            say([`Round ${round}: yours. Tank throws you a towel. (+25 health)`], [
+              { label: `Round ${round + 1}`, run: () => ringRound(round + 1) },
+              {
+                label: `Take $${purse} and go`,
+                run: () => {
+                  earn(purse);
+                  s.ring = 0;
+                  say(["Tank counts it into your hand. “Smart. Or scared. Same money.”"]);
+                },
+              },
+            ]),
+          500,
+        );
+        return;
+      }
+      s.ring = 0;
+      updateSave((x) => ({ ...x, stats: { ...x.stats, ringWins: x.stats.ringWins + 1, wins: x.stats.wins + 1 } }));
+      earn(150);
+      addRep(15);
+      addFans(150 + tierOf(v.fans) * 60, { kind: "fight", text: "fight night champion 🏆" });
+      sfx.coins();
+      window.setTimeout(() => say(["The champ stays down. The whole underpass loses it.", "Tank lifts your arm. “Fight night. Yours.”", "(+$150, +15 respect, and somebody got it all on video)"]), 500);
+      return;
+    }
+    const mobId = mobOf(crew);
+    const heavy = !!mobId && (crew.startsWith("heavy") || crew.startsWith("envoy"));
     const cash = f.foes.reduce((n, a) => n + (a.fighter?.purse ?? 0), 0);
-    const rep = f.boss ? 25 : 4 * f.foes.length;
+    const rep = heavy ? 30 : f.boss ? 25 : 4 * f.foes.length;
     const wins = v.stats.wins + 1;
-    const gained = [...unlockedByWins(wins), ...(f.boss ? ["mic"] : [])].filter((w) => !v.weapons.includes(w));
+    const gained = [...unlockedByWins(wins), ...(crew === "tank" ? ["mic"] : []), ...(heavy ? [mobId === "kings" ? "spiked" : "cane"] : [])].filter((w) => !v.weapons.includes(w));
+    // a crew seen off counts towards the heavy coming; the heavy down, and that's the end of it
+    if (mobId) updateSave((x) => ({ ...x, mob: { ...x.mob, [mobId]: heavy ? { ...x.mob[mobId], stage: "done" } : { ...x.mob[mobId], squads: x.mob[mobId].squads + (x.mob[mobId].stage === "hunted" ? 1 : 0) } } }));
+    // people film fights, once people know who you are
+    const clip = crew === "drunks" && tierOf(v.fans) === 0 ? 0 : heavy ? 300 + tierOf(v.fans) * 150 : crew === "tank" ? 80 : 4 + tierOf(v.fans) * 8;
+    if (clip) addFans(clip, { kind: "fight", text: heavy ? `${mobId === "kings" ? "Rook" : "Kade"} found out` : crew === "tank" ? "the underpass has a new name in it" : "someone filmed it. you're welcome" });
     updateSave((x) => ({
       ...x,
       hp: f.me.hp,
@@ -499,10 +933,22 @@ export default function Game({ onExit }: { onExit: () => void }) {
     }));
     sfx.coins();
     const w = gained.length ? weaponById(gained[gained.length - 1]) : null;
+    const squads = mobId && !heavy ? saveRef.current.mob[mobId] : null;
     const lines = [
-      f.boss ? "Tank goes down, and stays down a while. Nobody in the cypher says a word." : f.foes.length > 2 ? "The last of them hits the pavement." : "Both of them on the ground. Your hands are shaking.",
+      heavy
+        ? mobId === "kings"
+          ? "Rook goes down, gold teeth and all. His boys pick him up and drag him off."
+          : "Kade goes down in his white suit, in a puddle. The car drives off without him."
+        : crew === "tank"
+          ? "Tank goes down, and stays down a while. Nobody in the cypher says a word."
+          : f.foes.length > 2
+            ? "The last of them hits the pavement."
+            : "Both of them on the ground. Your hands are shaking.",
       ...cheer(),
       `They leave $${cash} behind getting up. (+${rep} respect)`,
+      ...(heavy ? [mobId === "kings" ? "The Block Kings won't be asking you for anything again." : "Mr. Vance sends a message, later: “Understood.” That's all."] : []),
+      ...(squads && squads.stage === "hunted" && mobId ? [squads.squads >= MOBS[mobId].squadsToHeavy ? `That's ${squads.squads} of their crews. ${MOBS[mobId].heavy} will come himself next.` : `${squads.squads} of ${MOBS[mobId].squadsToHeavy} of their crews seen off.`] : []),
+      ...(clip >= 10 ? [`Someone filmed it. (+${fmtFans(clip)} followers)`] : []),
       ...(w ? [w.found] : []),
     ];
     window.setTimeout(() => {
@@ -546,7 +992,23 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const wake = () => {
     const s = st.current;
     const v = saveRef.current;
-    const lost = Math.floor(v.cash * 0.25);
+    const crew = s.fight?.crew ?? "drunks";
+    // the ring: no pockets gone through, just the concrete and Tank with a bottle of water
+    if (crew === "ring") {
+      const round = s.ring;
+      updateSave((x) => ({ ...x, hp: 45, stats: { ...x.stats, losses: x.stats.losses + 1 } }));
+      dropFoes();
+      Object.assign(s, { fight: null, pending: null, ring: 0 });
+      setKo(0);
+      say([`You come round on the concrete. Round ${round}, gone.`, "Tank hands you a bottle of water. “Next time.” (health 45)"]);
+      root.current?.focus();
+      return;
+    }
+    // the ones who knew who you were take more, and what you had on
+    const share = crew === "drunks" ? 0.25 : crew === "robbers" ? 0.3 : 0.4;
+    const lost = Math.floor(v.cash * share);
+    const item = crew !== "drunks" && crew !== "tank" && v.profile ? takeable(v.profile) : null;
+    if (item) loseItem(item.id);
     // Dre's tape went with whoever went through your pockets: the job's off (he'll want to hear about it)
     const tapeGone = carrying(v);
     updateSave((x) => ({ ...x, hp: 60, cash: x.cash - lost, stats: { ...x.stats, losses: x.stats.losses + 1 }, job: tapeGone && x.job ? { ...x.job, stage: "lost" } : x.job }));
@@ -558,7 +1020,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     setPlace("bedroom", s.windowOpen);
     setPlaceName("bedroom");
     setKo(0);
-    say(["You wake up on your bedroom floor. No idea how you got home.", lost ? `Your pockets are $${lost} lighter.` : "Your pockets were empty anyway.", ...(tapeGone ? ["Dre's tape is gone too. He's not going to like that."] : []), "Your head's pounding. (health 60)"]);
+    say(["You wake up on your bedroom floor. No idea how you got home.", lost ? `Your pockets are $${lost} lighter.` : "Your pockets were empty anyway.", ...(item ? [`Your ${item.name}'s gone too.`] : []), ...(tapeGone ? ["Dre's tape is gone too. He's not going to like that."] : []), "Your head's pounding. (health 60)"]);
     root.current?.focus();
   };
 
@@ -570,6 +1032,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     updateSave((x) => ({ ...x, hp: f.me.hp, rep: Math.max(0, x.rep - 1), stats: { ...x.stats, fled: x.stats.fled + 1 } }));
     dropFoes(f.foes);
     s.fight = null;
+    s.ring = 0;
     setFighting(false);
     showToast("You got away.", 2400);
   };
@@ -638,6 +1101,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
     },
     sfx,
     ride: (to) => rideTo(to),
+    music: earnMusic,
+    fans: addFans,
+    ring: () => {
+      setDialog(null);
+      ringStart();
+    },
     life: () => life.current,
     t: () => st.current.t,
     get visit() {
@@ -695,6 +1164,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
       };
       window.setTimeout(() => call(0), 900);
     }
+    // the big artists are only round once they've heard of you
+    for (const a of ARTISTS) {
+      const actor = life.current.find((x) => x.id === `artist-${a.id}`);
+      if (actor) actor.hidden = v.fans < a.show && !v.contacts.includes(a.id);
+    }
     // the bouncer steps aside for people he'll let in
     const bouncer = life.current.find((a) => a.id === "bouncer");
     if (to === "avenue" && bouncer) bouncer.x = (clubOk(v) ? 36.9 : 35.5) * TILE;
@@ -720,6 +1194,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
     updateSave((x) => ({ ...x, stats: { ...x.stats, [mode === "cypher" ? "cypherBest" : "djBest"]: Math.max(best, score) }, heard: mode === "dj" ? { ...x.heard, dj: "a set" } : x.heard }));
     if (cash) earn(cash);
     if (rep) addRep(rep);
+    // a good set gets posted (by you, and by people in the crowd)
+    const fans = fresh && score >= 40 ? Math.round((mode === "dj" ? score / 2 : score / 5) * (1 + tierOf(v.fans) * 0.5)) : 0;
+    if (fans) addFans(fans, { kind: "show", text: mode === "dj" ? `took the decks at the club: ${score}%` : `kept the cypher going: ${score}%` });
     if (score >= 50) sfx.cheer();
     find(mode === "cypher" ? "mic" : "crowd");
     showToast(`${score}%: ${cash ? `+$${cash}` : "no money"}${rep ? `, +${rep} respect` : ""}${score > best ? " (your best)" : ""}${!fresh ? " · the crowd's thinner the second time" : ""}`, 4200);
@@ -731,6 +1208,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (won) {
       earn(rival.stake * 2);
       addRep(8);
+      addFans(20 + tierOf(saveRef.current.fans) * 15, { kind: "show", text: `beat ${rival.name} under the bridge, ${score}% to ${rival.score}%` });
       sfx.cheer();
       cheerFor(life.current, (a) => a.place === "underpass" && a.id.startsWith("mc-"));
     }
@@ -1235,14 +1713,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
   // ------------------------------------------------------------ input
 
   // the fight's actions, for handlers made once
-  const actions = useRef({ attack, dodge, eat: () => eatSomething() });
+  const actions = useRef({ attack, dodge, eat: () => eatSomething(), turnAway });
   useLayoutEffect(() => {
-    actions.current = { attack, dodge, eat: () => eatSomething() };
+    actions.current = { attack, dodge, eat: () => eatSomething(), turnAway };
   });
 
   const tryInteract = useCallback(() => {
     const u = ui.current;
-    if (u.phase !== "play" || u.studio || u.menu || u.mini || u.ko) return;
+    if (u.phase !== "play" || u.studio || u.menu || u.mini || u.ko || u.phone) return;
     const f = st.current.fight;
     if (f && !f.outcome && !u.dialog) {
       actions.current.attack();
@@ -1270,9 +1748,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
         return;
       }
       if (u.phase !== "play") return;
-      if (u.menu || u.mini || u.ko) {
+      if (u.menu || u.mini || u.ko || u.phone) {
         if (e.key === "Escape" && u.mini) setMini(null);
         else if (e.key === "Escape" && u.menu && !u.menu.creator) setMenu(null);
+        // the phone puts itself away with Esc or P, wherever focus has got to
+        else if (u.phone && !u.mini && (e.key === "Escape" || (e.code === "KeyP" && !e.repeat))) {
+          setPhone(null);
+          root.current?.focus();
+        }
         return;
       }
       const fighting = !!st.current.fight && !st.current.fight.outcome && !u.dialog;
@@ -1290,9 +1773,16 @@ export default function Game({ onExit }: { onExit: () => void }) {
         setMenu({ tab: "you", creator: false });
         return;
       }
+      if (e.code === "KeyP" && !u.dialog && !fighting && !e.repeat) {
+        e.preventDefault();
+        setPhone("page");
+        return;
+      }
       if (e.key === "Escape") {
         e.preventDefault();
-        if (u.dialog) setDialog(null);
+        // turning your back on whoever's walked up to you is an answer too
+        if (u.dialog && st.current.pending) actions.current.turnAway();
+        else if (u.dialog) setDialog(null);
         else if (u.help) tryInteract();
         else leave();
         return;
@@ -1455,7 +1945,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         st.current.lastTrouble = 1e9;
       },
       /** How likely trouble is to be waiting in a place, and how much sooner it comes, as things stand. */
-      odds: (place: Place) => ({ ambush: ambushOdds(place, saveRef.current), sooner: carrying(saveRef.current) ? CARRY_SOONER : 1 }),
+      odds: (place: Place) => ({ ambush: ambushOdds(place, saveRef.current), sooner: troublePace(saveRef.current) }),
       /** Go down in the fight you're in. */
       knockMe: () => {
         const f = st.current.fight;
@@ -1495,6 +1985,39 @@ export default function Game({ onExit }: { onExit: () => void }) {
       /** Pretend a rhythm game just finished with this score. */
       rhythm: (mode: "cypher" | "dj", score: number) => rhythmRef.current(mode, score),
       battle: (score: number, rival: number) => battleRef.current(score, { name: "Vee", score: rival, stake: 20 }),
+      /** Save a starter beat to the shelf under this name, as if made in the studio. */
+      makeTape: (name: string) => {
+        const store = loadStore();
+        const p = PRESETS[1].make();
+        p.name = name;
+        const slot = store.slots.findIndex((x) => x === null);
+        store.slots[slot < 0 ? store.slots.length - 1 : slot] = p;
+        saveStore(store);
+        const saved = savedProjects();
+        shelfRef.current = saved;
+        setShelf(saved);
+        updateSave((v) => v);
+      },
+      /** The career as things stand. */
+      career: () => {
+        const v = saveRef.current;
+        return { fans: v.fans, tier: tierOf(v.fans), posts: v.posts.length, inbox: v.inbox.map((m) => ({ id: m.id, kind: m.kind, act: m.act?.type ?? null, done: !!m.done })), contacts: v.contacts, rel: v.rel, leases: v.leases, collabs: v.collabs, posted: v.posted, mob: v.mob, cut: cutOf(v), royalties: v.stats.royalties };
+      },
+      /** Followers, as if they'd just come in (with a post, so the level-ups and messages happen). */
+      fans: (n: number) => addFans(n, { kind: "news", text: "test" }),
+      /** Let some minutes of your catalogue pass. */
+      payOut: (minutes: number) => payOut(minutes),
+      /** Finish a session with an artist at this score (as if played). */
+      session: (artist: string, q: number) => sessionDone(artist, q),
+      /** Bring a particular crew now. */
+      crew: (c: Crew) => {
+        st.current.lastTrouble = -1e9;
+        spawnTrouble(c);
+      },
+      crewNow: () => st.current.pendingCrew,
+      ring: () => ringStart(),
+      ringRound: () => st.current.ring,
+      phone: (tab: PhoneTab | null) => setPhone(tab),
       /** Open a mini-game or a menu tab straight away. */
       mini: (m: Mini | null) => setMini(m),
       menu: (tab: MenuTab | null) => setMenu(tab ? { tab, creator: false } : null),
@@ -1502,6 +2025,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
     return () => {
       delete w.__game;
     };
+    // the career handles work through refs (saveRef, st), so the first render's copies do
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateSave]);
 
   // ------------------------------------------------------------ the loop
@@ -1521,7 +2046,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       s.t += dt;
       const u = ui.current;
       const scene = SCENES[s.place];
-      const frozen = u.phase !== "play" || !!u.dialog || u.studio || u.help || !!s.trans || !!u.menu || !!u.mini || !!u.ko || !!s.ride;
+      const frozen = u.phase !== "play" || !!u.dialog || u.studio || u.help || !!s.trans || !!u.menu || !!u.mini || !!u.ko || !!s.ride || !!u.phone;
       const fight = s.fight;
       const dashing = !!fight && fight.me.dodge > 0;
 
@@ -1598,9 +2123,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
           } else if (s.pending.some((a) => Math.hypot(s.x - a.x, s.y - a.y) < 30)) confront();
         }
         if (life.current.some((a) => a.fighter && a.hidden && !s.fight?.foes.includes(a))) life.current = life.current.filter((a) => !(a.fighter && a.hidden && !s.fight?.foes.includes(a)));
-        // trouble, now and then, where it lives
-        if (ROUGH[s.place] !== undefined && !s.fight && !s.pending && saveRef.current.profile?.name) {
-          s.encounterIn -= dt * (carrying(saveRef.current) ? CARRY_SOONER : 1);
+        // trouble, now and then, where it lives (and, once people know you, wherever you are)
+        if (troubleHere(s.place, saveRef.current) && !s.fight && !s.pending && !s.ring && saveRef.current.profile?.name) {
+          s.encounterIn -= dt * troublePace(saveRef.current);
           if (s.encounterIn <= 0 && s.t - s.lastTrouble > BREATHER) {
             spawnTrouble();
             s.lastTrouble = s.t;
@@ -1609,6 +2134,15 @@ export default function Game({ onExit }: { onExit: () => void }) {
         }
       }
       s.shake = Math.max(0, s.shake - dt * 10);
+
+      // your catalogue earns while you walk about: every half a minute, songs and the beat store pay out
+      if (u.phase === "play" && !u.studio) {
+        s.payAcc += dt;
+        if (s.payAcc >= 30) {
+          s.payAcc = 0;
+          payOut(0.5);
+        }
+      }
 
       // doors
       if (!s.trans && u.phase === "play" && !frozen) {
@@ -1816,6 +2350,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
   };
 
   const foundCount = save.found.length;
+  // the beat a session's on, picked once as it opens (not every render)
+  const sessionTape = useMemo(() => (mini?.kind === "session" ? latestTape() : null), [mini]);
+  // your newest tape, for the phone's post button (the shelf changes when you save one)
+  const phoneTape = useMemo(() => (phone && shelf >= 0 ? latestTape() : null), [phone, shelf]);
 
   // ------------------------------------------------------------ mini-games
 
@@ -1842,8 +2380,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (!spend(price)) return;
     sfx.coins();
     const food = consumableById(id);
+    const weapon = WEAPONS.find((w) => w.id === id && "buy" in w.unlock);
     if (food) updateSave((v) => ({ ...v, items: { ...v.items, [id]: (v.items[id] ?? 0) + 1 } }));
-    else {
+    else if (weapon) {
+      updateSave((v) => ({ ...v, weapons: [...v.weapons, id], weapon: id }));
+      showToast(`Smokey wraps the ${weapon.name} in a newspaper. “You didn't get it from me.” (in your hand now; the menu swaps it)`, 4200);
+    } else {
       updateSave((v) => ({ ...v, owned: [...v.owned, id] }));
       showToast("In your wardrobe now: the mirror, or M.", 2600);
     }
@@ -1881,10 +2423,13 @@ export default function Game({ onExit }: { onExit: () => void }) {
         place={PLACE_NAMES[place]}
         cash={save.cash}
         rep={save.rep}
+        fans={save.fans}
+        unread={save.inbox.filter((m) => !m.read).length}
         found={foundCount}
         studio={studio}
         fighting={fighting}
         onMenu={() => !fighting && setMenu({ tab: "you", creator: false })}
+        onPhone={() => !fighting && setPhone("page")}
         onStudio={goToStudio}
         onExit={leave}
       />
@@ -1925,7 +2470,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
 
         {/* touch controls */}
         {touch && phase === "play" && !studio && (
-          <TouchPad down={down} fighting={fighting} prompt={prompt} onPress={press} onRelease={release} onEat={() => eatSomething()} onDodge={dodge} onUse={tryInteract} />
+          <TouchPad down={down} fighting={fighting} talking={!!dialog} prompt={prompt} onPress={press} onRelease={release} onEat={() => eatSomething()} onDodge={dodge} onUse={tryInteract} />
         )}
 
         {menu && (
@@ -2012,6 +2557,51 @@ export default function Game({ onExit }: { onExit: () => void }) {
           />
         )}
         {mini?.kind === "shop" && <Shop kind={mini.shop} save={save} onBuy={buy} onClose={closeMini} />}
+        {mini?.kind === "monte" && (
+          <Monte
+            cash={save.cash}
+            reduced={reduced}
+            onSettle={(d) => {
+              earn(d);
+              if (d > 0) {
+                sfx.coins();
+                updateSave((v) => ({ ...v, stats: { ...v.stats, monteWon: v.stats.monteWon + 1 } }));
+              }
+            }}
+            onClose={closeMini}
+          />
+        )}
+        {mini?.kind === "session" && (
+          <Session
+            artist={artistById(mini.artist)?.name ?? "them"}
+            line={artistById(mini.artist)?.session ?? ""}
+            tape={sessionTape}
+            volume={save.settings.music}
+            reduced={reduced}
+            onFinish={(q) => sessionDone(mini.artist, q)}
+            onClose={closeMini}
+          />
+        )}
+
+        {phone && (
+          <Phone
+            save={save}
+            tab={phone}
+            latest={phoneTape ? { name: phoneTape.name, ok: !save.posted.includes(phoneTape.name), why: save.posted.includes(phoneTape.name) ? "Your newest's already up. Make a new one in the studio." : undefined } : null}
+            onTab={(t) => {
+              setPhone(t);
+              if (t === "dms") updateSave((v) => ({ ...v, inbox: v.inbox.map((m) => ({ ...m, read: true })) }));
+            }}
+            onPostBeat={postBeat}
+            onPostFit={postFit}
+            onAct={answer}
+            onMob={mobCall}
+            onClose={() => {
+              setPhone(null);
+              root.current?.focus();
+            }}
+          />
+        )}
 
         {ko > 0 && <KnockedOut stage={ko} onWake={wake} />}
 
