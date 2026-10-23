@@ -8,7 +8,7 @@ import { hash, lampPole, paintGround, r, sign, T, TILE, type Fx, type G, type Sc
 const ROAD = [
   "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
   "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-  "bbbbbDbbbbbDbbbbbbDbbbbbbbbbbbbbbbbDbbbbbbbbbbbb",
+  "bbbbbDbbbbbDbbbbbbDbbbbbbbbbbbbbbbbDbbbbbbDbbbbb",
   "ssssssssssssssssssssssssssssssssssssssssssssssss",
   "ssssssssssssssssssssssssssssssssssssssssssssssss",
   "cccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -99,20 +99,25 @@ function paint(g: G, s: Scene) {
   r(g, 33.5 * TILE, 3 * TILE + 2, 2, 10, "#d8b35a");
   r(g, 37.3 * TILE, 3 * TILE + 2, 2, 10, "#d8b35a");
 
-  // the end of the block (42..47): stone, and the subway stairs on the pavement
+  // the end of the block (42..47): Maison, black stone and gold, one lit window; the subway stairs on the pavement
   for (let tx = 42; tx < 48; tx++)
     for (let ty = 0; ty < 3; ty++) {
-      r(g, tx * TILE, ty * TILE, TILE, TILE, "#3a3a40");
-      if (hash(tx, ty + 30) > 0.6) r(g, tx * TILE + 3, ty * TILE + 4, 6, 3, "#34343a");
-      r(g, tx * TILE, ty * TILE + 15, TILE, 1, "#2e2e33");
+      r(g, tx * TILE, ty * TILE, TILE, TILE, "#16151a");
+      if (hash(tx, ty + 30) > 0.6) r(g, tx * TILE + 3, ty * TILE + 4, 6, 3, "#1c1b21");
+      r(g, tx * TILE, ty * TILE + 15, TILE, 1, "#0f0e12");
     }
-  for (const [x, w] of [
-    [43, 1],
-    [46, 1],
-  ]) {
-    r(g, x * TILE + 3, 12, w * TILE - 6, 18, "#1a1c22");
-    r(g, x * TILE + 4, 13, w * TILE - 8, 16, "#c9a050");
-  }
+  r(g, 42 * TILE, 16, 6 * TILE, 1, "#c9a050");
+  sign(g, "MAISON", 43 * TILE + 6, 5, "#f0d890", "rgba(200,160,80,0.5)", 7);
+  // the window: one coat on a stand, lit like it's in a museum
+  r(g, 44 * TILE, 19, 3.6 * TILE, 26, "#2a2620");
+  r(g, 44 * TILE + 2, 21, 3.6 * TILE - 4, 22, "#e8e2d4");
+  r(g, 45.5 * TILE, 24, 10, 14, "#3a2a1e");
+  r(g, 45.5 * TILE + 2, 22, 6, 3, "#e8e0cf");
+  r(g, 45.5 * TILE + 4, 38, 2, 4, "#8a6a30");
+  // the door, gold handle
+  r(g, 42 * TILE + 1, 2 * TILE - 6, 14, TILE + 6, "#0b0a0d");
+  r(g, 42 * TILE + 3, 2 * TILE - 4, 10, TILE + 4, "#1d1a14");
+  r(g, 42 * TILE + 10, 2 * TILE + 4, 2, 4, "#f0c850");
   // stairs down
   r(g, 44 * TILE - 2, 3 * TILE + 2, 2 * TILE + 4, 2 * TILE - 4, "#55565c");
   for (let k = 0; k < 6; k++) r(g, 44 * TILE, 3 * TILE + 4 + k * 4, 2 * TILE, 3, k % 2 ? "#1c1d22" : "#26272c");
@@ -165,6 +170,7 @@ export const AVENUE: Scene = {
     { id: "laundry", zone: T(25.5, 3, 4, 1) },
     { id: "thrift-window", zone: T(1, 3, 3, 1) },
     { id: "records-window", zone: T(14, 3, 3, 1) },
+    { id: "maison-window", zone: T(46.6, 3, 1.2, 0.6) },
   ],
   doors: [
     { zone: { x: 0, y: 3 * TILE, w: 6, h: 7 * TILE }, to: "street", label: "← your street", spawn: { x: 38.6 * TILE, y: 4.4 * TILE, dir: "left" } },
@@ -172,6 +178,7 @@ export const AVENUE: Scene = {
     { zone: T(11, 2), to: "alley", label: "↑ the alley", spawn: { x: 12 * TILE, y: 8.4 * TILE, dir: "up" } },
     { zone: T(18, 2), to: "records", label: "↑ record shop", spawn: { x: 8 * TILE, y: 8.4 * TILE, dir: "up" } },
     { zone: T(35, 2), to: "club", label: "↑ the club", spawn: { x: 12 * TILE, y: 11.4 * TILE, dir: "up" }, lock: "club" },
+    { zone: T(42, 2), to: "boutique", label: "↑ Maison", spawn: { x: 8 * TILE, y: 8.4 * TILE, dir: "up" } },
     { zone: { x: 44 * TILE + 2, y: 3.4 * TILE, w: 2 * TILE - 4, h: 1.2 * TILE }, to: "subway", label: "↓ subway", spawn: { x: 3 * TILE, y: 3.6 * TILE, dir: "down" } },
     { zone: { x: 47 * TILE + 10, y: 3 * TILE, w: 6, h: 7 * TILE }, to: "underpass", label: "→ the underpass", spawn: { x: 1.4 * TILE, y: 6.5 * TILE, dir: "right" } },
   ],
@@ -185,6 +192,7 @@ export const AVENUE: Scene = {
     { x: 36 * TILE, y: 1 * TILE, r: 100, color: "rgba(255,60,200,0.4)" },
     { x: 35.5 * TILE, y: 2.6 * TILE, r: 40, color: "rgba(150,90,255,0.45)" },
     { x: 43.5 * TILE, y: 2.3 * TILE, r: 40, color: "rgba(120,255,170,0.4)" },
+    { x: 45.8 * TILE, y: 2 * TILE, r: 56, color: "rgba(255,230,180,0.45)" },
   ],
   darkness: 0.72,
   paint,

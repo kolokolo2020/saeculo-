@@ -6,7 +6,8 @@ import { GOALS } from "./goals";
 import { jobText } from "./scripts";
 import { personSprites } from "./people";
 import { MAX_HP, type SaveData, type Settings } from "./save";
-import { CONSUMABLES, WEAPONS } from "./weapons";
+import { fmtFans } from "./career";
+import { CONSUMABLES, howToGet, WEAPONS } from "./weapons";
 
 // The menu (M, or the button up top): you, your wardrobe, your weapons and
 // what's in your pockets, the goals, and the settings. The first time
@@ -54,7 +55,7 @@ function Swatches({ colors, value, onPick, label }: { colors: string[]; value: n
 
 function unlockText(it: Item): string {
   const u = it.unlock;
-  return u.kind === "buy" ? `$${u.price} at the thrift shop` : u.kind === "wins" ? `win ${u.n} fights` : u.kind === "goal" ? u.label : "";
+  return u.kind === "buy" ? `$${u.price} at the thrift shop` : u.kind === "designer" ? `$${u.price} at Maison${u.fans ? `, ${fmtFans(u.fans)} followers` : ""}` : u.kind === "wins" ? `win ${u.n} fights` : u.kind === "goal" ? u.label : "";
 }
 
 function You({ profile, onChange }: { profile: Profile; onChange: (p: Profile) => void }) {
@@ -146,6 +147,7 @@ function Wardrobe({ profile, owned, onChange }: { profile: Profile; owned: strin
         );
       })}
       <p className="text-[16px] text-[#8a8170]">locked: {ITEMS.filter((x) => !owned.includes(x.id)).map((x) => `${x.name} (${unlockText(x)})`).join(" · ") || "nothing. You've got it all."}</p>
+      <p className="text-[16px] text-[#8a8170]">Designer pieces turn heads: more followers for a fit pic, and more people who’d like to take them off you.</p>
     </div>
   );
 }
@@ -162,13 +164,13 @@ function Fight({ save, onEquip, onUse, touch }: { save: SaveData; onEquip: (id: 
         <ul className="flex flex-col gap-1">
           {WEAPONS.map((w) => {
             const has = save.weapons.includes(w.id);
-            const how = "wins" in w.unlock ? `win ${w.unlock.wins} ${w.unlock.wins === 1 ? "fight" : "fights"}` : "boss" in w.unlock ? "beat Tank" : "";
+            const how = howToGet(w);
             return (
               <li key={w.id} className="flex flex-wrap items-center gap-2">
                 <button className={btn} aria-pressed={save.weapon === w.id} disabled={!has} onClick={() => onEquip(w.id)} data-testid={`weapon-${w.id}`}>
                   {has ? w.name : `🔒 ${w.name}`}
                 </button>
-                <span className="text-[16px] text-[#8a8170]">{has ? `damage ${w.dmg} · reach ${w.reach}${w.sweep ? " · hits everyone in reach" : ""}` : how}</span>
+                <span className="text-[16px] text-[#8a8170]">{has ? `damage ${w.dmg} · reach ${w.reach}${w.sweep ? " · hits everyone in reach" : ""}${w.stun ? " · stuns" : ""}` : how}</span>
               </li>
             );
           })}

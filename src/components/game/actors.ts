@@ -1,5 +1,5 @@
 import { CAR_W, type Actor } from "./life";
-import type { Me } from "./combat";
+import { isBig, type Me } from "./combat";
 import { dogSprites, flashed, personSprites, pigeonSprites, type Look } from "./people";
 import type { Weapon } from "./weapons";
 import { TILE, type Dir, type Light } from "./world";
@@ -145,7 +145,14 @@ function drawPerson(g: G, a: Actor, t: number, beat: boolean, reduced: boolean) 
       r(g, Math.round(a.x), sy - 9, 2, 5, "#ffd23a");
       r(g, Math.round(a.x), sy - 3, 2, 2, "#ffd23a");
     }
-    if (f.state !== "flee") hpBar(g, Math.round(a.x), sy - 5 - (f.kind === "boss" ? 1 : 0), f.hp, f.maxHp, f.kind === "boss" ? 22 : 14);
+    // stars round their head while they're stunned
+    if (f.state === "stagger" && f.stunned > 2.5) {
+      for (let k = 0; k < 3; k++) {
+        const ang = (reduced ? k * 2.1 : t * 6) + k * 2.1;
+        r(g, Math.round(a.x + Math.cos(ang) * 5), sy - 1 + Math.round(Math.sin(ang) * 1.5), 1, 1, "#ffd23a");
+      }
+    }
+    if (f.state !== "flee") hpBar(g, Math.round(a.x), sy - 5 - (isBig(f.kind) ? 1 : 0), f.hp, f.maxHp, isBig(f.kind) ? 22 : 14);
   }
 }
 

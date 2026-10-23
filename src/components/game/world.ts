@@ -1,6 +1,6 @@
 import { hash, lampPole, paintGround, r, T, TILE, type Dir, type G, type Rect, type Scene } from "./places/kit";
 import { AVENUE } from "./places/avenue";
-import { CLUB, RECORDS, THRIFT } from "./places/interiors";
+import { BOUTIQUE, CLUB, RECORDS, THRIFT } from "./places/interiors";
 import { ALLEY, SUBWAY, UNDERPASS } from "./places/underground";
 import type { Place } from "./sfx";
 
@@ -235,6 +235,7 @@ export const SCENES: Record<Place, Scene> = {
   club: CLUB,
   subway: SUBWAY,
   underpass: UNDERPASS,
+  boutique: BOUTIQUE,
 };
 
 export const START = { place: "bedroom" as Place, x: 4 * TILE, y: 4.7 * TILE, dir: "up" as Dir };

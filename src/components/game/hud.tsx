@@ -1,6 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
+import { fmtFans } from "./career";
 import { FINDABLE } from "./studio/voices";
 import type { Dir } from "./world";
 
@@ -19,36 +20,45 @@ export interface Dialog {
   choices?: Choice[];
 }
 
-/** Where you are, cash and respect, sounds found, the menu, the studio and the way out. */
+/** Where you are, cash, respect and followers, sounds found, the menu, your phone, the studio and the way out. */
 export function TopBar({
   place,
   cash,
   rep,
+  fans,
+  unread,
   found,
   studio,
   fighting,
   onMenu,
+  onPhone,
   onStudio,
   onExit,
 }: {
   place: string;
   cash: number;
   rep: number;
+  fans: number;
+  unread: number;
   found: number;
   studio: boolean;
   fighting: boolean;
   onMenu: () => void;
+  onPhone: () => void;
   onStudio: () => void;
   onExit: () => void;
 }) {
   return (
-    <div className="relative flex h-12 shrink-0 items-center gap-3 border-b border-[#1d1b19] px-3 font-lcd text-[20px] leading-none whitespace-nowrap">
-      <span data-testid="game-place" className="truncate">
+    <div className="relative flex h-12 shrink-0 items-center gap-2 border-b border-[#1d1b19] px-3 font-lcd text-[20px] leading-none whitespace-nowrap sm:gap-3">
+      <span data-testid="game-place" className="min-w-[3ch] truncate">
         {place}
       </span>
-      <span className="text-amber" data-testid="game-cash" aria-label={`$${Math.floor(cash)}, respect ${Math.floor(rep)}`}>
+      <span className="text-amber" data-testid="game-cash" aria-label={`$${Math.floor(cash)}, respect ${Math.floor(rep)}, ${Math.floor(fans)} followers`}>
         ${Math.floor(cash)}
-        <span className="ml-2 text-[#b9b09e]">★{Math.floor(rep)}</span>
+        <span className="ml-2 hidden text-[#b9b09e] min-[420px]:inline">★{Math.floor(rep)}</span>
+        <span className="ml-2 text-[#e8a0b0]" data-testid="game-fans">
+          ♥{fmtFans(fans)}
+        </span>
       </span>
       <span className="hidden text-[#8a8170] lg:inline" aria-label={`${found} of ${FINDABLE.length} sounds found`}>
         sounds {found}/{FINDABLE.length}
@@ -56,7 +66,7 @@ export function TopBar({
       {!studio && (
         <>
           <button
-            className="ml-auto rounded-[3px] border border-[#3a3733] bg-[#171615] px-2.5 py-1.5 font-sans text-[13px] hover:border-[#6d6558] sm:px-3"
+            className="ml-auto rounded-[3px] border border-[#3a3733] bg-[#171615] px-2 py-1.5 font-sans text-[13px] hover:border-[#6d6558] sm:px-3"
             onClick={onMenu}
             disabled={fighting}
             data-testid="game-menu-btn"
@@ -66,13 +76,39 @@ export function TopBar({
             <span className="hidden sm:inline">Menu (M)</span>
           </button>
           <button
-            className="rounded-[3px] border border-[#3a3733] bg-[#171615] px-2.5 py-1.5 font-sans text-[13px] hover:border-[#6d6558] sm:px-3"
+            className="relative rounded-[3px] border border-[#3a3733] bg-[#171615] px-2.5 py-[7px] font-sans text-[13px] hover:border-[#6d6558] sm:px-3 sm:py-1.5"
+            onClick={onPhone}
+            disabled={fighting}
+            data-testid="game-phone-btn"
+            aria-label={unread ? `Phone (P), ${unread} new` : "Phone (P)"}
+          >
+            <svg className="block h-[15px] w-[10px] sm:hidden" viewBox="0 0 10 15" aria-hidden>
+              <rect x="0.75" y="0.75" width="8.5" height="13.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              <rect x="3.5" y="11" width="3" height="1.2" fill="currentColor" />
+            </svg>
+            <span className="hidden sm:inline">Phone (P)</span>
+            {unread > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] rounded-full bg-[#b33a3a] px-1 text-center text-[11px] leading-[18px] text-white" aria-hidden>
+                {unread}
+              </span>
+            )}
+          </button>
+          <button
+            className="rounded-[3px] border border-[#3a3733] bg-[#171615] px-2.5 py-[7px] font-sans text-[13px] hover:border-[#6d6558] sm:px-3 sm:py-1.5"
             onClick={onStudio}
             disabled={fighting}
             data-testid="game-to-studio"
+            aria-label="Go to the studio"
           >
-            <span className="sm:hidden">Studio</span>
-            <span className="hidden sm:inline">Go to the studio</span>
+            <svg className="block h-[15px] w-[13px] sm:hidden" viewBox="0 0 13 15" aria-hidden>
+              <path d="M4 12V2.5l8-1.8V10" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              <ellipse cx="2.6" cy="12.2" rx="2.3" ry="1.8" fill="currentColor" />
+              <ellipse cx="10.6" cy="10.4" rx="2.3" ry="1.8" fill="currentColor" />
+            </svg>
+            <span className="hidden sm:inline">
+              <span className="lg:hidden">Studio</span>
+              <span className="hidden lg:inline">Go to the studio</span>
+            </span>
           </button>
         </>
       )}
@@ -233,6 +269,7 @@ export function Overlays({
 export function TouchPad({
   down,
   fighting,
+  talking,
   prompt,
   onPress,
   onRelease,
@@ -242,6 +279,8 @@ export function TouchPad({
 }: {
   down: Dir | null;
   fighting: boolean;
+  /** Someone's talking: the box sits where the pad is, and there's nowhere to walk anyway. */
+  talking: boolean;
   prompt: string | null;
   onPress: (dir: Dir) => (e: React.PointerEvent) => void;
   onRelease: (e: React.PointerEvent) => void;
@@ -251,7 +290,7 @@ export function TouchPad({
 }) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between p-4 pb-[max(16px,env(safe-area-inset-bottom))]">
-      <div className="pointer-events-auto grid grid-cols-3 grid-rows-3 gap-1" aria-label="Movement pad">
+      <div className={`pointer-events-auto grid grid-cols-3 grid-rows-3 gap-1 ${talking ? "invisible" : ""}`} aria-label="Movement pad">
         {(
           [
             ["up", "▲", "col-start-2 row-start-1"],

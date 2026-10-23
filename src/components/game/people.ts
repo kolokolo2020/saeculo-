@@ -8,10 +8,12 @@ import type { Dir } from "./world";
 
 export type Hair = "short" | "long" | "cap" | "hood" | "curly" | "bald" | "bun" | "mullet" | "afro" | "buzz" | "braids" | "ponytail";
 export type Body = "slim" | "regular" | "broad";
-export type TopStyle = "tee" | "hoodie" | "jacket" | "puffer" | "track" | "varsity" | "leather";
-export type PantsStyle = "jeans" | "joggers" | "cargo" | "track";
-export type HatStyle = "cap" | "beanie" | "bucket" | "durag";
-export type ExtraStyle = "headphones" | "shades" | "chain" | "backpack";
+export type TopStyle = "tee" | "hoodie" | "jacket" | "puffer" | "track" | "varsity" | "leather" | "shark" | "fleece" | "mono" | "fur" | "logo" | "jersey";
+export type PantsStyle = "jeans" | "joggers" | "cargo" | "track" | "stacked" | "camo" | "leatherp";
+export type HatStyle = "cap" | "beanie" | "bucket" | "durag" | "ski" | "bandana";
+export type ExtraStyle = "headphones" | "shades" | "chain" | "backpack" | "grillz" | "bag" | "watch";
+/** What hangs round your neck (its own slot, so it goes with anything). */
+export type NeckStyle = "chain" | "cuban" | "iced";
 export interface Look {
   skin: string;
   hair: string;
@@ -33,6 +35,10 @@ export interface Look {
   extra?: ExtraStyle;
   extraColor?: string;
   extraShade?: string;
+  neck?: NeckStyle;
+  neckColor?: string;
+  /** The sole, or a stripe: shoes in two colours. */
+  shoeTrim?: string;
 }
 export type Pose = "stand" | "walk" | "sit" | "crouch";
 
@@ -51,7 +57,7 @@ const mix = (a: string, b: string, t: number) => {
 // Palette letters: h hair, b hair stubble, s skin, e eyes, c top, C top
 // shade, i top trim, L top shine, k hat/accent, K hat shade, p pants,
 // P pants shade, q pants trim, o shoes, g glasses, y chain, z headphones,
-// B bag, n bag shade.
+// B bag, n bag shade, Y neck piece, O shoe trim.
 const HEADS: Record<Hair, string[]> = {
   short: ["....hhhh....", "...hhhhhh...", "...hssssh...", "...sesses...", "...ssssss...", "....ssss...."],
   long: ["....hhhh....", "..hhhhhhhh..", "..hhsssshh..", "..hsesseshh.", "..hsssssshh.", "..hh.ssss.h."],
@@ -71,6 +77,9 @@ const HATS: Record<HatStyle, string[]> = {
   beanie: ["...kkkkkk...", "..kkkkkkkk..", "..KKKKKKKK.."],
   bucket: ["...kkkkkk...", "..kkkkkkkk..", ".KKKKKKKKKK."],
   durag: ["...kkkkkk...", "..kkkkkkkk..", "..kssssssk.."],
+  bandana: ["...kkkkkk...", "..kkkkkkkkK.", "..kssssssk.K"],
+  // the ski mask covers the lot; headFront cuts the eye slit
+  ski: ["...kkkkkk...", "..kkkkkkkk..", "..kkkkkkkk..", "..kKKKKKKk..", "..kkkkkkkk..", "...kkkkkk..."],
 };
 const TORSO: Record<Body, string[]> = {
   slim: ["....cccc....", "...cccccc...", "...sCccCs...", "...sccccs...", "....cccc...."],
@@ -105,23 +114,26 @@ function headFront(look: Look): string[] {
     const hat = HATS[look.hat];
     rows = rows.map((r, y) => hat[y] ?? r);
   }
+  if (look.hat === "ski") rows[3] = paint(rows[3], [4, 7], "e", () => true);
   if (look.extra === "shades") rows[3] = paint(rows[3], range(4, 7), "g");
+  if (look.extra === "grillz" && look.hat !== "ski") rows[4] = paint(rows[4], [5, 6], "y");
   if (look.extra === "headphones") {
     rows[0] = paint(rows[0], range(3, 8), "z", () => true);
     rows[2] = paint(rows[2], [2, 9], "z", () => true);
     rows[3] = paint(rows[3], [2, 9], "z", () => true);
   }
-  if (look.topStyle === "hoodie") rows[5] = paint(rows[5], [3, 8], "c", (o) => o === ".");
+  if (look.topStyle === "hoodie" || look.topStyle === "shark") rows[5] = paint(rows[5], [3, 8], "c", (o) => o === ".");
+  if (look.topStyle === "fur") rows[5] = paint(rows[5], [2, 3, 8, 9], "i", (o) => o === ".");
   return rows;
 }
 
 /** Back of the head: hair (or hood, cap) where the face was. */
 function headBack(rows: string[], style: Hair) {
   const fill = style === "hood" ? "c" : style === "bald" ? "s" : style === "buzz" ? "b" : "h";
-  return rows.map((r, y) => (y < 5 ? r.replace(/[seg]/g, fill) : r.replace(/[eg]/g, fill)));
+  return rows.map((r, y) => (y < 5 ? r.replace(/[segy]/g, fill) : r.replace(/[eg]/g, fill)));
 }
 /** Side view: one eye, towards the front. */
-const headSide = (rows: string[]) => rows.map((r) => r.replace(/e(?=[^e]*e)/, "s").replace(/g{4}/, "ssgg").replace(/^(.)/, ".$1").slice(0, 12));
+const headSide = (rows: string[]) => rows.map((r) => r.replace(/e(?=[^e]*e)/, "s").replace(/g{4}/, "ssgg").replace(/yy/, "sy").replace(/^(.)/, ".$1").slice(0, 12));
 
 function torsoFront(look: Look, back = false): string[] {
   const body = look.body ?? "regular";
@@ -172,8 +184,60 @@ function torsoFront(look: Look, back = false): string[] {
         rows[1] = paint(rows[1], [4], "L", isTop);
       }
       break;
+    case "shark":
+      // a hoodie with the teeth zipped across the chest
+      if (back) rows[0] = paint(rows[0], range(4, 7), "C");
+      else {
+        rows[0] = paint(rows[0], [5, 6], "i");
+        rows[1] = paint(rows[1], [4, 6], "i", isTop);
+        rows[2] = paint(rows[2], [5, 7], "i", isTop);
+      }
+      break;
+    case "fleece":
+      // two-tone, a diagonal panel and a zip
+      rows = rows.map((r, y) => paint(r, [3 + y, 4 + y], "i", isTop));
+      if (!back) rows = rows.map((r) => paint(r, [6], "C", isTop));
+      break;
+    case "mono":
+      // the all-over print: every other square
+      rows = rows.map((r, y) => [...r].map((ch, x) => (isTop(ch) && (x + y) % 2 === 0 ? "i" : ch)).join(""));
+      break;
+    case "fur":
+      // a big collar and fluffy edges
+      rows[0] = rows[0].replace(/[cC]/g, "i");
+      for (const y of [1, 2, 3, 4]) rows[y] = paint(rows[y], outer(rows[y].replace(/s/g, ".")), "i");
+      break;
+    case "logo":
+      rows = rows.map((r) => r.replace(/C/g, "c"));
+      if (!back) {
+        rows[0] = paint(rows[0], mid, "s");
+        rows[2] = paint(rows[2], mid, "i");
+      } else rows[1] = paint(rows[1], mid, "i");
+      break;
+    case "jersey":
+      // no sleeves, a number on the front and back
+      rows = rows.map((r) => r.replace(/C/g, "c"));
+      for (const y of [1, 2, 3]) rows[y] = paint(rows[y], outer(rows[y].replace(/s/g, ".")), "s");
+      rows[0] = paint(rows[0], mid, back ? "c" : "s");
+      rows[2] = paint(rows[2], mid, "i");
+      break;
   }
-  if (look.extra === "chain" && !back) rows[1] = paint(rows[1], mid, "y");
+  if ((look.extra === "chain" || look.neck === "chain") && !back) rows[1] = paint(rows[1], mid, look.neck === "chain" ? "Y" : "y");
+  if (look.neck === "cuban" && !back) {
+    rows[0] = paint(rows[0], [4, 7], "Y", isTop);
+    rows[1] = paint(rows[1], range(4, 7), "Y");
+  }
+  if (look.neck === "iced" && !back) {
+    rows[1] = paint(rows[1], [4, 7], "Y");
+    rows[2] = paint(rows[2], mid, "Y");
+    rows[3] = paint(rows[3], mid, "L");
+  }
+  if (look.extra === "bag") {
+    // a strap across, the bag at the hip
+    for (const y of [0, 1, 2]) rows[y] = paint(rows[y], [back ? 4 + y : 7 - y], "B", isTop);
+    if (!back) rows[3] = paint(rows[3], [3, 4], "n");
+  }
+  if (look.extra === "watch" && !back) rows[3] = paint(rows[3], [rows[3].search(/s/)], "y", () => true);
   if (look.extra === "backpack") {
     if (back) for (const y of [0, 1, 2, 3]) rows[y] = paint(rows[y], range(4, 7), y === 3 ? "n" : "B");
     else for (const y of [0, 1, 2]) rows[y] = paint(rows[y], [4, 7], "B", isTop);
@@ -185,11 +249,15 @@ function torsoSide(look: Look): string[] {
   let rows = [...TORSO_SIDE[look.body ?? "regular"]];
   if (look.topStyle === "track" || look.topStyle === "varsity") rows = rows.map((r, y) => (y >= 1 && y <= 3 ? paint(r, [r.lastIndexOf("c")], "i", isTop) : r));
   if (look.topStyle === "puffer") rows[2] = rows[2].replace(/c/g, "C");
+  if (look.topStyle === "mono") rows = rows.map((r, y) => [...r].map((ch, x) => (isTop(ch) && (x + y) % 2 === 0 ? "i" : ch)).join(""));
+  if (look.topStyle === "fur") rows[0] = rows[0].replace(/[cC]/g, "i");
+  if (look.topStyle === "jersey") rows = rows.map((r, y) => (y >= 1 && y <= 3 ? paint(r, [r.lastIndexOf("c")], "s", isTop) : r));
   if (look.extra === "backpack") rows = rows.map((r, y) => (y <= 3 ? paint(r, [r.search(/[cC]/) - 1, r.search(/[cC]/)], y === 3 ? "n" : "B", () => true) : r));
   return rows;
 }
 
 function legs(look: Look, rows: string[]): string[] {
+  if (look.shoeTrim) rows = rows.map((r, y) => (y === rows.length - 1 ? r.replace(/oo/g, "oO").replace(/ooo/g, "oOo") : r));
   switch (look.pantsStyle) {
     case "jeans":
       return rows.map((r) => r.replace(/pp/g, "pP"));
@@ -199,6 +267,13 @@ function legs(look: Look, rows: string[]): string[] {
       return rows.map((r, y) => (y === 0 ? r.replace(/pp/g, "Pp") : r));
     case "track":
       return rows.map((r, y) => (y < rows.length - 1 ? r.replace(/pp/g, "qp") : r));
+    case "stacked":
+      // bunched up over the shoes
+      return rows.map((r, y) => (y === rows.length - 2 ? r.replace(/p/g, "q") : r.replace(/pp/g, "pP")));
+    case "camo":
+      return rows.map((r, y) => (y < rows.length - 1 ? [...r].map((ch, x) => (ch === "p" && (x * 3 + y) % 4 === 0 ? "P" : ch === "p" && (x + y * 2) % 5 === 0 ? "q" : ch)).join("") : r));
+    case "leatherp":
+      return rows.map((r, y) => (y === 0 ? r.replace(/pp/g, "qp") : r));
     default:
       return rows;
   }
@@ -265,14 +340,17 @@ export function personSprites(look: Look): PersonSprites {
     z: look.extraColor ?? "#1b1b1f",
     B: look.extraColor ?? "#2a2c33",
     n: look.extraShade ?? "#1b1b1f",
+    Y: look.neckColor ?? "#d8b35a",
+    O: look.shoeTrim ?? look.shoes ?? "#0e0e10",
   };
   const head = headFront(look);
   const torso = torsoFront(look);
   const back = torsoFront(look, true);
   const side = torsoSide(look);
   const down = (l: string[]) => grid([...head, ...torso, ...legs(look, l)], pal);
-  const up = (l: string[]) => grid([...headBack(head, look.style), ...back, ...legs(look, l)], pal);
-  const sideOf = (l: string[]) => grid([...headSide(head), ...side, ...legs(look, l)], pal);
+  const ski = (rows: string[]) => (look.hat === "ski" ? rows.map((r, y) => (y < 6 ? r.replace(/[sbh]/g, "k").replace(/e/g, y === 3 ? "e" : "k") : r)) : rows);
+  const up = (l: string[]) => grid([...ski(headBack(head, look.style)).map((r, y) => (look.hat === "ski" && y === 3 ? r.replace(/e/g, "k") : r)), ...back, ...legs(look, l)], pal);
+  const sideOf = (l: string[]) => grid([...ski(headSide(head)), ...side, ...legs(look, l)], pal);
   const right = [sideOf(LEGS.still), sideOf(LEGS.sideA), sideOf(LEGS.sideB)];
   const sprites: PersonSprites = {
     walk: {

@@ -1,4 +1,4 @@
-import { styleOf } from "./character";
+import { itemById, styleOf } from "./character";
 import type { SaveData } from "./save";
 import { PLACES } from "./sfx";
 import { FINDABLE } from "./studio/voices";
@@ -47,6 +47,22 @@ export const GOALS: Goal[] = [
   { id: "tank", name: "Under the bridge", hint: "Tank runs the underpass. Win enough fights and he'll notice you.", done: (s) => s.seen.includes("tank-beaten"), reward: { cash: 80, rep: 20 } },
   { id: "explorer", name: "Know the block", hint: "Go everywhere there is to go.", done: (s) => PLACES.every((p) => s.places.includes(p)), progress: (s) => [PLACES.filter((p) => s.places.includes(p)).length, PLACES.length], reward: { cash: 30 } },
   { id: "known", name: "Known on the block", hint: "100 respect.", done: (s) => s.rep >= 100, progress: (s) => [Math.min(100, Math.floor(s.rep)), 100], reward: { cash: 100 } },
+
+  // the career: your page, the artists, the songs
+  { id: "fans-100", name: "Local", hint: "100 followers. Sell beats, post on your phone (P).", done: (s) => s.fans >= 100, progress: (s) => [Math.min(100, Math.floor(s.fans)), 100], reward: { cash: 20 } },
+  { id: "artist", name: "Customer", hint: "Sell a beat to an artist. Lil Brick's outside the store.", done: (s) => s.stats.leases > 0, reward: { cash: 15, rep: 5 } },
+  { id: "song", name: "Featuring", hint: "Make a song with an artist you've linked up with.", done: (s) => s.stats.songs > 0, reward: { rep: 10 } },
+  { id: "fans-500", name: "Buzzing", hint: "500 followers.", done: (s) => s.fans >= 500, progress: (s) => [Math.min(500, Math.floor(s.fans)), 500], reward: { cash: 50 } },
+  { id: "fans-2k", name: "Rising", hint: "2,000 followers. The club lets you straight in.", done: (s) => s.fans >= 2000, progress: (s) => [Math.min(2000, Math.floor(s.fans)), 2000], reward: { cash: 150 } },
+  { id: "songs-5", name: "A catalogue", hint: "Five songs out.", done: (s) => s.stats.songs >= 5, progress: (s) => [Math.min(5, s.stats.songs), 5], reward: { cash: 200, rep: 10 } },
+  { id: "kings", name: "Nobody's corner", hint: "The Block Kings come for a cut once you're getting money. Deal with them, one way or the other.", done: (s) => s.mob.kings.stage === "done" || s.mob.kings.stage === "paying", reward: { cash: 100, rep: 25 } },
+  { id: "ring", name: "Fight night", hint: "Win Tank's fight night: three rounds, back to back.", done: (s) => s.stats.ringWins > 0, reward: { rep: 20 } },
+  { id: "drip", name: "Drip", hint: "Wear an outfit worth 20 style. Maison, at the end of the avenue.", done: (s) => !!s.profile && styleOf(s.profile) >= 20, progress: (s) => [Math.min(20, s.profile ? styleOf(s.profile) : 0), 20], reward: { rep: 10 } },
+  { id: "fans-10k", name: "Hot right now", hint: "10,000 followers. Big Halo wants to meet.", done: (s) => s.fans >= 10000, progress: (s) => [Math.min(10000, Math.floor(s.fans)), 10000], reward: { cash: 500 } },
+  { id: "iced", name: "Iced out", hint: "Own the iced-out chain.", done: (s) => s.owned.includes("iced") && !!itemById("iced"), reward: { rep: 15 } },
+  { id: "fans-50k", name: "Famous", hint: "50,000 followers.", done: (s) => s.fans >= 50000, progress: (s) => [Math.min(50000, Math.floor(s.fans)), 50000], reward: { cash: 2000 } },
+  { id: "syndicate", name: "Untouchable", hint: "The Syndicate want a quarter. Deal with them, one way or the other.", done: (s) => s.mob.syndicate.stage === "done" || s.mob.syndicate.stage === "paying", reward: { cash: 1000, rep: 40 } },
+  { id: "fans-250k", name: "A star", hint: "250,000 followers.", done: (s) => s.fans >= 250000, progress: (s) => [Math.min(250000, Math.floor(s.fans)), 250000], reward: { cash: 10000 } },
 ];
 
 /** Goals newly reached by this save. */
