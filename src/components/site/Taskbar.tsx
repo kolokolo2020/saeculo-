@@ -14,7 +14,7 @@ import { TASKBAR_H } from "./Window";
 
 const TASK_ICONS: Record<WindowId, typeof BeatsIcon> = { beats: BeatsIcon, socials: SocialsIcon, contact: ContactIcon };
 
-function MiniPlayer() {
+function MiniPlayer({ compact }: { compact: boolean }) {
   const track = useCurrentTrack();
   const playing = usePlayerStore((s) => s.playing);
   const status = usePlayerStore((s) => s.status);
@@ -26,9 +26,9 @@ function MiniPlayer() {
   const pct = duration ? (currentTime / duration) * 100 : 0;
   return (
     <div className="tray min-w-0 gap-0.5 pr-0.5 pl-[3px]" data-testid="mini-player">
-      <button className="tray-link flex h-[28px] min-w-0 items-center gap-2 pr-1.5 pl-[1px] text-left" onClick={() => openWindow("beats")} aria-label={`Open Beats: ${track.title}`}>
+      <button className={`tray-link flex h-[28px] min-w-0 items-center gap-2 pl-[1px] text-left ${compact ? "max-sm:pr-0.5 sm:pr-1.5" : "pr-1.5"}`} onClick={() => openWindow("beats")} aria-label={`Open Beats: ${track.title}`}>
         <Image src={ALBUM.cover} alt="" width={26} height={26} quality={90} className="h-[26px] w-[26px] shrink-0 rounded-[5px] border border-edge object-cover" />
-        <span className="flex min-w-0 flex-col justify-center leading-tight">
+        <span className={`flex min-w-0 flex-col justify-center leading-tight ${compact ? "max-sm:hidden" : ""}`}>
           <span className="max-w-[22vw] truncate text-[12.5px] font-medium sm:max-w-[150px]">{track.title}</span>
           <span className="relative mt-[3px] hidden h-[2px] w-[104px] overflow-hidden rounded-full bg-rule sm:block" aria-hidden>
             <span className="absolute inset-y-0 left-0 bg-dusk" style={{ width: `${pct}%` }} />
@@ -164,22 +164,33 @@ export default function Taskbar({ onReplayIntro }: { onReplayIntro: () => void }
   const windows = useSiteStore((s) => s.windows);
   const active = useSiteStore(activeWindow);
   const { focus, minimize } = useSiteStore.getState();
+  const open = WINDOW_IDS.filter((id) => windows[id].open);
+  // on a phone there's only room for one name: with more windows open, each
+  // button is its icon and the mini-player drops the beat's name (both stay
+  // in the labels)
+  const compact = open.length > 1;
   return (
     <nav aria-label="Taskbar" className="taskbar fixed inset-x-0 bottom-0 z-[500] flex items-center gap-1.5 px-1.5" style={{ height: TASKBAR_H }}>
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-        {WINDOW_IDS.filter((id) => windows[id].open).map((id) => {
+        {open.map((id) => {
           const Icon = TASK_ICONS[id];
           return (
-            <button key={id} className="task-btn max-w-[150px] shrink" aria-pressed={active === id} onClick={() => (active === id ? minimize(id) : focus(id))}>
-              <span className="hidden shrink-0 sm:block">
+            <button
+              key={id}
+              className={`task-btn max-w-[150px] ${compact ? "shrink-0 max-sm:px-2" : "shrink"}`}
+              aria-pressed={active === id}
+              title={WINDOW_TITLES[id]}
+              onClick={() => (active === id ? minimize(id) : focus(id))}
+            >
+              <span className={`${compact ? "block" : "hidden"} shrink-0 sm:block`}>
                 <Icon size={16} />
               </span>
-              <span className="truncate">{WINDOW_TITLES[id]}</span>
+              <span className={compact ? "max-sm:sr-only sm:truncate" : "truncate"}>{WINDOW_TITLES[id]}</span>
             </button>
           );
         })}
       </div>
-      <MiniPlayer />
+      <MiniPlayer compact={compact} />
       <ThemeSwitch />
       <Clock onReplayIntro={onReplayIntro} />
     </nav>

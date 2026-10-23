@@ -30,7 +30,7 @@ const tracks = [...tracksSrc.matchAll(/\{\s*id: "([^"]+)",[^{}]*?(?:bpm: (\d+(?:
 if (!tracks.length) throw new Error("no tracks found in src/data/tracks.ts");
 
 const COLUMNS = 600;
-const executablePath = process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const executablePath = process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium";
 const browser = await chromium.launch({ executablePath });
 const page = await browser.newPage();
 await page.goto("about:blank");
