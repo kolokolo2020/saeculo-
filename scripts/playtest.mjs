@@ -6,7 +6,7 @@ import { chromium } from "playwright-core";
 import { mkdirSync } from "fs";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3210";
-const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium";
 const OUT = process.argv[2] ?? "playtest";
 const ONLY = process.argv[3];
 mkdirSync(OUT, { recursive: true });

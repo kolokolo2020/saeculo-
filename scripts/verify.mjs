@@ -15,7 +15,7 @@ try {
 }
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3210";
-const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium";
 
 const results = [];
 function check(name, ok, extra = "") {
@@ -461,6 +461,17 @@ try {
     const card = await page.request.get(BASE + new URL(ogImage).pathname);
     check("beat page: the card image is drawn", card.status() === 200 && card.headers()["content-type"] === "image/png" && (await card.body()).length > 20_000);
     check("beat page: an unknown beat is a 404", (await page.request.get(BASE + "/beat/nope")).status() === 404 && (await page.request.get(BASE + "/beat/nope/opengraph-image")).status() === 404);
+    await page.goto(BASE + "/beat/nope", { waitUntil: "networkidle" });
+    check("404: the desktop's own page, with the way back", (await page.getByRole("heading", { name: "Not found" }).isVisible()) && (await page.getByRole("link", { name: "Back to the desktop" }).getAttribute("href")) === "/");
+    if (axeSource) {
+      await page.addScriptTag({ content: axeSource });
+      const nv = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
+      check("axe: no violations on the 404", nv.length === 0, nv.join(", "));
+    }
+    await page.getByRole("link", { name: "Back to the desktop" }).click();
+    await page.waitForURL(BASE + "/", { timeout: 5000 }).catch(() => {});
+    check("404: the link goes home", new URL(page.url()).pathname === "/", page.url());
+    await page.goto(BASE + "/beat/beauty-fangs", { waitUntil: "networkidle" });
     const sitemap = await (await page.request.get(BASE + "/sitemap.xml")).text();
     check("beat page: the sitemap lists every beat's page", (sitemap.match(/<loc>[^<]*\/beat\/[a-z0-9-]+<\/loc>/g) ?? []).length === 12);
     // copy link gives the beat's own page
@@ -903,6 +914,18 @@ try {
     await page.getByRole("tab", { name: "settings" }).click();
     await page.getByRole("button", { name: "chill" }).click();
     check("menu: settings saved", (await saved()).settings.difficulty === "chill");
+    // the track is drawn in a pseudo-element: read its colour off the screen,
+    // a quarter of the way along (inside the 80% fill) and near the end
+    const sfx = page.getByRole("slider", { name: "sound effects" });
+    const px = await page.evaluate(async (b64) => {
+      const img = await createImageBitmap(await (await fetch("data:image/png;base64," + b64)).blob());
+      const c = new OffscreenCanvas(img.width, img.height);
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const at = (fx) => [...g.getImageData(Math.round(img.width * fx), Math.round(img.height / 2), 1, 1).data.slice(0, 3)];
+      return { fill: at(0.25), rest: at(0.95) };
+    }, (await sfx.screenshot()).toString("base64"));
+    check("menu: the volume sliders show how full they are", px.fill[0] > 180 && px.fill[2] < 140 && px.rest[0] < 90, JSON.stringify(px));
     await page.keyboard.press("Escape");
     await page.evaluate(() => window.__game.give({ cash: 200 }));
     await page.evaluate(() => window.__game.teleport("thrift", 3.5, 4.2, "up"));
@@ -1203,6 +1226,21 @@ try {
       const pv = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
       check("axe: no violations on a phone, Beats open", pv.length === 0, pv.join(", "));
     }
+    // all three windows open: every one has a button on the taskbar, in reach
+    for (const k of ["2", "3"]) {
+      await page.keyboard.press(k);
+      await page.waitForTimeout(250);
+    }
+    const tasks = await page.evaluate(() =>
+      [...document.querySelectorAll("nav[aria-label=Taskbar] .task-btn")].map((b) => {
+        const r = b.getBoundingClientRect();
+        const clip = b.parentElement.getBoundingClientRect();
+        return { name: b.textContent.trim(), whole: r.left >= clip.left && r.right <= clip.right + 0.5 && r.width >= 28 };
+      }),
+    );
+    check("phone: three windows open, three taskbar buttons in reach", tasks.length === 3 && tasks.every((t) => t.whole), JSON.stringify(tasks));
+    await page.getByRole("button", { name: "Close Contact" }).tap();
+    await page.getByRole("button", { name: "Close Socials" }).tap();
     await page.getByRole("button", { name: "Close Beats" }).tap();
     await page.getByTestId("icon-game").tap();
     await page.waitForTimeout(1800);

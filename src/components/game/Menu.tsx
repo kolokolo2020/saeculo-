@@ -243,14 +243,24 @@ function SettingsTab({ settings, onChange, onReset, touch }: { settings: Setting
           ["music", "music in the game"],
         ] as const
       ).map(([k, label]) => (
-        <label key={k} className="flex flex-wrap items-center gap-3">
-          <span className="w-[170px] text-[#b9b09e]">{label}</span>
-          <input type="range" min={0} max={1} step={0.05} value={settings[k]} onChange={(e) => set({ [k]: Number(e.target.value) })} className="deck-range w-40" aria-label={label} />
+        <label key={k} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="w-full text-[#b9b09e] sm:w-[170px]">{label}</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={settings[k]}
+            onChange={(e) => set({ [k]: Number(e.target.value) })}
+            className="deck-range min-w-0 flex-1 sm:w-40 sm:flex-none"
+            style={{ ["--fill" as string]: `${settings[k] * 100}%` }}
+            aria-label={label}
+          />
           <span className="w-10 text-[18px]">{Math.round(settings[k] * 100)}</span>
         </label>
       ))}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="w-[170px] text-[#b9b09e]">fights</span>
+        <span className="w-full text-[#b9b09e] sm:w-[170px]">fights</span>
         {(["chill", "normal", "hard"] as const).map((d) => (
           <button key={d} className={btn} aria-pressed={settings.difficulty === d} onClick={() => set({ difficulty: d })}>
             {d}

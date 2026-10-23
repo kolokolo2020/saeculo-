@@ -8,6 +8,7 @@
 // screen, which opens onto the real desktop underneath.
 // Times are in ms from when the intro opens; the press, in ms from the key.
 
+import { ALBUM } from "@/data/tracks";
 import { createRoom, FLOOR, FLOOR_Y, FOCUS, FOCUS_TALL, PEEK, PRESS, RH, RW, SCREEN, WALL } from "./room";
 
 export const T = {
@@ -247,7 +248,9 @@ export function createScene(el: HTMLCanvasElement, onChange?: () => void): Scene
     room.setCover(cover);
     onChange?.();
   };
-  cover.src = "/covers/saeculo.jpg";
+  // it hangs on the wall 24 room pixels square: a small copy from the image
+  // optimiser (under 1 KB), not the 1200px original
+  cover.src = `/_next/image?url=${encodeURIComponent(ALBUM.cover)}&w=64&q=90`;
   const face = getComputedStyle(document.documentElement).getPropertyValue("--nf-ui").trim() || "sans-serif";
 
   let W = 1;

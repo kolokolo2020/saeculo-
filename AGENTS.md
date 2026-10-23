@@ -22,7 +22,7 @@ lives.
   exposes `window.__game` (state, teleport, kit levels) for these tests.
 - **Look at the result:** take Playwright screenshots at 1366×800 (desktop)
   and 390×844 (phone) and check them. Chromium is at
-  `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`.
+  `/opt/pw-browsers/chromium`.
 - **Style:** quiet and restrained; four destinations only (Beats, Socials,
   Contact, Game); respect reduced motion and the still-visuals setting;
   nothing may block clicks or focus; must work on phones.
