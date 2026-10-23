@@ -1,5 +1,5 @@
 import { blingOf, styleOf } from "./character";
-import { ARTISTS, artistPrice, fameMult, fmtFans, priceOf, saleFans, tierOf, type Artist, type PostKind } from "./career";
+import { ARTISTS, artistPrice, fameMult, fmtFans, priceOf, saleFans, tierOf, type Artist, type PostKind, type Venue } from "./career";
 import type { Actor } from "./life";
 import type { MenuTab } from "./Menu";
 import { BATTLE_BEATS, type RhythmMode } from "./minigames/Rhythm";
@@ -18,7 +18,7 @@ export interface Choice {
   run: () => void;
 }
 export type Mini =
-  | { kind: "rhythm"; mode: RhythmMode; rival?: { name: string; score: number; stake: number; beat: string } }
+  | { kind: "rhythm"; mode: RhythmMode; rival?: { name: string; score: number; stake: number; beat: string }; venue?: Venue }
   | { kind: "dice" }
   | { kind: "crates" }
   | { kind: "hoops" }
@@ -331,7 +331,7 @@ function artistTalk(a: Artist, api: Api) {
   const rel = s.rel[a.id] ?? 0;
   const bought = !!tape && (s.leases[a.id] ?? []).includes(tape.name);
   const wait = Math.ceil(((s.cd[`song-${a.id}`] ?? 0) - Date.now()) / 1000);
-  const price = tape ? artistPrice(tape, a, s.fans) : 0;
+  const price = tape ? artistPrice(tape, a, s.fans, s.manager === "hired") : 0;
   const hello = rel ? a.warm[rel % a.warm.length] : [`${a.name}, ${a.kind}. ${["“So you're the producer.”", "“I've heard of you. Go on then.”", "“Took you long enough.”"][tierOf(s.fans) % 3]}`];
   const lines = [...hello, ...(tape && bought ? [`“I've already got ‘${tape.name}’. Make me something new.”`] : [])];
   const choices = [

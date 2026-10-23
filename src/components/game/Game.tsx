@@ -5,7 +5,7 @@ import { usePlayerStore } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { blingOf, DEFAULT_PROFILE, ITEMS, itemById, lookOf, randomProfile, styleOf, takeable, type Profile } from "./character";
-import { accrue, ARTISTS, artistById, cutOf, fanDm, fmtFans, huntedBy, makePost, makeSong, MOB_IDS, MOBS, mobDue, now, priceOf, recognised, roll, tierOf, TIERS, type MobId, type Msg, type PostKind } from "./career";
+import { accrue, ARTISTS, artistById, chartWeek, cutOf, fanDm, fmtFans, huntedBy, looseSongs, makePost, makeSong, MANAGER, MOB_IDS, MOBS, mobDue, now, priceOf, recognised, roll, showPay, TAPE_SIZE, tierOf, TIERS, VENUE_IDS, VENUES, type MobId, type Msg, type PostKind, type Venue } from "./career";
 import { faceOff, foeLines, freshMe, isUp, makeFoe, moveMe, robberLines, standDown, startDodge, swing, updateFoes, type FightEvents, type FoeKind, type Me } from "./combat";
 import Phone, { type PhoneTab } from "./Phone";
 import Monte from "./minigames/Monte";
@@ -272,6 +272,17 @@ export default function Game({ onExit }: { onExit: () => void }) {
       markSeen(`sponsor-${fans}`);
       message({ id: `sponsor-${fans}`, from: brand.replace(/ /g, "."), kind: "offer", text: `we love what you're doing. $${pay} for one post with our stuff in it. interested?`, read: false, act: { type: "sponsor", pay } });
     }
+    // someone who'd like to run your career for you
+    if (v.fans >= MANAGER.fans && v.manager === "none") {
+      updateSave((x) => ({ ...x, manager: "offered" }));
+      message({ id: "manager", from: MANAGER.handle, kind: "offer", text: `${MANAGER.name}, management. I've watched your numbers for a month. I take ${Math.round(MANAGER.cut * 100)}% and you get better deals, better money for shows, brands calling. Yes?`, read: false, act: { type: "manager" } });
+    }
+    // the first booking at each venue, as soon as you're big enough for it
+    for (const id of VENUE_IDS) {
+      if (v.fans < VENUES[id].fans || v.seen.includes(`show-offer-${id}`)) continue;
+      markSeen(`show-offer-${id}`);
+      offerShow(id);
+    }
     // someone's noticed you're getting money
     const due = mobDue(v);
     if (due && v.mob[due].stage === "none") {
@@ -280,6 +291,39 @@ export default function Game({ onExit }: { onExit: () => void }) {
       message({ id: `mob-${due}`, from: due === "kings" ? "rook.kings" : "unknown number", kind: "mob", text: due === "kings" ? "heard ur getting money now. we look after people round here. we'll come find u" : `${mob.boss} would like a word about your earnings. Someone will find you.`, read: false, act: { type: "mob", mob: due } });
       st.current.encounterIn = Math.min(st.current.encounterIn, 20);
     }
+  };
+
+  /** A booking: headline a venue (the show waits for you there). */
+  const offerShow = (id: Venue) => {
+    const ven = VENUES[id];
+    message({ id: `show-${id}-${now()}`, from: id === "underpass" ? "saintojay" : id === "club" ? "afterhours.club" : MANAGER.handle, kind: "offer", text: id === "rooftop" ? "your roof, your show, your crowd. say the word and I'll sort the speakers." : `${ven.host} wants you headlining ${ven.name}. Door money's yours. In?`, read: false, act: { type: "show", venue: id } });
+  };
+
+  /** A new week on the charts: where your songs landed, and what that brings. */
+  const chartTick = () => {
+    const v = saveRef.current;
+    if (!v.collabs.length) return;
+    const chart = chartWeek(v, roll);
+    const top = chart.entries.findIndex((e) => e.mine);
+    const entry = chart.entries[top];
+    const one = top === 0;
+    updateSave((x) => ({ ...x, chart, stats: { ...x.stats, number1s: x.stats.number1s + (one ? 1 : 0) } }));
+    if (entry) {
+      const move = entry.last ? (entry.last > top + 1 ? ` (up ${entry.last - top - 1})` : entry.last < top + 1 ? ` (down ${top + 1 - entry.last})` : " (same)") : " (new)";
+      showToast(`Charts, week ${chart.week}: “${entry.title}” is #${top + 1}${move}. ${one ? "Number one." : ""}`, 4600);
+      if (one) addFans(Math.round(150 + v.fans * 0.05), { kind: "news", text: `“${entry.title}” is number one 🥇` });
+    } else if (chart.yours) showToast(`Charts, week ${chart.week}: “${chart.yours.title}” is #${chart.yours.pos}, outside the top 10. Bigger artists, better sessions.`, 4200);
+    // Vee doesn't like being under you (or loves being over you)
+    const vee = chart.entries.findIndex((e) => e.artist === "Vee");
+    if (vee >= 0 && (now() > (v.cd.diss ?? 0)) && v.stats.battleWins + v.stats.battleLosses > 0) {
+      updateSave((x) => ({ ...x, cd: { ...x.cd, diss: now() + 6 * 60_000 } }));
+      message({ id: `diss-${now()}`, from: "vee.makes.beats", kind: "artist", text: top >= 0 && top < vee ? "enjoy it while it lasts. I'm coming for that spot" : "heard your little songs. cute. try harder", read: false, act: { type: "diss" } });
+    }
+    // with a manager, the brands call more
+    if (v.manager === "hired" && roll() < 0.5) message({ id: `sponsor-m-${now()}`, from: MANAGER.handle, kind: "offer", text: "brand deal came in. one post. easy money.", read: false, act: { type: "sponsor", pay: Math.max(300, Math.round(v.fans * 0.06)) } });
+    // and venues want you back
+    const open = VENUE_IDS.filter((id) => v.fans >= VENUES[id].fans);
+    if (!v.show && open.length && now() > (v.cd.show ?? 0) && roll() < 0.5) offerShow(open[Math.floor(roll() * open.length)]);
   };
 
   /** Some minutes of your songs and beat store earning (and fans writing in). */
@@ -293,6 +337,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
       s.paidSince += earnMusic(total);
     }
     s.payTicks++;
+    // every three minutes, a new week on the charts
+    if (s.payTicks % 6 === 0) chartTick();
     // a note every couple of minutes, not every half a minute
     if (s.payTicks % 4 === 0 && s.paidSince >= 1) {
       showToast(`Streams and leases: +$${Math.floor(s.paidSince)}${cutOf(v) ? " (after the cut)" : ""}`, 3000);
@@ -352,7 +398,64 @@ export default function Game({ onExit }: { onExit: () => void }) {
       addFans(Math.round(pay / 4), { kind: "news", text: "#ad (they sent a lot of free stuff)" });
       sfx.coins();
       showToast(`+$${pay}. The free stuff arrives in a very big box.`, 3600);
+    } else if (m.act.type === "show") {
+      const id = m.act.venue;
+      updateSave((x) => ({ ...x, show: id }));
+      showToast(`Booked: you're headlining ${VENUES[id].name}. Go there when you're ready.`, 4600);
+    } else if (m.act.type === "manager") {
+      updateSave((x) => ({ ...x, manager: "hired" }));
+      showToast(`${MANAGER.name} is your manager now: ${Math.round(MANAGER.cut * 100)}% of your music money, better deals, more bookings.`, 4600);
+    } else if (m.act.type === "diss") {
+      setPhone(null);
+      setMini({ kind: "session", artist: "diss" });
     }
+  };
+  const managerCall = (what: "fire" | "hire") => {
+    updateSave((x) => ({ ...x, manager: what === "fire" ? "fired" : "hired" }));
+    showToast(what === "fire" ? `You let ${MANAGER.name} go. “You'll call me.”` : `${MANAGER.name}'s back. “Knew you'd call.”`, 3600);
+  };
+
+  /** Five songs not on a tape yet: put them out together. */
+  const releaseTape = () => {
+    const v = saveRef.current;
+    const loose = looseSongs(v).slice(0, TAPE_SIZE);
+    if (loose.length < TAPE_SIZE) return;
+    const name = `${v.profile?.name || "untitled"} tape vol. ${v.mixtapes.length + 1}`;
+    const titles = loose.map((x) => x.title);
+    // a tape brings the songs back round: more plays, for longer
+    updateSave((x) => ({ ...x, mixtapes: [...x.mixtapes, { name, songs: titles }], collabs: x.collabs.map((c) => (titles.includes(c.title) ? { ...c, rate: c.rate * 1.6 + 2, floor: c.floor * 1.5 } : c)) }));
+    const advance = earnMusic(Math.round(loose.reduce((n, c) => n + c.rate, 0) * 20));
+    const gain = Math.round(200 + loose.reduce((n, c) => n + (artistById(c.artist)?.reach ?? 0), 0) * 1.5);
+    addFans(gain, { kind: "song", text: `${name} out now 📼 (${titles.length} songs)` });
+    sfx.coins();
+    showToast(`${name} is out: +$${advance}, +${fmtFans(gain)} followers. Your roof's having a listening party.`, 5600);
+  };
+
+  /** The diss track: just you on the mic, Vee's name in it. */
+  const dissDone = (q: number) => {
+    const v = saveRef.current;
+    if (q >= 60) {
+      updateSave((x) => ({ ...x, stats: { ...x.stats, disses: x.stats.disses + 1 }, chart: { ...x.chart, entries: x.chart.entries.filter((e) => e.artist !== "Vee") } }));
+      addFans(Math.round(120 + v.fans * 0.08), { kind: "song", text: "“Sampler Under Your Arm” (for Vee) 🔥" });
+      showToast("The diss lands. The whole city's quoting it. Vee's song drops off the chart.", 4800);
+    } else {
+      const lost = Math.round(v.fans * 0.04);
+      updateSave((x) => ({ ...x, fans: Math.max(0, x.fans - lost) }));
+      addFans(0, { kind: "news", text: "Vee clowned the diss. the comments are rough" });
+      showToast(`It's flat, and Vee says so, at length. (−${fmtFans(lost)} followers)`, 4200);
+    }
+  };
+
+  /** Your show: door money (the cut comes out of it), followers, a post. */
+  const showDone = (id: Venue, score: number) => {
+    const v = saveRef.current;
+    const { crowd, cash, gain } = showPay(id, v.fans, score, v.manager === "hired");
+    const kept = earnMusic(cash);
+    updateSave((x) => ({ ...x, show: null, stats: { ...x.stats, shows: x.stats.shows + 1 }, cd: { ...x.cd, show: now() + 5 * 60_000 } }));
+    addFans(gain, { kind: "show", text: `${crowd === VENUES[id].cap ? "sold out" : `${crowd} people`} at ${VENUES[id].name}: ${score}%` });
+    addRep(Math.round(score / 10));
+    if (score >= 50) sfx.cheer();
+    showToast(`${crowd} through the door${crowd === VENUES[id].cap ? " (sold out)" : ""}: +$${kept}, +${fmtFans(gain)} followers.`, 5200);
   };
   const mobCall = (id: MobId, what: "stop" | "peace") => {
     const v = saveRef.current;
@@ -376,12 +479,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const tape = latestTape();
     const v = saveRef.current;
     if (!a || !tape) return;
-    const { song, upfront, gain } = makeSong(a, tape, q, v.fans);
+    const { song, upfront, gain } = makeSong(a, tape, q, v.fans, v.collabs.map((x) => x.title), v.manager === "hired");
     updateSave((x) => ({ ...x, collabs: [song, ...x.collabs].slice(0, 40), rel: { ...x.rel, [a.id]: (x.rel[a.id] ?? 0) + 1 }, stats: { ...x.stats, songs: x.stats.songs + 1 }, cd: { ...x.cd, [`song-${a.id}`]: Date.now() + 4 * 60_000 } }));
     const kept = earnMusic(upfront);
     addFans(gain, { kind: "song", text: `“${song.title}” ft. ${a.name}, out now` });
     sfx.coins();
     showToast(`“${song.title}” with ${a.name} is out: +$${kept}, +${fmtFans(gain)} followers. It keeps earning (phone → money).`, 5600);
+    // your first song puts you on the charts straight away
+    if (!saveRef.current.chart.week) window.setTimeout(chartTick, 6000);
   };
   const heal = (n: number) => {
     const f = st.current.fight;
@@ -1173,6 +1278,26 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const bouncer = life.current.find((a) => a.id === "bouncer");
     if (to === "avenue" && bouncer) bouncer.x = (clubOk(v) ? 36.9 : 35.5) * TILE;
     if (to === "club" && !v.places.includes("club")) window.setTimeout(() => showToast("The bass is in your chest before the door shuts.", 3600), 300);
+    // a show you're booked for: the crowd's already in
+    if (v.show && VENUES[v.show].place === to) {
+      const id = v.show;
+      window.setTimeout(() => {
+        if (st.current.place !== to || ui.current.dialog || ui.current.mini) return;
+        say([`${VENUES[id].name[0].toUpperCase()}${VENUES[id].name.slice(1)}'s full. They're chanting something. It's your name.`, `(about ${showPay(id, saveRef.current.fans, 70, false).crowd} people)`], [
+          { label: "Go on", run: () => setMini({ kind: "rhythm", mode: "show", venue: id }) },
+          { label: "Not yet", run: () => say(["“Don't make them wait too long.”"]) },
+        ]);
+      }, 800);
+    }
+    // a tape just out: half the block's on your roof
+    const party = v.mixtapes.length && !v.seen.includes(`party-${v.mixtapes.length}`);
+    if (to === "rooftop" && party) {
+      markSeen(`party-${v.mixtapes.length}`);
+      window.setTimeout(() => {
+        addFans(60 + Math.round(v.fans * 0.02), { kind: "news", text: "listening party on the roof 📼" });
+        say(["The roof's full. Someone's brought a speaker the size of a fridge. Your tape's on.", "People you've never met are telling you which song's their favourite. They're all different songs."]);
+      }, 700);
+    }
   };
 
   const arriveRef = useRef(arriveAt);
@@ -2001,7 +2126,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       /** The career as things stand. */
       career: () => {
         const v = saveRef.current;
-        return { fans: v.fans, tier: tierOf(v.fans), posts: v.posts.length, inbox: v.inbox.map((m) => ({ id: m.id, kind: m.kind, act: m.act?.type ?? null, done: !!m.done })), contacts: v.contacts, rel: v.rel, leases: v.leases, collabs: v.collabs, posted: v.posted, mob: v.mob, cut: cutOf(v), royalties: v.stats.royalties };
+        return { chart: v.chart, show: v.show, mixtapes: v.mixtapes, manager: v.manager, stats: v.stats, fans: v.fans, tier: tierOf(v.fans), posts: v.posts.length, inbox: v.inbox.map((m) => ({ id: m.id, kind: m.kind, act: m.act?.type ?? null, done: !!m.done })), contacts: v.contacts, rel: v.rel, leases: v.leases, collabs: v.collabs, posted: v.posted, mob: v.mob, cut: cutOf(v), royalties: v.stats.royalties };
       },
       /** Followers, as if they'd just come in (with a post, so the level-ups and messages happen). */
       fans: (n: number) => addFans(n, { kind: "news", text: "test" }),
@@ -2015,6 +2140,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
         spawnTrouble(c);
       },
       crewNow: () => st.current.pendingCrew,
+      chartTick: () => chartTick(),
+      showDone: (id: Venue, score: number) => showDone(id, score),
+      releaseTape: () => releaseTape(),
+      dissDone: (q: number) => dissDone(q),
       ring: () => ringStart(),
       ringRound: () => st.current.ring,
       phone: (tab: PhoneTab | null) => setPhone(tab),
@@ -2510,7 +2639,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
             rival={mini.rival}
             volume={save.settings.music}
             touch={touch}
-            onFinish={(score) => (mini.mode === "battle" && mini.rival ? battleDone(score, mini.rival) : mini.mode !== "battle" && rhythmDone(mini.mode, score))}
+            pick={mini.venue ? VENUES[mini.venue].beat : undefined}
+            venue={mini.venue ? VENUES[mini.venue].name : undefined}
+            onFinish={(score) => (mini.mode === "battle" && mini.rival ? battleDone(score, mini.rival) : mini.mode === "show" && mini.venue ? showDone(mini.venue, score) : (mini.mode === "cypher" || mini.mode === "dj") && rhythmDone(mini.mode, score))}
             onClose={closeMini}
           />
         )}
@@ -2573,12 +2704,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
         )}
         {mini?.kind === "session" && (
           <Session
-            artist={artistById(mini.artist)?.name ?? "them"}
-            line={artistById(mini.artist)?.session ?? ""}
+            artist={mini.artist === "diss" ? "Vee (she's not here)" : artistById(mini.artist)?.name ?? "them"}
+            line={mini.artist === "diss" ? "Just you in the booth, Vee's name, and sixteen bars. Make them count." : artistById(mini.artist)?.session ?? ""}
             tape={sessionTape}
             volume={save.settings.music}
             reduced={reduced}
-            onFinish={(q) => sessionDone(mini.artist, q)}
+            onFinish={(q) => (mini.artist === "diss" ? dissDone(q) : sessionDone(mini.artist, q))}
             onClose={closeMini}
           />
         )}
@@ -2596,6 +2727,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
             onPostFit={postFit}
             onAct={answer}
             onMob={mobCall}
+            onTape={releaseTape}
+            onManager={managerCall}
             onClose={() => {
               setPhone(null);
               root.current?.focus();

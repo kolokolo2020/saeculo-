@@ -180,12 +180,18 @@ for (const [dev, opts] of [["desk", { viewport: { width: 1366, height: 800 } }],
   await g("fans", 2400);
   await page.waitForTimeout(300);
   await g("payOut", 3);
-  for (const t of ["page", "dms", "money"]) {
+  await g("chartTick");
+  await g("give", { show: "club" });
+  for (const t of ["page", "dms", "charts", "money"]) {
     await g("phone", t);
     await page.waitForTimeout(300);
     await snap(`phone-${t}`);
   }
   await g("phone", null);
+  await g("mini", { kind: "rhythm", mode: "show", venue: "underpass" });
+  await page.waitForTimeout(400);
+  await snap("mini-show");
+  await g("mini", null);
   await g("mini", { kind: "session", artist: "kaya" });
   await page.waitForTimeout(300);
   await page.getByTestId("session-start").click();

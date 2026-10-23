@@ -191,7 +191,7 @@ export const ARTISTS: Artist[] = [
 export const artistById = (id: string) => ARTISTS.find((a) => a.id === id);
 
 /** What an artist pays for a beat of yours, at your current fame. */
-export const artistPrice = (tape: Project, a: Artist, fans: number) => Math.round(priceOf(tape) * a.pays * fameMult(fans));
+export const artistPrice = (tape: Project, a: Artist, fans: number, managed = false) => Math.round(priceOf(tape) * a.pays * fameMult(fans) * (managed ? MANAGER.prices : 1));
 /** How many people find you through a beat sold to them. */
 export const saleFans = (tape: Project, a: Artist) => Math.round(a.reach * (0.5 + priceOf(tape) / 90));
 
@@ -220,11 +220,16 @@ export function songTitle(seed = Math.random()): string {
 }
 
 /** A finished session becomes a song: money up front, followers, and a rate it earns at. */
-export function makeSong(a: Artist, tape: Project, q: number, fans: number): { song: Song; upfront: number; gain: number } {
-  const price = artistPrice(tape, a, fans);
+export function makeSong(a: Artist, tape: Project, q: number, fans: number, taken: string[] = [], managed = false): { song: Song; upfront: number; gain: number } {
+  const price = artistPrice(tape, a, fans, managed);
+  // the session's most of it, but a fuller beat makes a better song
+  q = Math.round(q * 0.8 + (priceOf(tape) / 90) * 20);
   const k = 0.3 + q / 100;
   const rate = Math.max(1, Math.round(price * 0.22 * k));
-  const song: Song = { title: songTitle(), artist: a.id, q, streams: 0, earned: 0, rate, floor: Math.max(0.5, rate * 0.08) };
+  // a title of its own (the charts go by title)
+  let title = songTitle();
+  for (let n = 0; taken.includes(title) && n < 20; n++) title = n < 10 ? songTitle() : `${songTitle()} ${["II", "III", "IV", "V"][n % 4]}`;
+  const song: Song = { title, artist: a.id, q, streams: 0, earned: 0, rate, floor: Math.max(0.5, rate * 0.08) };
   return { song, upfront: Math.round(price * 0.5 * k), gain: Math.round(a.reach * (1 + q / 35)) };
 }
 
@@ -246,7 +251,7 @@ export interface Msg {
   text: string;
   read: boolean;
   /** Something you can answer (an artist to link up with, a mob to pay or not, a brand deal). */
-  act?: { type: "link"; artist: string } | { type: "mob"; mob: MobId } | { type: "sponsor"; pay: number };
+  act?: { type: "link"; artist: string } | { type: "mob"; mob: MobId } | { type: "sponsor"; pay: number } | { type: "show"; venue: Venue } | { type: "manager" } | { type: "diss" };
   done?: boolean;
 }
 
@@ -307,7 +312,7 @@ export const MOB_IDS: MobId[] = ["kings", "syndicate"];
 export const freshMob = (): MobState => ({ stage: "none", squads: 0, paid: 0 });
 
 /** The share of what your music earns that goes to people you pay. */
-export const cutOf = (s: SaveData) => MOB_IDS.reduce((c, id) => c + (s.mob[id].stage === "paying" ? MOBS[id].cut : 0), 0);
+export const cutOf = (s: SaveData) => MOB_IDS.reduce((c, id) => c + (s.mob[id].stage === "paying" ? MOBS[id].cut : 0), 0) + (s.manager === "hired" ? MANAGER.cut : 0);
 /** Who's after you right now, if anyone (the worse one first). */
 export const huntedBy = (s: SaveData): MobId | null => (s.mob.syndicate.stage === "hunted" ? "syndicate" : s.mob.kings.stage === "hunted" ? "kings" : null);
 /** How much less trouble you get for paying. */
@@ -327,7 +332,7 @@ export const storeRate = (s: SaveData) => Math.min(80, s.posted.length * Math.sq
 export function accrue(s: SaveData, minutes: number): { songs: Song[]; songCash: number; storeCash: number } {
   let songCash = 0;
   const songs = s.collabs.map((x) => {
-    const cash = x.rate * minutes;
+    const cash = x.rate * chartBoost(s, x) * minutes;
     songCash += cash;
     return { ...x, earned: x.earned + cash, streams: x.streams + Math.round(cash * 330), rate: Math.max(x.floor, x.rate * Math.pow(0.94, minutes)) };
   });
@@ -338,3 +343,100 @@ export function accrue(s: SaveData, minutes: number): { songs: Song[]; songCash:
 
 /** Odds that trouble on the street is someone who knows your face. */
 export const recognised = (s: SaveData) => Math.min(0.75, tierOf(s.fans) * 0.12);
+
+// ------------------------------------------------------------ the charts
+
+/** A song on the chart: yours (by its title), or someone else's. */
+export interface ChartEntry {
+  title: string;
+  artist: string;
+  mine: boolean;
+  score: number;
+  /** Where it was last week (0 = new). */
+  last: number;
+}
+export interface Chart {
+  week: number;
+  entries: ChartEntry[];
+  /** Your best song this week and where it landed, top 10 or not. */
+  yours?: { title: string; pos: number } | null;
+}
+/** The rest of the city's music: names on the chart that aren't yours (Vee's are there too). */
+const RIVALS: { title: string; artist: string; base: number }[] = [
+  { title: "Pressure", artist: "Kilo Grey", base: 900 },
+  { title: "No Signal", artist: "Ama Lux", base: 640 },
+  { title: "Fumes", artist: "Big Halo", base: 520 },
+  { title: "Glass House", artist: "Nova Reign", base: 1200 },
+  { title: "Outside", artist: "Trey Mane", base: 300 },
+  { title: "Paper Plates", artist: "Duchess", base: 210 },
+  { title: "Late Fee", artist: "Lil Brick", base: 40 },
+  { title: "Overcast", artist: "Kaya", base: 75 },
+  { title: "Sirens Again", artist: "Mo Dread", base: 130 },
+  { title: "Bodega", artist: "J. Static", base: 160 },
+  { title: "Cold Feet", artist: "Rae Sun", base: 95 },
+  { title: "Velvet Rope", artist: "Juno Vale", base: 260 },
+  { title: "Underpass", artist: "Saint Ojay", base: 380 },
+  { title: "Taxi Home", artist: "Mila Ko", base: 55 },
+];
+/** Vee's songs, in the order she puts them out, each a bit bigger than the last. */
+const VEE_SONGS = ["Sampler Under My Arm", "Twenty Dollars", "Run It Back", "Better Producer", "Your Loss", "My Win"];
+
+/** How your song scores this week: what it earns, how good it is. */
+export const songScore = (x: Song) => Math.round(x.rate * 8 * (0.6 + x.q / 100));
+
+/**
+ * A new week on the chart: everyone drifts, Vee keeps pace with your best
+ * (she's only beaten in battles and beef), your songs go in by how they're doing.
+ */
+export function chartWeek(s: SaveData, rand: () => number): Chart {
+  const week = s.chart.week + 1;
+  const lastPos = (title: string, artist: string) => s.chart.entries.findIndex((e) => e.title === title && e.artist === artist) + 1;
+  const mine = s.collabs.map((x) => ({ title: x.title, artist: artistById(x.artist)?.name ?? "", mine: true, score: songScore(x) }));
+  const best = mine.reduce((m, e) => Math.max(m, e.score), 0);
+  // Vee: one song at a time, newest once she's put out a few; her edge shrinks with every battle you win and every beef you take
+  const veeSong = VEE_SONGS[Math.min(VEE_SONGS.length - 1, Math.floor(week / 3))];
+  const veeEdge = Math.max(0.55, 1.25 - 0.08 * s.stats.battleWins - 0.12 * s.stats.disses);
+  const vee = s.stats.beatsSold + s.stats.cypherBest + s.stats.battleWins > 0 ? [{ title: veeSong, artist: "Vee", mine: false, score: Math.round(Math.max(60, best) * veeEdge * (0.9 + rand() * 0.2)) }] : [];
+  const rivals = RIVALS.map((r) => ({ title: r.title, artist: r.artist, mine: false, score: Math.round(r.base * (0.8 + rand() * 0.4)) }));
+  const all = [...mine, ...vee, ...rivals].sort((a, b) => b.score - a.score);
+  const pos = all.findIndex((e) => e.mine);
+  return { week, entries: all.slice(0, 10).map((e) => ({ ...e, last: lastPos(e.title, e.artist) })), yours: pos >= 0 ? { title: all[pos].title, pos: pos + 1 } : null };
+}
+/** What being on the chart does for a song's streams: the higher, the more people press play. */
+export const chartBoost = (s: SaveData, x: Song) => {
+  const pos = s.chart.entries.findIndex((e) => e.mine && e.title === x.title) + 1;
+  return pos === 1 ? 2.5 : pos > 0 && pos <= 3 ? 1.8 : pos > 0 ? 1.3 : 1;
+};
+
+// ------------------------------------------------------------ shows
+
+export type Venue = "club" | "underpass" | "rooftop";
+export const VENUES: Record<Venue, { name: string; fans: number; cap: number; ticket: number; host: string; beat: string; place: Place }> = {
+  club: { name: "the club", fans: 1000, cap: 300, ticket: 10, host: "the club's promoter", beat: "trap", place: "club" },
+  underpass: { name: "the underpass", fans: 5000, cap: 900, ticket: 15, host: "Saint Ojay", beat: "boombap", place: "underpass" },
+  rooftop: { name: "your roof", fans: 20000, cap: 2500, ticket: 25, host: "you, for once", beat: "drill", place: "rooftop" },
+};
+export const VENUE_IDS: Venue[] = ["club", "underpass", "rooftop"];
+/** Who turns up: a share of your followers, as many as the place holds. */
+export const crowdAt = (v: Venue, fans: number) => Math.min(VENUES[v].cap, Math.round(fans * 0.03) + 20);
+/** The door money for a show, and the followers it brings. */
+export function showPay(v: Venue, fans: number, score: number, managed: boolean) {
+  const crowd = crowdAt(v, fans);
+  const cash = Math.round(crowd * VENUES[v].ticket * (0.4 + score / 100) * (managed ? 1.25 : 1));
+  return { crowd, cash, gain: Math.round(crowd * (0.5 + score / 50)) };
+}
+
+// ------------------------------------------------------------ mixtapes
+
+export interface Mixtape {
+  name: string;
+  songs: string[];
+}
+export const TAPE_SIZE = 5;
+/** Songs not on a tape yet. */
+export const looseSongs = (s: SaveData) => s.collabs.filter((x) => !s.mixtapes.some((m) => m.songs.includes(x.title)));
+
+// ------------------------------------------------------------ a manager
+
+export type ManagerStage = "none" | "offered" | "hired" | "fired";
+export const MANAGER = { name: "Dee Mills", handle: "deemills.mgmt", fans: 2000, cut: 0.1, prices: 1.15 };

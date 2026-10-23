@@ -58,6 +58,18 @@ export default function Monte({ cash, reduced, onSettle, onClose }: { cash: numb
     onSettle(won ? bet : -bet);
   };
 
+  // 1, 2, 3 pick a cup by where it sits
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const k = ["Digit1", "Digit2", "Digit3"].indexOf(e.code);
+      if (k < 0 || phase !== "pick") return;
+      const cup = slots.indexOf(k);
+      if (cup >= 0) pick(cup);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   return (
     <Frame title="The cups" sub="find the ball, double your money" onClose={onClose} testid="monte">
       <div className="flex flex-col gap-3">
@@ -94,7 +106,7 @@ export default function Monte({ cash, reduced, onSettle, onClose }: { cash: numb
             {phase === "show" ? "Play" : "Again"}
           </button>
         </div>
-        <p className="text-[16px] text-[#8a8170]">you’ve got ${Math.floor(cash)} · bigger bets, faster hands</p>
+        <p className="text-[16px] text-[#8a8170]">you’ve got ${Math.floor(cash)} · bigger bets, faster hands · 1 2 3 pick a cup</p>
       </div>
     </Frame>
   );

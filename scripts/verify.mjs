@@ -1627,6 +1627,108 @@ try {
     await ctx.close();
   }
 
+  // ---------------------------------------------------------------- charts, shows, a manager, a mixtape, Vee's beef
+  {
+    const SAVE = { found: ["rain"], seenHelp: true, unseen: [], cash: 300, rep: 10, fans: 900, profile: { name: "Tester", skin: 2, hair: "short", hairColor: 0, body: "slim" }, stats: { battleWins: 1, beatsSold: 1 }, settings: { sfx: 0, music: 0, shake: false, hints: true, difficulty: "chill" } };
+    const { ctx, page } = await open({ init: { "saeculo-game": JSON.stringify(SAVE) } });
+    await page.getByTestId("icon-game").click();
+    await page.waitForTimeout(1600);
+    const g = (fn, ...a) => page.evaluate(([fn, a]) => window.__game[fn](...a), [fn, a]);
+    const career = () => g("career");
+    const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-game")));
+    const shut = async () => {
+      for (let i = 0; i < 8 && (await page.getByTestId("game-dialog").count()); i++) {
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(120);
+      }
+    };
+    await g("peace");
+    await g("makeTape", "chart tape");
+    await g("give", { contacts: ["brick"], rel: { brick: 1 } });
+    await g("session", "brick", 85);
+    await g("chartTick");
+    let c = await career();
+    check("charts: your first song goes onto the city top 10", c.chart.week === 1 && c.chart.entries.some((e) => e.mine) && c.chart.entries.some((e) => e.artist === "Vee"), JSON.stringify(c.chart.entries.map((e) => e.title)).slice(0, 160));
+    await g("phone", "charts");
+    await page.waitForTimeout(250);
+    check("phone: the charts tab shows it", (await page.getByTestId("phone-charts").textContent()).includes(c.collabs[0].title));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // a booking: the club, at 1,000 followers
+    await g("fans", 200);
+    await page.waitForTimeout(300);
+    c = await career();
+    check("shows: at 1,000 followers the club wants you headlining", c.inbox.some((m) => m.act === "show"));
+    await g("phone", "dms");
+    await page.waitForTimeout(200);
+    await page.getByTestId("phone-dms").getByRole("button", { name: /headline the club/ }).first().click();
+    await page.waitForTimeout(200);
+    check("shows: say yes and it's booked", (await career()).show === "club");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    await g("teleport", "club", 12, 10, "up");
+    for (let i = 0; i < 12 && !(await page.getByTestId("game-dialog").count()); i++) await page.waitForTimeout(200);
+    for (let i = 0; i < 4 && !(await page.getByTestId("game-dialog").getByRole("button", { name: "Go on" }).count()); i++) {
+      await page.keyboard.press("e");
+      await page.waitForTimeout(150);
+    }
+    await page.getByTestId("game-dialog").getByRole("button", { name: "Go on" }).click();
+    await page.waitForTimeout(300);
+    check("shows: walk in and the show starts (the rhythm game, your show)", (await page.getByTestId("rhythm").isVisible()) && (await page.getByTestId("rhythm").textContent()).includes("Your show"));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    const cash0 = (await saved()).cash;
+    await g("showDone", "club", 80);
+    c = await career();
+    check("shows: door money, followers, the booking's done", c.stats.shows === 1 && c.show === null && (await saved()).cash > cash0);
+    await shut();
+
+    // a manager at 2,000
+    await g("fans", 1000);
+    await page.waitForTimeout(300);
+    await g("phone", "dms");
+    await page.waitForTimeout(200);
+    await page.getByTestId("phone-dms").getByRole("button", { name: /sign with/ }).click();
+    await page.waitForTimeout(200);
+    c = await career();
+    check("manager: sign at 2,000 followers, and they take their 10%", c.manager === "hired" && Math.abs(c.cut - 0.1) < 0.001);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // a mixtape: five songs
+    for (let i = 0; i < 4; i++) await g("session", "brick", 70);
+    await g("phone", "money");
+    await page.waitForTimeout(200);
+    await page.getByTestId("phone-mixtape").click();
+    await page.waitForTimeout(200);
+    c = await career();
+    check("mixtape: five songs go out as a tape", c.mixtapes.length === 1 && c.mixtapes[0].songs.length === 5 && (await page.getByTestId("phone-mixtape").isDisabled()));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    await g("teleport", "rooftop", 6, 6, "up");
+    for (let i = 0; i < 10 && !(await page.getByTestId("game-dialog").count()); i++) await page.waitForTimeout(200);
+    check("mixtape: a listening party on your roof", (await page.getByTestId("game-dialog").textContent()).includes("roof"));
+    await shut();
+
+    // Vee's beef
+    await g("dissDone", 80);
+    c = await career();
+    check("beef: a diss that lands knocks Vee off the chart", c.stats.disses === 1 && !c.chart.entries.some((e) => e.artist === "Vee"));
+
+    // the cups by keyboard
+    await g("mini", { kind: "monte" });
+    await page.waitForTimeout(300);
+    const m0 = (await saved()).cash;
+    await page.getByTestId("monte-go").click();
+    for (let i = 0; i < 40 && !(await page.getByTestId("monte-cup-1").isEnabled()); i++) await page.waitForTimeout(200);
+    await page.keyboard.press("2");
+    await page.waitForTimeout(200);
+    check("cups: 1 2 3 pick a cup", Math.abs((await saved()).cash - m0) === 5);
+    await page.keyboard.press("Escape");
+    await ctx.close();
+  }
+
   // ---------------------------------------------------------------- the phone on a phone
   {
     const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, mobile: true, init: { "saeculo-game": JSON.stringify({ found: [], seenHelp: true, unseen: [], profile: { name: "R", skin: 1, hair: "short", hairColor: 0, body: "slim" }, fans: 3000 }) } });

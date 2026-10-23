@@ -2,7 +2,7 @@ import { fromOldTape, loadStore, saveStore } from "./studio/project";
 import { ITEMS, sanitizeProfile, STARTERS, type Profile } from "./character";
 import { FINDABLE } from "./studio/voices";
 import { WEAPONS } from "./weapons";
-import { ARTISTS, freshMob, MOB_IDS, type MobId, type MobState, type Msg, type Post, type Song } from "./career";
+import { ARTISTS, freshMob, MOB_IDS, VENUE_IDS, type Chart, type ManagerStage, type Mixtape, type MobId, type MobState, type Msg, type Post, type Song, type Venue } from "./career";
 
 // What the game remembers between visits, in this browser only: who you
 // are and what you wear, your cash and respect, your health, what you've
@@ -49,6 +49,10 @@ export interface Stats {
   /** Fight nights won, and rounds. */
   ringWins: number;
   monteWon: number;
+  shows: number;
+  /** Weeks with a song of yours at number one. */
+  number1s: number;
+  disses: number;
 }
 
 /** A job from Dre: a tape to take somewhere, then back to him for the money (or to tell him it's gone). */
@@ -109,13 +113,18 @@ export interface SaveData {
   mob: Record<MobId, MobState>;
   /** When things can happen again (wall-clock ms). */
   cd: Record<string, number>;
+  chart: Chart;
+  /** A show you've said yes to, waiting for you at the venue. */
+  show: Venue | null;
+  mixtapes: Mixtape[];
+  manager: ManagerStage;
   settings: Settings;
 }
 
 const KEY = "saeculo-game";
 
 export const DEFAULT_SETTINGS: Settings = { sfx: 0.8, music: 0.8, shake: true, hints: true, difficulty: "normal" };
-const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0, battleWins: 0, battleLosses: 0, jobs: 0, rides: 0, royalties: 0, leases: 0, songs: 0, ringWins: 0, monteWon: 0 };
+const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0, battleWins: 0, battleLosses: 0, jobs: 0, rides: 0, royalties: 0, leases: 0, songs: 0, ringWins: 0, monteWon: 0, shows: 0, number1s: 0, disses: 0 };
 
 export function freshSave(): SaveData {
   return {
@@ -148,6 +157,10 @@ export function freshSave(): SaveData {
     posted: [],
     mob: { kings: freshMob(), syndicate: freshMob() },
     cd: {},
+    chart: { week: 0, entries: [] },
+    show: null,
+    mixtapes: [],
+    manager: "none",
     settings: { ...DEFAULT_SETTINGS },
   };
 }
@@ -172,7 +185,17 @@ function loadInbox(x: unknown): Msg[] {
     if (!MSG_KINDS.includes(o.kind as string) || typeof o.id !== "string") return [];
     const a = obj(o.act);
     const act: Msg["act"] =
-      a.type === "link" && ARTISTS.some((x) => x.id === a.artist) ? { type: "link", artist: a.artist as string } : a.type === "mob" && MOB_IDS.includes(a.mob as MobId) ? { type: "mob", mob: a.mob as MobId } : a.type === "sponsor" ? { type: "sponsor", pay: num(a.pay, 0, 1e6, 0) } : undefined;
+      a.type === "link" && ARTISTS.some((x) => x.id === a.artist)
+        ? { type: "link", artist: a.artist as string }
+        : a.type === "mob" && MOB_IDS.includes(a.mob as MobId)
+          ? { type: "mob", mob: a.mob as MobId }
+          : a.type === "sponsor"
+            ? { type: "sponsor", pay: num(a.pay, 0, 1e6, 0) }
+            : a.type === "show" && VENUE_IDS.includes(a.venue as Venue)
+              ? { type: "show", venue: a.venue as Venue }
+              : a.type === "manager" || a.type === "diss"
+                ? { type: a.type }
+                : undefined;
     return [{ id: o.id, from: str(o.from, 40), kind: o.kind as Msg["kind"], text: str(o.text, 400), read: o.read === true, act, done: o.done === true }];
   });
 }
@@ -190,6 +213,21 @@ function loadMob(x: unknown): Record<MobId, MobState> {
     return { stage: STAGES.includes(m.stage as string) ? (m.stage as MobState["stage"]) : "none", squads: num(m.squads, 0, 99, 0), paid: num(m.paid, 0, 1e9, 0) };
   };
   return { kings: one(o.kings), syndicate: one(o.syndicate) };
+}
+function loadChart(x: unknown): Chart {
+  const o = obj(x);
+  const entries = (Array.isArray(o.entries) ? o.entries : []).slice(0, 10).flatMap((v): Chart["entries"] => {
+    const e = obj(v);
+    return typeof e.title === "string" && typeof e.artist === "string" ? [{ title: str(e.title, 60), artist: str(e.artist, 40), mine: e.mine === true, score: num(e.score, 0, 1e9, 0), last: num(e.last, 0, 10, 0) }] : [];
+  });
+  const y = obj(o.yours);
+  return { week: num(o.week, 0, 1e6, 0), entries, yours: typeof y.title === "string" ? { title: str(y.title, 60), pos: num(y.pos, 1, 99, 99) } : null };
+}
+function loadMixtapes(x: unknown): Mixtape[] {
+  return (Array.isArray(x) ? x : []).slice(0, 40).flatMap((v): Mixtape[] => {
+    const m = obj(v);
+    return typeof m.name === "string" ? [{ name: str(m.name, 60), songs: strings(m.songs) }] : [];
+  });
 }
 const lists = (x: unknown): Record<string, string[]> => Object.fromEntries(Object.entries(obj(x)).map(([k, v]) => [k, strings(v)]));
 const nums = (x: unknown, hi: number): Record<string, number> => Object.fromEntries(Object.entries(obj(x)).flatMap(([k, v]) => (typeof v === "number" && Number.isFinite(v) ? [[k, Math.max(0, Math.min(hi, v))]] : [])));
@@ -240,6 +278,10 @@ export function loadSave(): SaveData {
       posted: strings(raw.posted),
       mob: loadMob(raw.mob),
       cd: nums(raw.cd, 1e15),
+      chart: loadChart(raw.chart),
+      show: VENUE_IDS.includes(raw.show) ? raw.show : null,
+      mixtapes: loadMixtapes(raw.mixtapes),
+      manager: ["none", "offered", "hired", "fired"].includes(raw.manager) ? raw.manager : "none",
       settings: {
         sfx: num(st.sfx, 0, 1, DEFAULT_SETTINGS.sfx),
         music: num(st.music, 0, 1, DEFAULT_SETTINGS.music),

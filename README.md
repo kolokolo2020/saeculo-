@@ -230,6 +230,25 @@ bring in a minute, every song with its streams, your contacts, protection).
   song pays something up front, brings their fans to you, and keeps earning
   while you walk about, fading but never to nothing. Going up a level brings
   messages from the next artists, and brand deals at 10K and 50K.
+- **The charts** (phone → charts): a city top 10, a new week every three
+  minutes of play. Your songs go in by what they earn and how good they are
+  (the session, and how full the beat was); the higher up, the more they
+  play (number one pays two and a half times as much). Vee's songs are on
+  it too, and she keeps pace with your best, less so with every battle you
+  win. When she's charting she messages you; **answer with a diss** (a
+  session on your own) that lands and she drops off the chart, or falls
+  flat and costs you followers.
+- **Shows**: venues message you a booking at 1,000 followers (the club),
+  5,000 (the underpass) and 20,000 (your roof). Say yes, walk in, and play
+  your show (the rhythm game, longer, on the venue's beat). Door money goes
+  by the crowd (a share of your followers, as many as the place holds) and
+  how well you played; more bookings come round after.
+- **Mixtapes** (phone → money): five songs not on a tape go out together:
+  money up front, a crowd of new followers, the songs earn more for longer,
+  and a listening party on your roof next time you go up.
+- **A manager**: at 2,000 followers Dee Mills offers to manage you. 10% of
+  your music money, for artists paying more, shows paying more and brands
+  calling every few weeks. Let them go (or call back) on your phone.
 - **Being known**: from 500 followers people know your face anywhere outside
   (not on your own roof), and some of the trouble is people after what
   you've got on (the more it cost, the more often). Take a picture with them
@@ -254,11 +273,11 @@ bring in a minute, every song with its streams, your contacts, protection).
   mask, bandanas, grillz, an iced watch, a crossbody bag, and round your
   neck (its own slot now) a cuban link and an iced-out chain. Some of it is
   only sold to people with a following.
-- **The cups**: Slick outside the laundromat; find the ball, even money,
-  faster hands the more you bet.
+- **The cups**: Slick outside the laundromat; find the ball (click, or 1 2
+  3), even money, faster hands the more you bet.
 
 **The menu** (M, or the button up top): you, your wardrobe (48 pieces,
-most bought or earned), weapons and food, goals (32, each pays out),
+most bought or earned), weapons and food, goals (36, each pays out),
 settings (sound and music levels, fight difficulty, shake, hints, start
 over). Cash, respect, health and everything else save in the browser.
 

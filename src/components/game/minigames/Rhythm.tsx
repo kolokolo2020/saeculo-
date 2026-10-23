@@ -16,7 +16,7 @@ import Frame, { miniBtn } from "./Frame";
 // (a different one each time), the hats on you too, and less room either
 // side.
 
-export type RhythmMode = "cypher" | "dj" | "battle";
+export type RhythmMode = "cypher" | "dj" | "battle" | "show";
 
 interface Hit {
   t: number;
@@ -58,11 +58,13 @@ const FEEL: Record<RhythmMode, { fall: number; perfect: number; late: number; ga
   cypher: { fall: 1.5, perfect: 0.06, late: 0.17, gap: 0.2, loops: 4, preset: "boombap", hats: 4 },
   dj: { fall: 1.5, perfect: 0.06, late: 0.17, gap: 0.17, loops: 5, preset: "trap", hats: 4 },
   battle: { fall: 1.2, perfect: 0.045, late: 0.13, gap: 0.13, loops: 4, preset: "drill", hats: 2 },
+  // your own show: longer, a bit quicker than a club set, on the venue's beat
+  show: { fall: 1.35, perfect: 0.055, late: 0.15, gap: 0.15, loops: 6, preset: "trap", hats: 4 },
 };
 
 /** The beat a game is played on: the mode's own, or the one the rival picked. */
 function beatFor(mode: RhythmMode, pick?: string) {
-  const b = (mode === "battle" && BATTLE_BEATS.find((x) => x.preset === pick)) || { preset: FEEL[mode].preset, hats: FEEL[mode].hats };
+  const b = (mode === "battle" && BATTLE_BEATS.find((x) => x.preset === pick)) || { preset: (mode === "show" && pick) || FEEL[mode].preset, hats: FEEL[mode].hats };
   const preset = PRESETS.find((p) => p.id === b.preset) ?? PRESETS[0];
   return { preset, hats: b.hats, name: preset.name.split(" · ")[0] };
 }
@@ -124,9 +126,9 @@ export function battleCharts() {
   });
 }
 
-export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }: { mode: RhythmMode; volume: number; touch: boolean; onFinish: (score: number) => void; onClose: () => void; rival?: { name: string; score: number; beat?: string } }) {
+export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival, pick, venue }: { mode: RhythmMode; volume: number; touch: boolean; onFinish: (score: number) => void; onClose: () => void; rival?: { name: string; score: number; beat?: string }; pick?: string; venue?: string }) {
   const { fall: FALL, perfect: PERFECT, late: LATE } = FEEL[mode];
-  const beat = beatFor(mode, rival?.beat);
+  const beat = beatFor(mode, rival?.beat ?? pick);
   // the lanes are named for what's in them on this beat (a clap, a shaker, a bass)
   const [laneVoices] = useState(() => {
     const p = beat.preset.make();
@@ -316,7 +318,7 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  const title = mode === "cypher" ? "The cypher" : mode === "battle" ? "Beat battle" : "Your set";
+  const title = mode === "cypher" ? "The cypher" : mode === "battle" ? "Beat battle" : mode === "show" ? "Your show" : "Your set";
   const verdict = (s: number) =>
     rival
       ? s >= rival.score
@@ -330,6 +332,14 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }
           : s >= 45
             ? "It held together. Mostly."
             : "The MC stops halfway. “Run it back when you're ready.”"
+      : mode === "show"
+      ? s >= 85
+        ? "They sing your beats back at you. Your beats don't even have words."
+        : s >= 70
+          ? "Phones up the whole way. That's going everywhere tonight."
+          : s >= 45
+            ? "Some of them were here for you. Most of them stayed."
+            : "It falls apart in the middle. People are filming that too."
       : s >= 85
         ? "The floor doesn't stop. The DJ hands you a drink."
         : s >= 70
@@ -339,7 +349,7 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }
             : "The floor empties a bit. The DJ takes over again.";
 
   return (
-    <Frame title={title} sub={mode === "cypher" ? "keep the beat going" : mode === "battle" ? (rival ? `beat ${rival.name}'s ${rival.score}%` : "the hard one") : "keep the floor"} onClose={onClose} testid="rhythm" wide>
+    <Frame title={title} sub={mode === "cypher" ? "keep the beat going" : mode === "battle" ? (rival ? `beat ${rival.name}'s ${rival.score}%` : "the hard one") : mode === "show" ? (venue ? `headlining ${venue}` : "they came for you") : "keep the floor"} onClose={onClose} testid="rhythm" wide>
       {phase === "ready" && (
         <div className="flex flex-col gap-3">
           <p>
@@ -347,7 +357,9 @@ export default function Rhythm({ mode, volume, touch, onFinish, onClose, rival }
               ? "They'll rap over whatever you play. One loop of the beat, then the kick, the snare and the keys are yours."
               : mode === "battle"
                 ? `${rival?.name ?? "They"} played the ${beat.name} first: ${rival?.score ?? "?"}%. Now you: one loop to hear it, then everything's on you, ${laneName(2)} too. Faster, and less room for error.`
-                : "Your set. One loop to get the feel, then the kick, the snare and the 808 are yours. Keep the floor."}
+                : mode === "show"
+                  ? `Your name's on the flyer${venue ? ` at ${venue}` : ""}. The ${beat.name}: one loop for them to scream, then the kick, the snare and the 808 are yours. Longer than a club set.`
+                  : "Your set. One loop to get the feel, then the kick, the snare and the 808 are yours. Keep the floor."}
           </p>
           <p className="text-[17px] text-[#b9b09e]">{touch ? "Tap the pads as the bars reach the line." : `D F J K (or ← ↓ ↑ →) as the bars reach the line.${mode === "battle" ? "" : " The hats keep time."}`}</p>
           <button className={miniBtn} onClick={begin} data-autofocus data-testid="rhythm-start">

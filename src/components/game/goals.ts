@@ -62,6 +62,10 @@ export const GOALS: Goal[] = [
   { id: "iced", name: "Iced out", hint: "Own the iced-out chain.", done: (s) => s.owned.includes("iced") && !!itemById("iced"), reward: { rep: 15 } },
   { id: "fans-50k", name: "Famous", hint: "50,000 followers.", done: (s) => s.fans >= 50000, progress: (s) => [Math.min(50000, Math.floor(s.fans)), 50000], reward: { cash: 2000 } },
   { id: "syndicate", name: "Untouchable", hint: "The Syndicate want a quarter. Deal with them, one way or the other.", done: (s) => s.mob.syndicate.stage === "done" || s.mob.syndicate.stage === "paying", reward: { cash: 1000, rep: 40 } },
+  { id: "headliner", name: "Headliner", hint: "Play a show of your own. Venues message you once you've got 1,000 followers.", done: (s) => s.stats.shows > 0, reward: { rep: 10 } },
+  { id: "number-one", name: "Number one", hint: "Get a song to the top of the charts (phone → charts).", done: (s) => s.stats.number1s > 0, reward: { cash: 300, rep: 15 } },
+  { id: "mixtape", name: "The tape", hint: "Put five songs out as a mixtape (phone → money).", done: (s) => s.mixtapes.length > 0, reward: { cash: 150, rep: 10 } },
+  { id: "beef", name: "Beef", hint: "Answer Vee with a diss that lands.", done: (s) => s.stats.disses > 0, reward: { rep: 15 } },
   { id: "fans-250k", name: "A star", hint: "250,000 followers.", done: (s) => s.fans >= 250000, progress: (s) => [Math.min(250000, Math.floor(s.fans)), 250000], reward: { cash: 10000 } },
 ];
 

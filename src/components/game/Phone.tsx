@@ -2,18 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_PROFILE, lookOf, styleOf } from "./character";
-import { ARTISTS, artistById, cutOf, fmtFans, MOB_IDS, MOBS, nextTier, storeRate, tierOf, TIERS, type Msg, type PostKind } from "./career";
+import { ARTISTS, artistById, cutOf, fmtFans, looseSongs, MANAGER, MOB_IDS, MOBS, nextTier, storeRate, TAPE_SIZE, tierOf, TIERS, VENUES, type Msg, type PostKind } from "./career";
 import { personSprites } from "./people";
 import type { SaveData } from "./save";
 
 // Your phone (P, or the button up top): your page (followers, posts, a
 // beat or a fit to post), your messages (fans, artists who want to link,
-// people who want a cut), and the money your music makes on its own.
+// people who want a cut), the charts, and the money your music makes on
+// its own (mixtapes and your manager live there too).
 
-export type PhoneTab = "page" | "dms" | "money";
+export type PhoneTab = "page" | "dms" | "charts" | "money";
 const TABS: { id: PhoneTab; name: string }[] = [
   { id: "page", name: "page" },
   { id: "dms", name: "messages" },
+  { id: "charts", name: "charts" },
   { id: "money", name: "money" },
 ];
 const GLYPH: Record<PostKind, string> = { beat: "♪", sale: "$", song: "★", fit: "◆", fight: "✊", show: "♫", news: "!" };
@@ -45,6 +47,8 @@ export default function Phone({
   onPostFit,
   onAct,
   onMob,
+  onTape,
+  onManager,
   onClose,
 }: {
   save: SaveData;
@@ -56,6 +60,8 @@ export default function Phone({
   onPostFit: () => void;
   onAct: (m: Msg, yes: boolean) => void;
   onMob: (id: (typeof MOB_IDS)[number], what: "stop" | "peace") => void;
+  onTape: () => void;
+  onManager: (what: "fire" | "hire") => void;
   onClose: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -109,7 +115,7 @@ export default function Phone({
               key={t.id}
               role="tab"
               aria-selected={tab === t.id}
-              className="flex-1 border-b-2 border-transparent px-2 py-1.5 text-[#b9b09e] aria-selected:border-amber aria-selected:text-amber"
+              className="flex-1 border-b-2 border-transparent px-1 py-1.5 text-[#b9b09e] aria-selected:border-amber aria-selected:text-amber sm:px-2"
               onClick={() => onTab(t.id)}
               data-testid={`phone-tab-${t.id}`}
             >
@@ -217,11 +223,69 @@ export default function Phone({
                         </>
                       )}
                       {m.act.type === "mob" && <span className="text-[15px] text-[#8a8170]">They’d rather talk in person.</span>}
+                      {m.act.type === "show" && (
+                        <>
+                          <button className={btn} disabled={!!save.show} onClick={() => onAct(m, true)}>
+                            {save.show ? "already booked" : `headline ${VENUES[m.act.venue].name}`}
+                          </button>
+                          <button className={btn} onClick={() => onAct(m, false)}>
+                            pass
+                          </button>
+                        </>
+                      )}
+                      {m.act.type === "manager" && (
+                        <>
+                          <button className={btn} onClick={() => onAct(m, true)}>
+                            sign with {MANAGER.name}
+                          </button>
+                          <button className={btn} onClick={() => onAct(m, false)}>
+                            no thanks
+                          </button>
+                        </>
+                      )}
+                      {m.act.type === "diss" && (
+                        <>
+                          <button className={btn} onClick={() => onAct(m, true)}>
+                            answer with a diss
+                          </button>
+                          <button className={btn} onClick={() => onAct(m, false)}>
+                            ignore her
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </li>
               ))}
             </ul>
+          )}
+          {tab === "charts" && (
+            <div className="flex flex-col gap-2" data-testid="phone-charts">
+              <p className="text-[16px] text-[#b9b09e]">{save.chart.week ? `the city top 10 · week ${save.chart.week}` : "the city top 10"}</p>
+              {save.chart.entries.length ? (
+                <ol className="flex flex-col gap-1">
+                  {save.chart.entries.map((e, i) => (
+                    <li key={e.title + e.artist} className={`flex items-baseline gap-2 rounded-[2px] px-1.5 py-0.5 leading-tight ${e.mine ? "bg-[#3a2e1c] text-amber" : e.artist === "Vee" ? "text-[#c9a0ff]" : ""}`}>
+                      <span className="w-6 shrink-0 text-right">{i + 1}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {e.title} <span className="text-[15px] text-[#8a8170]">{e.artist}</span>
+                      </span>
+                      <span className="shrink-0 text-[14px] text-[#8a8170]" aria-label={e.last ? `last week ${e.last}` : "new"}>
+                        {!e.last ? "new" : e.last > i + 1 ? `▲${e.last - i - 1}` : e.last < i + 1 ? `▼${i + 1 - e.last}` : "–"}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-[#8a8170]">Your first song puts you on the charts. A new week every few minutes.</p>
+              )}
+              {save.chart.yours && save.chart.yours.pos > 10 && (
+                <p className="text-[16px] text-amber" data-testid="phone-chart-yours">
+                  your best: “{save.chart.yours.title}” at #{save.chart.yours.pos}
+                </p>
+              )}
+              <p className="text-[15px] leading-tight text-[#8a8170]">Higher on the chart, more plays: number one earns two and a half times as much. Number ones so far: {save.stats.number1s}.</p>
+            </div>
           )}
           {tab === "money" && (
             <div className="flex flex-col gap-3" data-testid="phone-money">
@@ -261,6 +325,36 @@ export default function Phone({
                   <p className="text-[15px] text-[#8a8170]">None yet. Link up with an artist and make one.</p>
                 )}
               </div>
+              <div>
+                <p className="text-[#b9b09e]">mixtapes · {save.mixtapes.length} out</p>
+                <p className="text-[15px] text-[#8a8170]">{looseSongs(save).length}/{TAPE_SIZE} songs not on a tape yet. A tape brings them all back round, and a crowd to your roof.</p>
+                <button className={`${btn} mt-1`} disabled={looseSongs(save).length < TAPE_SIZE} onClick={onTape} data-testid="phone-mixtape">
+                  release a mixtape
+                </button>
+                {save.mixtapes.length > 0 && <p className="mt-1 text-[15px] leading-tight text-[#b9b09e]">{save.mixtapes.map((m) => m.name).join(" · ")}</p>}
+              </div>
+              {save.show && <p className="text-[16px] text-amber">booked: headlining {VENUES[save.show].name}. Go there when you’re ready.</p>}
+              {save.manager !== "none" && (
+                <div>
+                  <p className="text-[#b9b09e]">management</p>
+                  <p className="text-[16px] leading-tight">
+                    {MANAGER.name}{" "}
+                    <span className="text-[#8a8170]">
+                      {save.manager === "hired" ? `takes ${Math.round(MANAGER.cut * 100)}%: artists pay more, shows pay more, brands call.` : save.manager === "fired" ? "let go. Still answers the phone." : "wants to manage you (see messages)."}
+                    </span>
+                  </p>
+                  {save.manager === "hired" && (
+                    <button className={`${btn} mt-1`} onClick={() => onManager("fire")}>
+                      let them go
+                    </button>
+                  )}
+                  {save.manager === "fired" && (
+                    <button className={`${btn} mt-1`} onClick={() => onManager("hire")}>
+                      call {MANAGER.name} back
+                    </button>
+                  )}
+                </div>
+              )}
               <div>
                 <p className="text-[#b9b09e]">contacts</p>
                 <p className="text-[16px] leading-tight">
