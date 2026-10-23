@@ -267,3 +267,16 @@ export const ChevronUpGlyph = (p: P) => (
     <path d="M4.5 10l3.5-3.5 3.5 3.5" />
   </L>
 );
+/** Day: a small sun. */
+export const SunGlyph = (p: P) => (
+  <L {...p}>
+    <circle cx="8" cy="8" r="2.75" />
+    <path d="M8 1.75v1.5M8 12.75v1.5M1.75 8h1.5M12.75 8h1.5M3.6 3.6l1.05 1.05M11.35 11.35l1.05 1.05M3.6 12.4l1.05-1.05M11.35 4.65l1.05-1.05" />
+  </L>
+);
+/** Night: a crescent moon. */
+export const MoonGlyph = (p: P) => (
+  <L {...p}>
+    <path d="M13.25 9.6A5.5 5.5 0 0 1 6.4 2.75a5.5 5.5 0 1 0 6.85 6.85z" />
+  </L>
+);

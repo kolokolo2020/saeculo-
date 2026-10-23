@@ -173,7 +173,7 @@ try {
   {
     const { ctx, page } = await open();
     check("Beats opens by default", await page.getByTestId("window-beats").isVisible());
-    check("tracklist lists the beats", (await page.locator("[data-testid^=track-]").count()) === 14);
+    check("tracklist lists the beats", (await page.locator("[data-testid^=track-]").count()) === 12);
     check("one album cover for every beat", (await page.locator("[data-testid=window-beats] img").count()) === 1 && decodeURIComponent(await page.locator("[data-testid=window-beats] img").getAttribute("src")).includes("url=/covers/saeculo.jpg"));
     await page.getByTestId("deck-play").click();
     await page.waitForTimeout(1200);
@@ -192,8 +192,8 @@ try {
     // the next file can take a moment to buffer
     for (let i = 0; i < 10 && (await audio(page)).paused; i++) await page.waitForTimeout(250);
     const a2 = await audio(page);
-    check("next track", a2.src.includes("kiss%20me") && !a2.paused);
-    check("active row follows", (await page.getByTestId("track-kiss-me-miss-ya").getAttribute("aria-current")) === "true");
+    check("next track", a2.src.includes("growin%20") && !a2.paused);
+    check("active row follows", (await page.getByTestId("track-growin-and-slowin").getAttribute("aria-current")) === "true");
     await page.getByTestId("track-dull-knife").click();
     await page.waitForTimeout(600);
     check("pick from the folder", (await audio(page)).src.includes("dull%20knife"));
@@ -280,7 +280,9 @@ try {
     await page.getByTestId("mini-play").click();
     await page.waitForTimeout(300);
     const links = await page.locator("[data-testid=window-socials] a").evaluateAll((as) => as.map((a) => [a.href, a.target]));
-    check("socials: five real links, new tab", links.length === 5 && links.every(([h, t]) => h.startsWith("https://") && t === "_blank"));
+    const labels = await page.locator("[data-testid=window-socials] a > span:first-child").allTextContents();
+    check("socials: in order, no Linktree", JSON.stringify(labels) === JSON.stringify(["Instagram", "YouTube", "YouTube Music", "Spotify", "SoundCloud", "Apple Music", "Amazon Music", "TIDAL"]), labels.join(", "));
+    check("socials: eight real links, new tab", links.length === 8 && links.every(([h, t]) => h.startsWith("https://") && t === "_blank"));
     const onLink = () => page.evaluate(() => !!document.activeElement?.closest?.("[data-testid=window-socials] a"));
     await page.locator("[data-testid=window-socials] .win-title h2").click();
     for (let i = 0; i < 8 && !(await onLink()); i++) await page.keyboard.press("Tab");
@@ -296,21 +298,21 @@ try {
 
   // share link, unavailable file, reduced motion
   {
-    const { ctx, page } = await open({ seen: false, hash: "#track=joy4us" });
+    const { ctx, page } = await open({ seen: false, hash: "#track=beauty-fangs" });
     check("share link skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
-    check("share link selects the track", (await page.getByTestId("track-joy4us").getAttribute("aria-current")) === "true");
+    check("share link selects the track", (await page.getByTestId("track-beauty-fangs").getAttribute("aria-current")) === "true");
     await ctx.close();
   }
   {
     const ctx = await browser.newContext({ viewport: { width: 1366, height: 800 } });
     await ctx.addInitScript(() => localStorage.setItem("saeculo-intro-seen", "1"));
-    await ctx.route("**/audio/growin*", (r) => r.fulfill({ status: 404, body: "" }));
+    await ctx.route("**/audio/care4me*", (r) => r.fulfill({ status: 404, body: "" }));
     const page = await ctx.newPage();
     await page.goto(BASE, { waitUntil: "networkidle" });
     await page.getByTestId("deck-play").click();
     await page.waitForTimeout(1000);
     check("missing file: player says so", (await page.getByTestId("lcd").textContent()).includes("FILE UNAVAILABLE"));
-    check("missing file: row marked", (await page.getByTestId("track-growin-and-slowin").textContent()).includes("unavailable"));
+    check("missing file: row marked", (await page.getByTestId("track-care4me").textContent()).includes("unavailable"));
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.waitForTimeout(800);
     check("missing file: next still plays", !(await audio(page)).paused);
@@ -398,8 +400,8 @@ try {
       const r = await page.request.get(BASE + t.src, { headers: { range: "bytes=0-1" } });
       if (![200, 206].includes(r.status())) missing.push(`${t.id} ${r.status()}`);
     }
-    check("files: every beat's MP3 loads", list.length === 14 && missing.length === 0, missing.join(", "));
-    check("files: names with brackets and commas are linked as-is", list.some((t) => t.src.includes("(24.09.26)")) && list.some((t) => t.src.includes("%2C")) && !list.some((t) => /%28|%29/.test(t.src)));
+    check("files: every beat's MP3 loads", list.length === 12 && missing.length === 0, missing.join(", "));
+    check("files: names with brackets and & are linked as-is", list.some((t) => t.src.includes("(24.09.26)")) && list.some((t) => t.src.includes("%26")) && !list.some((t) => /%28|%29/.test(t.src)));
     check("files: every link is the file name through encodeURIComponent", list.every((t) => t.src === "/audio/" + encodeURIComponent(decodeURIComponent(t.src.slice(7)))));
 
     // even loudness: loud beats are turned down to the target, quiet ones left alone
@@ -429,8 +431,8 @@ try {
   {
     const { ctx, page } = await open({ now: "2026-10-01T12:00:00Z" });
     const tagged = await page.locator("[data-testid^=track-]:has(.mp-new)").evaluateAll((rows) => rows.map((r) => r.dataset.testid.replace("track-", "")));
-    check("new tags: on 1 October the three September beats say new", JSON.stringify(tagged) === JSON.stringify(["growin-and-slowin", "kiss-me-miss-ya", "joy4us"]), tagged.join(", "));
-    check("new tags: still fourteen rows, the tag isn't one", (await page.locator("[data-testid^=track-]").count()) === 14);
+    check("new tags: none for now (growin & slowin's is off)", tagged.length === 0, tagged.join(", "));
+    check("new tags: twelve rows", (await page.locator("[data-testid^=track-]").count()) === 12);
     if (axeSource) {
       await page.addScriptTag({ content: axeSource });
       const v = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length})`));
@@ -446,21 +448,21 @@ try {
   // ---------------------------------------------------------------- a page per beat
   {
     const SITE = "https://www.saeculobeats.com";
-    const { ctx, page } = await open({ seen: false, path: "/beat/joy4us" });
+    const { ctx, page } = await open({ seen: false, path: "/beat/beauty-fangs" });
     check("beat page: a first visit there skips the intro", (await page.getByRole("dialog", { name: "Intro" }).count()) === 0);
-    check("beat page: Beats is open on that beat, ready, not playing", (await page.getByTestId("window-beats").isVisible()) && (await page.getByTestId("track-joy4us").getAttribute("aria-current")) === "true" && (await audio(page)).paused);
-    check("beat page: the tab is titled with the beat", (await page.title()).startsWith("joy4us"), await page.title());
-    const html = await (await page.request.get(BASE + "/beat/joy4us")).text();
+    check("beat page: Beats is open on that beat, ready, not playing", (await page.getByTestId("window-beats").isVisible()) && (await page.getByTestId("track-beauty-fangs").getAttribute("aria-current")) === "true" && (await audio(page)).paused);
+    check("beat page: the tab is titled with the beat", (await page.title()).startsWith("beauty fangs"), await page.title());
+    const html = await (await page.request.get(BASE + "/beat/beauty-fangs")).text();
     const attr = (re) => (html.match(re) ?? [])[1];
-    check("beat page: its canonical link is its own address", attr(/<link rel="canonical" href="([^"]+)"/) === `${SITE}/beat/joy4us`, attr(/<link rel="canonical" href="([^"]+)"/));
-    check("beat page: its share card names the beat", attr(/<meta property="og:title" content="([^"]+)"/) === "joy4us — saeculo" && attr(/<meta property="og:url" content="([^"]+)"/) === `${SITE}/beat/joy4us` && (attr(/<meta property="og:description" content="([^"]+)"/) ?? "").includes("96 bpm"));
+    check("beat page: its canonical link is its own address", attr(/<link rel="canonical" href="([^"]+)"/) === `${SITE}/beat/beauty-fangs`, attr(/<link rel="canonical" href="([^"]+)"/));
+    check("beat page: its share card names the beat", attr(/<meta property="og:title" content="([^"]+)"/) === "beauty fangs — saeculo" && attr(/<meta property="og:url" content="([^"]+)"/) === `${SITE}/beat/beauty-fangs` && (attr(/<meta property="og:description" content="([^"]+)"/) ?? "").includes("149 bpm"));
     const ogImage = attr(/<meta property="og:image" content="([^"]+)"/) ?? "";
-    check("beat page: one card image, its own", (html.match(/property="og:image"/g) ?? []).length === 1 && new URL(ogImage).pathname === "/beat/joy4us/opengraph-image", ogImage);
+    check("beat page: one card image, its own", (html.match(/property="og:image"/g) ?? []).length === 1 && new URL(ogImage).pathname === "/beat/beauty-fangs/opengraph-image", ogImage);
     const card = await page.request.get(BASE + new URL(ogImage).pathname);
     check("beat page: the card image is drawn", card.status() === 200 && card.headers()["content-type"] === "image/png" && (await card.body()).length > 20_000);
     check("beat page: an unknown beat is a 404", (await page.request.get(BASE + "/beat/nope")).status() === 404 && (await page.request.get(BASE + "/beat/nope/opengraph-image")).status() === 404);
     const sitemap = await (await page.request.get(BASE + "/sitemap.xml")).text();
-    check("beat page: the sitemap lists every beat's page", (sitemap.match(/<loc>[^<]*\/beat\/[a-z0-9-]+<\/loc>/g) ?? []).length === 14);
+    check("beat page: the sitemap lists every beat's page", (sitemap.match(/<loc>[^<]*\/beat\/[a-z0-9-]+<\/loc>/g) ?? []).length === 12);
     // copy link gives the beat's own page
     await page.evaluate(() => {
       window.__copied = null;
@@ -510,19 +512,19 @@ try {
         }).length;
       });
     const at1366 = await rowsInView(page);
-    check("1366×800: Beats shows most of the tracklist without scrolling", at1366 >= 7, `${at1366} of 14 rows`);
+    check("1366×800: Beats shows most of the tracklist without scrolling", at1366 >= 7, `${at1366} of 12 rows`);
     await ctx.close();
     const { ctx: big, page: bp } = await open({ viewport: { width: 1920, height: 1080 } });
     const at1080 = await rowsInView(bp);
-    check("1920×1080: Beats shows the whole tracklist", at1080 === 14, `${at1080} of 14 rows`);
+    check("1920×1080: Beats shows the whole tracklist", at1080 === 12, `${at1080} of 12 rows`);
     await big.close();
 
     // lease this: Contact, about that beat, and the beat in the email's subject
     const { ctx: c3, page: p3 } = await open();
-    await p3.getByTestId("track-joy4us").click();
+    await p3.getByTestId("track-beauty-fangs").click();
     await p3.getByTestId("lease-this").click();
     const win = p3.getByTestId("window-contact");
-    check("lease this: opens Contact about that beat", (await win.isVisible()) && (await win.getByTestId("contact-beat").textContent()).includes("joy4us"));
+    check("lease this: opens Contact about that beat", (await win.isVisible()) && (await win.getByTestId("contact-beat").textContent()).includes("beauty fangs"));
     await p3.evaluate(() => {
       window.__mailto = null;
       document.addEventListener("click", (e) => {
@@ -538,7 +540,7 @@ try {
     await win.getByRole("button", { name: "Send" }).click();
     await p3.waitForTimeout(200);
     const mail = decodeURIComponent((await p3.evaluate(() => window.__mailto)) ?? "");
-    check("lease this: the email's subject names the beat", mail.includes("subject=Leasing “joy4us” (Test)") && mail.includes("For a single, out in spring."), mail.slice(0, 90));
+    check("lease this: the email's subject names the beat", mail.includes("subject=Leasing “beauty fangs” (Test)") && mail.includes("For a single, out in spring."), mail.slice(0, 90));
     await win.getByRole("button", { name: "just a message" }).click();
     check("lease this: can go back to a plain message", (await win.getByTestId("contact-beat").count()) === 0);
     if (axeSource) {
@@ -1153,10 +1155,10 @@ try {
     await page.getByTestId("sample-this").click();
     await page.waitForTimeout(2500);
     const st = await page.evaluate(() => window.__game?.studio());
-    const cuts = st?.project.channels.filter((c) => c.voice.startsWith("cut:growin-and-slowin:")) ?? [];
+    const cuts = st?.project.channels.filter((c) => c.voice.startsWith("cut:care4me:")) ?? [];
     check("sample this: opens the studio with the beat cut into four pieces", (await page.getByTestId("studio").isVisible()) && cuts.length === 4);
-    check("sample this: cut from where the player was", cuts.length > 0 && Math.abs(Number(cuts[0].voice.split(":")[2]) * (60 / 100.77) - 40) < 4, cuts[0]?.voice);
-    check("sample this: at the track's tempo and key, and playing", st.project.tempo === 101 && st.project.key === 3 && st.project.scale === "major" && st.playing);
+    check("sample this: cut from where the player was", cuts.length > 0 && Math.abs(Number(cuts[0].voice.split(":")[2]) * (60 / 142.68) - 40) < 4, cuts[0]?.voice);
+    check("sample this: at the track's tempo and key, and playing", st.project.tempo === 143 && st.project.key === 5 && st.project.scale === "major" && st.playing);
     check("sample this: the site player is paused, not underneath", (await audio(page)).paused);
     await page.getByTestId("studio").getByRole("button", { name: "Undo" }).click();
     check("sample this: undo brings back the project you had", !(await page.evaluate(() => window.__game.studio())).project.channels.some((c) => c.voice.startsWith("cut:")));
@@ -1274,6 +1276,13 @@ try {
     await page.keyboard.press("Escape");
     await page.reload({ waitUntil: "networkidle" });
     check("night: the choice is remembered over the system's", (await page.evaluate(() => document.documentElement.dataset.theme)) === "day");
+    const sw = page.getByTestId("theme-switch");
+    check("night: the taskbar switch shows light", (await sw.getAttribute("aria-checked")) === "false");
+    await sw.click();
+    l = await look();
+    check("night: the taskbar switch turns it on", l.theme === "night" && l.paper === "rgb(30, 28, 25)" && (await sw.getAttribute("aria-checked")) === "true");
+    await sw.click();
+    check("night: and back off", (await page.evaluate(() => document.documentElement.dataset.theme)) === "day");
     await page.keyboard.press("n");
     check("night: N switches it", (await page.evaluate(() => document.documentElement.dataset.theme)) === "night");
     if (axeSource) {

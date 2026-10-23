@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { usePlayerStore, useCurrentTrack } from "@/components/player/playerStore";
-import { BeatsIcon, ChevronUpGlyph, ContactIcon, NextGlyph, PauseGlyph, PlayGlyph, SocialsIcon } from "./Icons";
+import { BeatsIcon, ChevronUpGlyph, ContactIcon, MoonGlyph, NextGlyph, PauseGlyph, PlayGlyph, SocialsIcon, SunGlyph } from "./Icons";
 import { ALBUM } from "@/data/tracks";
 import { activeWindow, useSiteStore, WINDOW_IDS, WINDOW_TITLES, type WindowId } from "./siteStore";
 import { TASKBAR_H } from "./Window";
@@ -43,6 +43,27 @@ function MiniPlayer() {
         <NextGlyph size={12} />
       </button>
     </div>
+  );
+}
+
+/** The day/night switch: always in the taskbar, one click either way. */
+function ThemeSwitch() {
+  const night = useSiteStore((s) => s.night);
+  const setNight = useSiteStore((s) => s.setNight);
+  return (
+    <button
+      className="tray theme-switch shrink-0 px-[3px]"
+      role="switch"
+      aria-checked={night}
+      aria-label="Dark mode"
+      title={night ? "Switch to light (N)" : "Switch to dark (N)"}
+      onClick={() => setNight(!night)}
+      data-testid="theme-switch"
+    >
+      <span className="theme-switch-track" aria-hidden>
+        <span className="theme-switch-knob">{night ? <MoonGlyph size={12} /> : <SunGlyph size={12} />}</span>
+      </span>
+    </button>
   );
 }
 
@@ -159,6 +180,7 @@ export default function Taskbar({ onReplayIntro }: { onReplayIntro: () => void }
         })}
       </div>
       <MiniPlayer />
+      <ThemeSwitch />
       <Clock onReplayIntro={onReplayIntro} />
     </nav>
   );
