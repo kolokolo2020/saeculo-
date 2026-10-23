@@ -27,6 +27,7 @@ export function TopBar({
   rep,
   fans,
   unread,
+  saved,
   found,
   studio,
   fighting,
@@ -40,6 +41,8 @@ export function TopBar({
   rep: number;
   fans: number;
   unread: number;
+  /** Just saved (a moment's note), or the browser won't keep it. */
+  saved: "" | "saved" | "failed";
   found: number;
   studio: boolean;
   fighting: boolean;
@@ -59,6 +62,10 @@ export function TopBar({
         <span className="ml-2 text-[#e8a0b0]" data-testid="game-fans">
           ♥{fmtFans(fans)}
         </span>
+      </span>
+      {/* under the bar's left end, over the picture, so it never squeezes anything */}
+      <span className={`pointer-events-none absolute top-full left-3 z-10 mt-1 rounded-[2px] bg-black/60 px-1.5 text-[16px] transition-opacity ${saved === "failed" ? "text-[#ff9a7a]" : "text-[#b9b09e]"} ${saved ? "opacity-100" : "opacity-0"}`} role="status" data-testid="game-saved">
+        {saved === "failed" ? "not saved" : saved ? "saved ✓" : ""}
       </span>
       <span className="hidden text-[#8a8170] lg:inline" aria-label={`${found} of ${FINDABLE.length} sounds found`}>
         sounds {found}/{FINDABLE.length}

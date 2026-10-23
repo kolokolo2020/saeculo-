@@ -171,6 +171,24 @@ export default function Game({ onExit }: { onExit: () => void }) {
     ui.current = { dialog, studio, help, phase, menu, mini, ko, phone };
   }, [dialog, studio, help, phase, menu, mini, ko, phone]);
 
+  // a small "saved" in the top bar whenever something you did is kept (not for the money that ticks in by itself)
+  const [saved, setSaved] = useState<"" | "saved" | "failed">("");
+  const quiet = useRef(false);
+  const savedTimer = useRef(0);
+  const warnedSave = useRef(false);
+  const noteSaved = useCallback((ok: boolean) => {
+    if (ok && quiet.current) return;
+    window.clearTimeout(savedTimer.current);
+    setSaved(ok ? "saved" : "failed");
+    if (ok) savedTimer.current = window.setTimeout(() => setSaved(""), 1800);
+    if (!ok && !warnedSave.current) {
+      warnedSave.current = true;
+      window.setTimeout(() => {
+        setToast("This browser isn't keeping your save (a private window, or storage turned off). Your character lasts until you close the page.");
+        window.setTimeout(() => setToast(null), 7000);
+      }, 0);
+    }
+  }, []);
   const updateSave = useCallback((fn: (s: SaveData) => SaveData) => {
     let next = fn(saveRef.current);
     // goals reached by this change pay out once
@@ -201,9 +219,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
       }, reached.length ? 5200 : 0);
     }
     saveRef.current = next;
-    writeSave(next);
+    noteSaved(writeSave(next));
     setSaveState(next);
-  }, []);
+  }, [noteSaved]);
 
   // ------------------------------------------------------------ money, respect, health
 
@@ -328,6 +346,14 @@ export default function Game({ onExit }: { onExit: () => void }) {
 
   /** Some minutes of your songs and beat store earning (and fans writing in). */
   const payOut = (minutes: number) => {
+    quiet.current = true;
+    try {
+      payOutNow(minutes);
+    } finally {
+      quiet.current = false;
+    }
+  };
+  const payOutNow = (minutes: number) => {
     const s = st.current;
     const v = saveRef.current;
     const { songs, songCash, storeCash } = accrue(v, minutes);
@@ -2554,6 +2580,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
         rep={save.rep}
         fans={save.fans}
         unread={save.inbox.filter((m) => !m.read).length}
+        saved={saved}
         found={foundCount}
         studio={studio}
         fighting={fighting}
@@ -2625,8 +2652,16 @@ export default function Game({ onExit }: { onExit: () => void }) {
               setMenu({ tab: "you", creator: true });
               setHelp(true);
             }}
+            onSave={() => {
+              const ok = writeSave(saveRef.current);
+              noteSaved(ok);
+              if (ok) showToast("Saved. (The game also saves by itself, every time something changes, in this browser.)", 3600);
+            }}
             onClose={() => {
-              if (menu.creator) updateSave((v) => ({ ...v, profile: v.profile && { ...v.profile, name: v.profile.name.trim() || "anon" } }));
+              if (menu.creator) {
+                updateSave((v) => ({ ...v, profile: v.profile && { ...v.profile, name: v.profile.name.trim() || "anon" } }));
+                noteSaved(writeSave(saveRef.current));
+              }
               setMenu(null);
               root.current?.focus();
             }}

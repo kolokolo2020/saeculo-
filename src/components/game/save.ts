@@ -295,11 +295,14 @@ export function loadSave(): SaveData {
   }
 }
 
-export function writeSave(data: SaveData) {
+/** Returns false when the browser won't keep it (a private window, storage blocked or full). */
+export function writeSave(data: SaveData): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(data));
+    return localStorage.getItem(KEY) !== null;
   } catch {
     // storage full or blocked: progress lasts for this visit
+    return false;
   }
 }
 

@@ -279,7 +279,12 @@ bring in a minute, every song with its streams, your contacts, protection).
 **The menu** (M, or the button up top): you, your wardrobe (48 pieces,
 most bought or earned), weapons and food, goals (36, each pays out),
 settings (sound and music levels, fight difficulty, shake, hints, start
-over). Cash, respect, health and everything else save in the browser.
+over). Cash, respect, health and everything else save in the browser by
+themselves, the moment they change: a small "saved ✓" shows under the top
+bar, the menu has a **Save** button, and the mirror's button is "Save and
+start". If the browser won't keep it (a private window, storage blocked) the
+game says so once. Saves belong to that browser at that address, so another
+device or a preview link starts fresh.
 
 Sound: footsteps change with what's underfoot (wood, tiles, wet road,
 grit in the alley, the ridged strip on the platform, the club floor,

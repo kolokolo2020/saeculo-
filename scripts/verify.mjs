@@ -618,10 +618,12 @@ try {
     await page.getByTestId("menu-name").fill("Tester");
     await page.getByRole("button", { name: "mullet" }).click();
     await page.getByRole("button", { name: "broad" }).click();
+    check("save: the mirror's button says it saves", (await page.getByTestId("menu-close").textContent()).includes("Save"));
     await page.getByTestId("menu-close").click();
     await page.waitForTimeout(300);
     const prof = await page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-game")).profile);
     check("game: your name and look are saved", prof.name === "Tester" && prof.hair === "mullet" && prof.body === "broad");
+    check("save: you're told it's saved", (await page.getByTestId("game-saved").textContent()).includes("saved") || (await page.getByTestId("game-toast").textContent().catch(() => "")).includes("saved"));
     check("game: controls card on first visit", await page.getByTestId("game-help").isVisible());
     await page.evaluate(() => document.querySelector("audio").play());
     await page.waitForTimeout(300);
@@ -1212,7 +1214,7 @@ try {
 
   // ---------------------------------------------------------------- phone
   {
-    const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, mobile: true });
+    const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, mobile: true, now: "2026-10-23T22:58:00" }); // the widest clock ("10:58 PM", local time)
     const w = await page.getByTestId("window-beats").boundingBox();
     check("phone: windows fill the screen", w && w.width >= 385);
     check("phone: no sideways scroll", await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
@@ -1231,6 +1233,8 @@ try {
       await page.keyboard.press(k);
       await page.waitForTimeout(250);
     }
+    // let the taskbar finish making room before measuring it
+    await page.waitForTimeout(600);
     const tasks = await page.evaluate(() =>
       [...document.querySelectorAll("nav[aria-label=Taskbar] .task-btn")].map((b) => {
         const r = b.getBoundingClientRect();
@@ -1419,6 +1423,13 @@ try {
     await g("peace");
 
     check("career: followers in the top bar", (await page.getByTestId("game-fans").textContent()).includes("12"));
+    await g("menu", "settings");
+    await page.waitForTimeout(250);
+    await page.getByTestId("menu-save").click();
+    await page.waitForTimeout(150);
+    check("save: a Save button in the menu, and it says so", (await page.getByTestId("game-saved").textContent()).includes("saved") && (await page.getByTestId("menu-save-note").isVisible()));
+    await g("menu", null);
+    await page.waitForTimeout(150);
     await page.keyboard.press("p");
     await page.waitForTimeout(300);
     check("phone: P opens your page", await page.getByTestId("phone").isVisible());
@@ -1427,6 +1438,8 @@ try {
     await page.getByTestId("phone-tab-money").click();
     check("phone: the money tab", await page.getByTestId("phone-money").isVisible());
     if (axeSource) {
+      // after the phone's fade in (mid-fade, colours read too dim)
+      await page.waitForTimeout(500);
       await page.addScriptTag({ content: axeSource });
       const pv = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length}): ${x.nodes.map((n) => n.target).join(" ")}`));
       check("axe: no violations on the phone", pv.length === 0, pv.join(", "));

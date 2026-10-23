@@ -284,6 +284,7 @@ function SettingsTab({ settings, onChange, onReset, touch }: { settings: Setting
           <p>WASD / arrows: walk · E / Space: use, talk, swing · Shift: dodge · Q: eat · M: this menu · Esc: back to the site</p>
         )}
         <p>Reduced motion (or still visuals on the site) turns off rain, flicker and shake.</p>
+        <p data-testid="menu-save-note">Saving: everything saves by itself, the moment it changes (Save up top does it now, too). It’s kept in this browser, at this address: another device, a private window or a preview link starts fresh.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {sure ? (
@@ -318,6 +319,7 @@ export default function Menu({
   onUse,
   onSettings,
   onReset,
+  onSave,
   onClose,
 }: {
   save: SaveData;
@@ -332,6 +334,7 @@ export default function Menu({
   onUse: (id: string) => void;
   onSettings: (s: Settings) => void;
   onReset: () => void;
+  onSave: () => void;
   onClose: () => void;
 }) {
   const profile = save.profile ?? DEFAULT_PROFILE;
@@ -360,8 +363,13 @@ export default function Menu({
             ${Math.floor(save.cash)} · respect {Math.floor(save.rep)} · style {styleOf(profile)} · health {Math.round(save.hp)}
           </span>
         )}
-        <button className={`${btn} ml-auto font-sans text-[13px]`} onClick={onClose} data-testid="menu-close">
-          {creator ? "Start" : <>Close<span className="hidden sm:inline"> (Esc)</span></>}
+        {!creator && (
+          <button className={`${btn} ml-auto font-sans text-[13px]`} onClick={onSave} data-testid="menu-save">
+            Save
+          </button>
+        )}
+        <button className={`${btn} ${creator ? "ml-auto" : ""} font-sans text-[13px]`} onClick={onClose} data-testid="menu-close">
+          {creator ? "Save and start" : <>Close<span className="hidden sm:inline"> (Esc)</span></>}
         </button>
       </div>
       {!creator && (
