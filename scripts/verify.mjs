@@ -914,6 +914,18 @@ try {
     await page.getByRole("tab", { name: "settings" }).click();
     await page.getByRole("button", { name: "chill" }).click();
     check("menu: settings saved", (await saved()).settings.difficulty === "chill");
+    // the track is drawn in a pseudo-element: read its colour off the screen,
+    // a quarter of the way along (inside the 80% fill) and near the end
+    const sfx = page.getByRole("slider", { name: "sound effects" });
+    const px = await page.evaluate(async (b64) => {
+      const img = await createImageBitmap(await (await fetch("data:image/png;base64," + b64)).blob());
+      const c = new OffscreenCanvas(img.width, img.height);
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const at = (fx) => [...g.getImageData(Math.round(img.width * fx), Math.round(img.height / 2), 1, 1).data.slice(0, 3)];
+      return { fill: at(0.25), rest: at(0.95) };
+    }, (await sfx.screenshot()).toString("base64"));
+    check("menu: the volume sliders show how full they are", px.fill[0] > 180 && px.fill[2] < 140 && px.rest[0] < 90, JSON.stringify(px));
     await page.keyboard.press("Escape");
     await page.evaluate(() => window.__game.give({ cash: 200 }));
     await page.evaluate(() => window.__game.teleport("thrift", 3.5, 4.2, "up"));
