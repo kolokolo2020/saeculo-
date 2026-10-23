@@ -66,6 +66,11 @@ export const GOALS: Goal[] = [
   { id: "number-one", name: "Number one", hint: "Get a song to the top of the charts (phone → charts).", done: (s) => s.stats.number1s > 0, reward: { cash: 300, rep: 15 } },
   { id: "mixtape", name: "The tape", hint: "Put five songs out as a mixtape (phone → money).", done: (s) => s.mixtapes.length > 0, reward: { cash: 150, rep: 10 } },
   { id: "beef", name: "Beef", hint: "Answer Vee with a diss that lands.", done: (s) => s.stats.disses > 0, reward: { rep: 15 } },
+  { id: "freestyle", name: "Off the top", hint: "Win a freestyle battle at the cypher.", done: (s) => s.stats.freestyleWins > 0, reward: { cash: 30, rep: 10 } },
+  { id: "pool", name: "Pool shark", hint: "Beat Big Lou at pool, at the back of the club.", done: (s) => s.stats.poolWins > 0, reward: { rep: 5 } },
+  { id: "courier", name: "Courier", hint: "Finish a delivery run for the corner store.", done: (s) => s.stats.deliveries > 0, reward: { cash: 15 } },
+  { id: "turf", name: "Corner boy", hint: "Clear a corner for the Kings.", done: (s) => s.stats.turfWins > 0, reward: { rep: 10 } },
+  { id: "studio-up", name: "Real studio", hint: "Put a vocal booth in the studio (phone → shop online).", done: (s) => s.upgrades.includes("booth"), reward: { rep: 10 } },
   { id: "fans-250k", name: "A star", hint: "250,000 followers.", done: (s) => s.fans >= 250000, progress: (s) => [Math.min(250000, Math.floor(s.fans)), 250000], reward: { cash: 10000 } },
 ];
 

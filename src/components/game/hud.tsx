@@ -28,6 +28,7 @@ export function TopBar({
   fans,
   unread,
   saved,
+  heat,
   found,
   studio,
   fighting,
@@ -43,6 +44,8 @@ export function TopBar({
   unread: number;
   /** Just saved (a moment's note), or the browser won't keep it. */
   saved: "" | "saved" | "failed";
+  /** Police heat, 0..5: shown as stars once it's at least one. */
+  heat: number;
   found: number;
   studio: boolean;
   fighting: boolean;
@@ -63,6 +66,11 @@ export function TopBar({
           ♥{fmtFans(fans)}
         </span>
       </span>
+      {Math.floor(heat) >= 1 && (
+        <span className="text-[#7aa8ff]" data-testid="game-heat" aria-label={`Police heat: ${Math.floor(heat)} of 5`} title="Police heat: it cools off by itself, faster at home; sleeping clears it">
+          {"✶".repeat(Math.floor(heat))}
+        </span>
+      )}
       {/* under the bar's left end, over the picture, so it never squeezes anything */}
       <span className={`pointer-events-none absolute top-full left-3 z-10 mt-1 rounded-[2px] bg-black/60 px-1.5 text-[16px] transition-opacity ${saved === "failed" ? "text-[#ff9a7a]" : "text-[#b9b09e]"} ${saved ? "opacity-100" : "opacity-0"}`} role="status" data-testid="game-saved">
         {saved === "failed" ? "not saved" : saved ? "saved ✓" : ""}
@@ -282,6 +290,7 @@ export function TouchPad({
   onRelease,
   onEat,
   onDodge,
+  onHeavy,
   onUse,
 }: {
   down: Dir | null;
@@ -293,6 +302,7 @@ export function TouchPad({
   onRelease: (e: React.PointerEvent) => void;
   onEat: () => void;
   onDodge: () => void;
+  onHeavy: () => void;
   onUse: () => void;
 }) {
   return (
@@ -323,6 +333,16 @@ export function TouchPad({
       <div className="pointer-events-auto flex items-end gap-2">
         {fighting && (
           <div className="flex flex-col gap-2">
+            <button
+              className="pad-btn h-11 w-14 rounded-[4px] text-[16px]"
+              aria-label="H: heavy hit"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                onHeavy();
+              }}
+            >
+              H
+            </button>
             <button
               className="pad-btn h-11 w-14 rounded-[4px] text-[16px]"
               aria-label="Eat"

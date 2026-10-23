@@ -198,8 +198,11 @@ follows you about for a while.
 
 **Trouble**: now and then, in the rougher places, a group of drunks walks up
 to you. Fight, pay them off, play them your beat, or walk away. Fights are
-real-time: E/Space swings (watch for the “!”, that's a swing coming),
-Shift dodges, Q eats something. A hit staggers them, but then they shrug
+real-time: E/Space swings (three hits in a row is a combo, the third
+lands harder), R is a heavy hit (slower to come round, through any guard,
+and it knocks a knife or a bat out of their hand), Shift dodges (watch for
+the “!”, that's a swing coming), Q eats something. Some of them carry
+knives (quicker, nastier) or bats (longer reach). A hit staggers them, but then they shrug
 hits off for a moment and swing back, so mashing alone won't do: dodge the
 “!”. Chill, normal and hard change how hard they hit, how much they take,
 how long they wind up and how soon they come again. Win and they leave cash
@@ -273,11 +276,34 @@ bring in a minute, every song with its streams, your contacts, protection).
   mask, bandanas, grillz, an iced watch, a crossbody bag, and round your
   neck (its own slot now) a cuban link and an iced-out chain. Some of it is
   only sold to people with a following.
+- **Police heat** (blue stars up top): fights get noticed, more so with a
+  weapon in your hand, with the mobs, or in front of a police car. It cools
+  off by itself (much faster at home; sleeping clears it). Two stars or more
+  and an officer on foot can stop you on your street, the avenue, in the
+  park or the subway: pay the fine, sign something for his kid (it works
+  more the more famous you are), or run. Caught: a bigger fine, and they
+  keep the weapon if you bought it or took it off someone.
+- **Turf jobs**: once you pay the Kings (or have beaten them), and while the
+  Syndicate aren't yours, Rook messages you corners to clear: the
+  Syndicate's men are waiting there; run them off for the money.
+- **Shop online** (phone): acoustic panels and a vocal booth for the studio
+  (better sessions; the booth gets artists back twice as fast), proper
+  monitors (every beat's worth 15% more), a neon sign over your bed (fit
+  pics do better), a scooter (the taxi's free). Each shows up where it goes,
+  and your number ones and mixtapes hang as plaques on your wall.
+- **Taxi** (phone): $12 to anywhere outside you've already been; free with
+  the scooter.
+- **Freestyle battle** at the cypher: four rounds; they spit a bar, you pick
+  the comeback (1 2 3) before the beat comes round. The one that rhymes and
+  flips it takes the crowd.
+- **Pool** with Big Lou at the back of the club: three in six shots.
+- **Delivery runs** for the corner store, on the shop's bike: three lanes,
+  bags to grab, cars and puddles to miss.
 - **The cups**: Slick outside the laundromat; find the ball (click, or 1 2
   3), even money, faster hands the more you bet.
 
 **The menu** (M, or the button up top): you, your wardrobe (48 pieces,
-most bought or earned), weapons and food, goals (36, each pays out),
+most bought or earned), weapons and food, goals (41, each pays out),
 settings (sound and music levels, fight difficulty, shake, hints, start
 over). Cash, respect, health and everything else save in the browser by
 themselves, the moment they change: a small "saved ✓" shows under the top

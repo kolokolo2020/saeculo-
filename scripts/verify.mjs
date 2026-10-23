@@ -1742,6 +1742,172 @@ try {
     await ctx.close();
   }
 
+  // ---------------------------------------------------------------- street life, upgrades, the taxi, three more games
+  {
+    const SAVE = { found: ["rain"], seenHelp: true, unseen: [], cash: 3000, rep: 10, fans: 600, places: ["bedroom", "street", "avenue", "underpass", "club"], profile: { name: "Tester", skin: 2, hair: "short", hairColor: 0, body: "slim" }, settings: { sfx: 0, music: 0, shake: false, hints: true, difficulty: "chill" } };
+    const { ctx, page } = await open({ init: { "saeculo-game": JSON.stringify(SAVE) } });
+    await page.getByTestId("icon-game").click();
+    await page.waitForTimeout(1600);
+    const g = (fn, ...a) => page.evaluate(([fn, a]) => window.__game[fn](...a), [fn, a]);
+    const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem("saeculo-game")));
+    const shut = async () => {
+      for (let i = 0; i < 8 && (await page.getByTestId("game-dialog").count()); i++) {
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(120);
+      }
+    };
+    const choose = async (name) => {
+      for (let i = 0; i < 8 && !(await page.getByTestId("game-dialog").getByRole("button", { name }).count()); i++) {
+        await page.keyboard.press("e");
+        await page.waitForTimeout(150);
+      }
+      const b = page.getByTestId("game-dialog").getByRole("button", { name });
+      if (await b.count()) await b.first().click();
+      await page.waitForTimeout(200);
+    };
+    const meetCrew = async (crew) => {
+      await g("crew", crew);
+      for (let i = 0; i < 40 && !(await page.getByTestId("game-dialog").count()); i++) await page.waitForTimeout(250);
+    };
+    const nextTo = async (place) => {
+      const f = await g("fight");
+      const foe = f.foes.find((x) => x.state !== "down" && x.state !== "flee");
+      if (foe) await page.evaluate(([p, x, y]) => window.__game.teleport(p, (x - 9) / 16, y / 16, "right"), [place, foe.x, foe.y]);
+      return foe;
+    };
+    await g("peace");
+
+    // a heavy hit (R) knocks the knife out of their hand; three in a row is a combo
+    await g("teleport", "alley", 12, 6, "right");
+    await page.waitForTimeout(300);
+    await meetCrew("drunks");
+    await choose("Fight");
+    await page.waitForTimeout(300);
+    await g("armFoes", "knife");
+    let disarmed = false;
+    for (let i = 0; i < 10 && !disarmed; i++) {
+      await nextTo("alley");
+      await page.keyboard.press("r");
+      await page.waitForTimeout(150);
+      disarmed = (await g("fight")).foes.some((f) => f.arm === null);
+      await page.waitForTimeout(900);
+    }
+    check("fight: a heavy hit (R) knocks the knife out of their hand", disarmed);
+    let best = 0;
+    for (let i = 0; i < 14 && best < 3 && (await g("fight"))?.outcome === ""; i++) {
+      await nextTo("alley");
+      await page.keyboard.press("e");
+      await page.waitForTimeout(400);
+      best = Math.max(best, (await g("fight"))?.combo ?? 0);
+    }
+    check("fight: hits in a row build a combo", best >= 2, `best run ${best}`);
+    await g("weaken");
+    for (let i = 0; i < 30 && (await g("fight"))?.outcome === ""; i++) {
+      await nextTo("alley");
+      await page.keyboard.press("e");
+      await page.waitForTimeout(380);
+    }
+    await page.waitForTimeout(700);
+    check("heat: a fight won gets noticed", (await saved()).heat >= 0.5, String((await saved()).heat));
+    await shut();
+
+    // the police: hot enough, an officer stops you
+    await g("give", { heat: 3 });
+    await page.waitForTimeout(200);
+    check("heat: stars in the top bar", (await page.getByTestId("game-heat").textContent()).length === 3);
+    await g("teleport", "avenue", 20, 4.6, "down");
+    await page.waitForTimeout(300);
+    await g("peace");
+    await page.waitForTimeout(1500);
+    await meetCrew("cops");
+    await choose(/Pay the fine \(\$120\)/);
+    check("police: pay the fine and the heat's gone", (await saved()).heat === 0 && (await saved()).cash <= 3000 - 120 + 200);
+    await shut();
+
+    // a corner for the Kings
+    await g("give", { mob: { ...(await saved()).mob, kings: { stage: "paying", squads: 0, paid: 0 } }, turf: "underpass" });
+    await g("peace");
+    await g("teleport", "underpass", 4, 6.5, "right");
+    for (let i = 0; i < 30 && !(await page.getByTestId("game-dialog").getByRole("button", { name: "Run them off" }).count()); i++) {
+      await page.waitForTimeout(250);
+      if (await page.getByTestId("game-dialog").count()) await page.keyboard.press("e");
+    }
+    check("turf: the Syndicate are on the Kings' corner", (await page.getByTestId("game-dialog").getByRole("button", { name: "Run them off" }).count()) === 1);
+    await choose("Run them off");
+    await g("weaken");
+    for (let i = 0; i < 40 && (await g("fight"))?.outcome === ""; i++) {
+      await nextTo("underpass");
+      await page.keyboard.press("e");
+      await page.waitForTimeout(380);
+    }
+    await page.waitForTimeout(800);
+    check("turf: clear it and Rook pays", (await saved()).stats.turfWins === 1 && (await saved()).turf === null);
+    await shut();
+
+    // upgrades, bought on the phone
+    await g("phone", "page");
+    await page.waitForTimeout(250);
+    await page.getByTestId("phone-shop").click();
+    await page.waitForTimeout(250);
+    check("shop online: opens from the phone", await page.getByTestId("shop").isVisible());
+    for (const id of ["monitors", "booth", "scooter", "neon"]) await page.getByTestId(`buy-${id}`).getByRole("button").click();
+    const ups = (await saved()).upgrades;
+    check("upgrades: monitors, a booth, a scooter, a neon sign", ["monitors", "booth", "scooter", "neon"].every((id) => ups.includes(id)));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // the scooter: free, anywhere you've been
+    await g("phone", "page");
+    await page.waitForTimeout(250);
+    await page.getByTestId("phone-taxi").click();
+    await page.waitForTimeout(250);
+    const c0 = (await saved()).cash;
+    await page.getByTestId("taxi-street").click();
+    await page.waitForTimeout(900);
+    check("scooter: off to your block, free", (await page.getByTestId("game").getAttribute("data-place")) === "street" && (await saved()).cash === c0);
+
+    // the freestyle battle
+    await shut();
+    await g("mini", { kind: "freestyle", opponent: "Riz" });
+    await page.waitForTimeout(300);
+    await page.getByTestId("freestyle-start").click();
+    for (let r = 0; r < 4; r++) {
+      await page.waitForTimeout(200);
+      await page.keyboard.press("1");
+      await page.waitForTimeout(200);
+      if (r < 3) await page.getByTestId("freestyle-next").click();
+    }
+    await page.waitForTimeout(300);
+    check("freestyle: four rounds, a result", await page.getByTestId("freestyle-result").isVisible());
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // pool
+    await g("mini", { kind: "pool" });
+    await page.waitForTimeout(300);
+    await page.getByTestId("pool-start").click();
+    await page.getByTestId("pool-shoot").click();
+    await page.waitForTimeout(400);
+    check("pool: rack them, take a shot", (await page.getByTestId("pool").textContent()).includes("5 shots left"));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+
+    // a delivery run
+    await g("mini", { kind: "delivery" });
+    await page.waitForTimeout(300);
+    await page.getByTestId("delivery-start").click();
+    await page.waitForTimeout(800);
+    await page.keyboard.press("ArrowLeft");
+    check("delivery: on the bike, on the road", (await page.getByTestId("delivery-start").count()) === 0 && (await page.getByTestId("delivery-road").isVisible()));
+    if (axeSource) {
+      await page.addScriptTag({ content: axeSource });
+      const dv = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ["violations"] })).violations.map((x) => `${x.id} (${x.nodes.length}): ${x.nodes.map((n) => n.target).join(" ")}`));
+      check("axe: no violations on the delivery run", dv.length === 0, dv.join(", "));
+    }
+    await page.keyboard.press("Escape");
+    await ctx.close();
+  }
+
   // ---------------------------------------------------------------- the phone on a phone
   {
     const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, mobile: true, init: { "saeculo-game": JSON.stringify({ found: [], seenHelp: true, unseen: [], profile: { name: "R", skin: 1, hair: "short", hairColor: 0, body: "slim" }, fans: 3000 }) } });

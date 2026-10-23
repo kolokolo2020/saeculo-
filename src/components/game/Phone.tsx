@@ -49,6 +49,7 @@ export default function Phone({
   onMob,
   onTape,
   onManager,
+  onApp,
   onClose,
 }: {
   save: SaveData;
@@ -61,6 +62,8 @@ export default function Phone({
   onAct: (m: Msg, yes: boolean) => void;
   onMob: (id: (typeof MOB_IDS)[number], what: "stop" | "peace") => void;
   onTape: () => void;
+  /** Open the taxi or the online shop (the phone goes away). */
+  onApp: (app: "taxi" | "shop") => void;
   onManager: (what: "fire" | "hire") => void;
   onClose: () => void;
 }) {
@@ -160,6 +163,14 @@ export default function Phone({
                 <div className="mt-1 h-2 w-full rounded-full bg-[#2a2724]" role="progressbar" aria-label="Followers to the next level" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
                   <div className="h-2 rounded-full bg-amber" style={{ width: `${pct}%` }} />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button className={`${btn} flex items-center justify-center gap-1.5`} onClick={() => onApp("taxi")} data-testid="phone-taxi">
+                  <span aria-hidden>🚕</span> {save.upgrades.includes("scooter") ? "scooter" : "taxi"}
+                </button>
+                <button className={`${btn} flex items-center justify-center gap-1.5`} onClick={() => onApp("shop")} data-testid="phone-shop">
+                  <span aria-hidden>🛒</span> shop online
+                </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button className={btn} disabled={!latest?.ok || beatWait > 0} onClick={onPostBeat} data-testid="phone-post-beat">

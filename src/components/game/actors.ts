@@ -1,5 +1,6 @@
 import { CAR_W, type Actor } from "./life";
-import { isBig, type Me } from "./combat";
+import { ARMS, COMBO, isBig, type Me } from "./combat";
+import { sign } from "./places/kit";
 import { dogSprites, flashed, personSprites, pigeonSprites, type Look } from "./people";
 import type { Weapon } from "./weapons";
 import { TILE, type Dir, type Light } from "./world";
@@ -152,7 +153,15 @@ function drawPerson(g: G, a: Actor, t: number, beat: boolean, reduced: boolean) 
         r(g, Math.round(a.x + Math.cos(ang) * 5), sy - 1 + Math.round(Math.sin(ang) * 1.5), 1, 1, "#ffd23a");
       }
     }
-    if (f.state !== "flee") hpBar(g, Math.round(a.x), sy - 5 - (isBig(f.kind) ? 1 : 0), f.hp, f.maxHp, isBig(f.kind) ? 22 : 14);
+    // what they're holding, in the near hand (swung forward on the strike)
+    if (f.arm && f.state !== "down" && f.state !== "flee") {
+      const A = ARMS[f.arm];
+      const [hx, hy] = handAt(a.dir, sx, sy);
+      const fwd = a.dir === "left" ? Math.PI : 0;
+      const ang = f.state === "strike" ? fwd : f.state === "windup" ? fwd + (a.dir === "left" ? 1.9 : -1.9) : Math.PI / 2 + (a.dir === "left" ? 0.5 : -0.5);
+      weaponLine(g, hx, hy, ang, { id: f.arm, colors: A.colors, len: A.len } as Weapon);
+    }
+    if (f.state !== "flee" && f.kind !== "cop") hpBar(g, Math.round(a.x), sy - 5 - (isBig(f.kind) ? 1 : 0), f.hp, f.maxHp, isBig(f.kind) ? 22 : 14);
   }
 }
 
@@ -213,6 +222,8 @@ export function drawMe(g: G, v: MeView, t: number, reduced: boolean) {
   // blink while you can't be hit
   if (!(me && me.iframes > 0 && !dodging && !reduced && Math.floor(t * 20) % 2 === 0)) g.drawImage(img, sx, sy);
   if (!me || v.sitting) return;
+  // the third hit in a row: a moment's COMBO over your head
+  if (me.combo > 0 && me.combo % COMBO.hits === 0 && me.comboT > COMBO.window - 0.5) sign(g, "COMBO", Math.round(v.x) - 13, sy - 9, "#ffd23a", undefined, 6);
   const [hx, hy] = handAt(v.dir, sx, sy);
   const w = v.weapon;
   if (me.atk > 0) {
@@ -227,9 +238,9 @@ export function drawMe(g: G, v: MeView, t: number, reduced: boolean) {
       weaponLine(g, hx, hy, DIR_ANG[v.dir] + side * (-1.7 + p * 2.4), w);
       if (!reduced && p > 0.3 && p < 0.8) {
         // the arc it cuts
-        g.fillStyle = "rgba(255,255,255,0.25)";
-        for (let k = 0; k < 5; k++) {
-          const a = DIR_ANG[v.dir] + side * (-1.2 + k * 0.45);
+        g.fillStyle = me.heavy ? "rgba(255,210,90,0.5)" : "rgba(255,255,255,0.25)";
+        for (let k = 0; k < (me.heavy ? 8 : 5); k++) {
+          const a = DIR_ANG[v.dir] + side * (-1.2 + k * (me.heavy ? 0.34 : 0.45));
           g.fillRect(Math.round(hx + Math.cos(a) * w.reach), Math.round(hy + Math.sin(a) * w.reach), 1, 1);
         }
       }

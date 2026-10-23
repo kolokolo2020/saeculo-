@@ -233,6 +233,34 @@ for (const [dev, opts] of [["desk", { viewport: { width: 1366, height: 800 } }],
   await clear();
   await page.waitForTimeout(1200);
   await snap("career-4-ring");
+  await clear();
+  // round three: upgrades where they go, the police, the new games
+  await g("give", { upgrades: ["panels", "monitors", "booth", "neon", "scooter"], stats: { number1s: 2, shows: 1 }, heat: 3 });
+  for (const [p, x, y] of [["bedroom", 14, 5], ["studio", 8, 5], ["street", 7, 5]]) {
+    await g("teleport", p, x, y, "up");
+    await page.waitForTimeout(500);
+    await snap(`up-${p}`);
+  }
+  await g("teleport", "avenue", 20, 4.6, "down");
+  await page.waitForTimeout(300);
+  await g("crew", "cops");
+  for (let i = 0; i < 30 && !(await dialog.count()); i++) await page.waitForTimeout(200);
+  for (let i = 0; i < 2; i++) {
+    await page.keyboard.press("e");
+    await page.waitForTimeout(150);
+  }
+  await snap("police");
+  await clear();
+  for (const [name, m] of [["freestyle", { kind: "freestyle", opponent: "Riz" }], ["pool", { kind: "pool" }], ["delivery", { kind: "delivery" }], ["taxi", { kind: "taxi" }]]) {
+    await g("mini", m);
+    await page.waitForTimeout(400);
+    const start = page.getByTestId(`${name}-start`);
+    if (await start.count()) await start.click();
+    await page.waitForTimeout(name === "delivery" ? 3000 : 600);
+    await snap(`mini-${name}`);
+    await g("mini", null);
+    await page.waitForTimeout(200);
+  }
   await ctx.close();
 }
 await browser.close();

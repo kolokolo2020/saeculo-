@@ -191,7 +191,7 @@ export const ARTISTS: Artist[] = [
 export const artistById = (id: string) => ARTISTS.find((a) => a.id === id);
 
 /** What an artist pays for a beat of yours, at your current fame. */
-export const artistPrice = (tape: Project, a: Artist, fans: number, managed = false) => Math.round(priceOf(tape) * a.pays * fameMult(fans) * (managed ? MANAGER.prices : 1));
+export const artistPrice = (tape: Project, a: Artist, fans: number, managed = false, boost = 1) => Math.round(priceOf(tape) * a.pays * fameMult(fans) * (managed ? MANAGER.prices : 1) * boost);
 /** How many people find you through a beat sold to them. */
 export const saleFans = (tape: Project, a: Artist) => Math.round(a.reach * (0.5 + priceOf(tape) / 90));
 
@@ -220,8 +220,8 @@ export function songTitle(seed = Math.random()): string {
 }
 
 /** A finished session becomes a song: money up front, followers, and a rate it earns at. */
-export function makeSong(a: Artist, tape: Project, q: number, fans: number, taken: string[] = [], managed = false): { song: Song; upfront: number; gain: number } {
-  const price = artistPrice(tape, a, fans, managed);
+export function makeSong(a: Artist, tape: Project, q: number, fans: number, taken: string[] = [], managed = false, boost = 1): { song: Song; upfront: number; gain: number } {
+  const price = artistPrice(tape, a, fans, managed, boost);
   // the session's most of it, but a fuller beat makes a better song
   q = Math.round(q * 0.8 + (priceOf(tape) / 90) * 20);
   const k = 0.3 + q / 100;
@@ -251,7 +251,7 @@ export interface Msg {
   text: string;
   read: boolean;
   /** Something you can answer (an artist to link up with, a mob to pay or not, a brand deal). */
-  act?: { type: "link"; artist: string } | { type: "mob"; mob: MobId } | { type: "sponsor"; pay: number } | { type: "show"; venue: Venue } | { type: "manager" } | { type: "diss" };
+  act?: { type: "link"; artist: string } | { type: "mob"; mob: MobId } | { type: "sponsor"; pay: number } | { type: "show"; venue: Venue } | { type: "manager" } | { type: "diss" } | { type: "turf"; place: Place };
   done?: boolean;
 }
 
@@ -440,3 +440,35 @@ export const looseSongs = (s: SaveData) => s.collabs.filter((x) => !s.mixtapes.s
 
 export type ManagerStage = "none" | "offered" | "hired" | "fired";
 export const MANAGER = { name: "Dee Mills", handle: "deemills.mgmt", fans: 2000, cut: 0.1, prices: 1.15 };
+
+// ------------------------------------------------------------ your room, your studio, your ride
+
+export interface Upgrade {
+  id: string;
+  name: string;
+  price: number;
+  /** Where you'll see it. */
+  where: Place;
+  /** What it does, in a few words. */
+  what: string;
+}
+export const UPGRADES: Upgrade[] = [
+  { id: "panels", name: "acoustic panels", price: 250, where: "studio", what: "sessions come out 5 points better" },
+  { id: "neon", name: "a neon sign for your room", price: 300, where: "bedroom", what: "fit pics bring a quarter more followers" },
+  { id: "monitors", name: "proper studio monitors", price: 450, where: "studio", what: "every beat's worth 15% more" },
+  { id: "scooter", name: "a scooter", price: 900, where: "street", what: "the taxi's free, and quicker" },
+  { id: "booth", name: "a vocal booth", price: 1600, where: "studio", what: "sessions 10 points better, artists ready again twice as fast" },
+];
+export const has = (s: SaveData, id: string) => s.upgrades.includes(id);
+/** What your gear adds to a beat's worth. */
+export const beatBoost = (s: SaveData) => (has(s, "monitors") ? 1.15 : 1);
+/** What your studio adds to a session. */
+export const sessionBonus = (s: SaveData) => (has(s, "panels") ? 5 : 0) + (has(s, "booth") ? 10 : 0);
+/** Where a taxi goes, and where it drops you. */
+export const TAXI: { place: Place; name: string; x: number; y: number }[] = [
+  { place: "street", name: "your block", x: 5.5, y: 4.4 },
+  { place: "park", name: "the park", x: 27, y: 6 },
+  { place: "avenue", name: "the avenue", x: 20, y: 4.6 },
+  { place: "underpass", name: "the underpass", x: 3, y: 6.5 },
+];
+export const TAXI_FARE = 12;

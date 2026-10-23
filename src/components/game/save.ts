@@ -2,6 +2,7 @@ import { fromOldTape, loadStore, saveStore } from "./studio/project";
 import { ITEMS, sanitizeProfile, STARTERS, type Profile } from "./character";
 import { FINDABLE } from "./studio/voices";
 import { WEAPONS } from "./weapons";
+import { PLACES, type Place } from "./sfx";
 import { ARTISTS, freshMob, MOB_IDS, VENUE_IDS, type Chart, type ManagerStage, type Mixtape, type MobId, type MobState, type Msg, type Post, type Song, type Venue } from "./career";
 
 // What the game remembers between visits, in this browser only: who you
@@ -50,6 +51,11 @@ export interface Stats {
   ringWins: number;
   monteWon: number;
   shows: number;
+  arrests: number;
+  turfWins: number;
+  freestyleWins: number;
+  poolWins: number;
+  deliveries: number;
   /** Weeks with a song of yours at number one. */
   number1s: number;
   disses: number;
@@ -118,13 +124,19 @@ export interface SaveData {
   show: Venue | null;
   mixtapes: Mixtape[];
   manager: ManagerStage;
+  /** How much the police have noticed you, 0..5 (it cools off). */
+  heat: number;
+  /** A corner the Kings want cleared, if you've said yes. */
+  turf: Place | null;
+  /** What you've bought for your room, your studio, your ride. */
+  upgrades: string[];
   settings: Settings;
 }
 
 const KEY = "saeculo-game";
 
 export const DEFAULT_SETTINGS: Settings = { sfx: 0.8, music: 0.8, shake: true, hints: true, difficulty: "normal" };
-const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0, battleWins: 0, battleLosses: 0, jobs: 0, rides: 0, royalties: 0, leases: 0, songs: 0, ringWins: 0, monteWon: 0, shows: 0, number1s: 0, disses: 0 };
+const ZERO: Stats = { wins: 0, losses: 0, fled: 0, beatsSold: 0, earned: 0, cypherBest: 0, djBest: 0, diceWon: 0, digs: 0, tags: 0, swishes: 0, battleWins: 0, battleLosses: 0, jobs: 0, rides: 0, royalties: 0, leases: 0, songs: 0, ringWins: 0, monteWon: 0, shows: 0, arrests: 0, turfWins: 0, freestyleWins: 0, poolWins: 0, deliveries: 0, number1s: 0, disses: 0 };
 
 export function freshSave(): SaveData {
   return {
@@ -161,6 +173,9 @@ export function freshSave(): SaveData {
     show: null,
     mixtapes: [],
     manager: "none",
+    heat: 0,
+    turf: null,
+    upgrades: [],
     settings: { ...DEFAULT_SETTINGS },
   };
 }
@@ -193,6 +208,8 @@ function loadInbox(x: unknown): Msg[] {
             ? { type: "sponsor", pay: num(a.pay, 0, 1e6, 0) }
             : a.type === "show" && VENUE_IDS.includes(a.venue as Venue)
               ? { type: "show", venue: a.venue as Venue }
+              : a.type === "turf" && (PLACES as readonly string[]).includes(a.place as string)
+                ? { type: "turf", place: a.place as Place }
               : a.type === "manager" || a.type === "diss"
                 ? { type: a.type }
                 : undefined;
@@ -282,6 +299,9 @@ export function loadSave(): SaveData {
       show: VENUE_IDS.includes(raw.show) ? raw.show : null,
       mixtapes: loadMixtapes(raw.mixtapes),
       manager: ["none", "offered", "hired", "fired"].includes(raw.manager) ? raw.manager : "none",
+      heat: num(raw.heat, 0, 5, 0),
+      upgrades: strings(raw.upgrades),
+      turf: (PLACES as readonly string[]).includes(raw.turf) ? raw.turf : null,
       settings: {
         sfx: num(st.sfx, 0, 1, DEFAULT_SETTINGS.sfx),
         music: num(st.music, 0, 1, DEFAULT_SETTINGS.music),
