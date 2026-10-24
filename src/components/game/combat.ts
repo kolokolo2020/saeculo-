@@ -13,7 +13,13 @@ import type { Weapon } from "./weapons";
 // wake up at home with less in your pockets. Leaving through a door is
 // always an option.
 
-export type FoeKind = "drunk" | "rowdy" | "boss" | "goon" | "robber" | "gang" | "suit" | "rook" | "kade" | "boxer" | "champ";
+export type FoeKind = "drunk" | "rowdy" | "boss" | "goon" | "robber" | "gang" | "suit" | "rook" | "kade" | "boxer" | "champ" | "cop";
+/** What a foe's holding: a knife comes quicker and cuts deeper, a bat reaches further. A heavy hit knocks it out of their hand. */
+export type Arm = "knife" | "bat";
+export const ARMS: Record<Arm, { dmg: number; windup: number; reach: number; colors: [string, string]; len: number }> = {
+  knife: { dmg: 1.35, windup: 0.85, reach: 0, colors: ["#26262b", "#d9d9d9"], len: 4 },
+  bat: { dmg: 1.2, windup: 1.05, reach: 5, colors: ["#8a6038", "#b88a52"], len: 8 },
+};
 /** The big ones: a wide health bar, hard to shove, slow to stagger. */
 export const isBig = (k: FoeKind) => k === "boss" || k === "rook" || k === "kade" || k === "champ";
 export type FoeState = "approach" | "windup" | "strike" | "recover" | "stagger" | "down" | "flee";
@@ -40,6 +46,7 @@ export interface Fighter {
   guard: number;
   /** Stunned (a taser, spray) recently: it won't take again for a bit. */
   stunned: number;
+  arm?: Arm;
 }
 
 export interface Me {
@@ -49,6 +56,11 @@ export interface Me {
   hp: number;
   /** Swing animation time left. */
   atk: number;
+  /** The last swing was a heavy one (drawn bigger). */
+  heavy: boolean;
+  /** Hits landed in a row, and how long the run stays open. */
+  combo: number;
+  comboT: number;
   atkCd: number;
   dodge: number;
   dodgeCd: number;
@@ -60,7 +72,11 @@ export interface Me {
   flash: number;
 }
 
-export const freshMe = (x: number, y: number, dir: Dir, hp: number): Me => ({ x, y, dir, hp, atk: 0, atkCd: 0, dodge: 0, dodgeCd: 0, dvx: 0, dvy: 0, iframes: 0, kvx: 0, kvy: 0, flash: 0 });
+export const freshMe = (x: number, y: number, dir: Dir, hp: number): Me => ({ x, y, dir, hp, atk: 0, heavy: false, combo: 0, comboT: 0, atkCd: 0, dodge: 0, dodgeCd: 0, dvx: 0, dvy: 0, iframes: 0, kvx: 0, kvy: 0, flash: 0 });
+/** Hits in a row that make a combo (the last one lands harder), and how long between them. */
+export const COMBO = { hits: 3, window: 0.9, mult: 1.6 };
+/** The heavy hit: slower to come round, twice the damage, through any guard. */
+export const HEAVY = { dmg: 2, cooldown: 2.2, knock: 1.8 };
 
 export interface FightEvents {
   hit: (heavy: boolean) => void;
@@ -82,6 +98,8 @@ const STATS: Record<FoeKind, Omit<Fighter, "kind" | "state" | "timer" | "cd" | "
   rook: { hp: 230, maxHp: 230, dmg: 21, speed: 42, reach: 17, windup: 0.52 },
   kade: { hp: 300, maxHp: 300, dmg: 24, speed: 44, reach: 18, windup: 0.46 },
   champ: { hp: 210, maxHp: 210, dmg: 19, speed: 46, reach: 15, windup: 0.44 },
+  // an officer on foot: never fights you here, just stops you
+  cop: { hp: 99, maxHp: 99, dmg: 0, speed: 40, reach: 12, windup: 1 },
 };
 /** How much harder (or softer) each setting makes them. */
 export const TUNING: Record<Difficulty, { dmg: number; hp: number; windup: number; rest: number }> = {
@@ -90,7 +108,15 @@ export const TUNING: Record<Difficulty, { dmg: number; hp: number; windup: numbe
   hard: { dmg: 1.3, hp: 1.2, windup: 0.82, rest: 0.7 },
 };
 /** How long each kind shrugs off hits after being staggered. */
-const GUARD: Record<FoeKind, number> = { drunk: 1.5, rowdy: 1.9, goon: 2, boss: 2.6, robber: 1.7, gang: 2, suit: 2.2, boxer: 2.1, rook: 2.6, kade: 2.8, champ: 2.5 };
+const GUARD: Record<FoeKind, number> = { drunk: 1.5, rowdy: 1.9, goon: 2, boss: 2.6, robber: 1.7, gang: 2, suit: 2.2, boxer: 2.1, rook: 2.6, kade: 2.8, champ: 2.5, cop: 2 };
+/** Who carries what, and how often. */
+const ARMED: Partial<Record<FoeKind, [Arm, number][]>> = {
+  robber: [["knife", 0.5]],
+  gang: [["bat", 0.4], ["knife", 0.3]],
+  suit: [["knife", 0.35]],
+  rook: [["bat", 1]],
+  rowdy: [["bat", 0.15]],
+};
 
 const LOOKS: Look[] = [
   { skin: "#e0b193", hair: "#6b3a1c", top: "#5a2a3a", pants: "#23252e", style: "short", body: "broad" },
@@ -123,6 +149,7 @@ const BOXERS: Look[] = [
   { skin: "#4e3020", hair: "#0d0a08", top: "#c9c2b3", topStyle: "jersey", trim: "#b33a3a", pants: "#b33a3a", style: "buzz", body: "broad" },
   { skin: "#e0b193", hair: "#6b3a1c", top: "#2a4a7a", topStyle: "jersey", trim: "#e8e0cf", pants: "#2a4a7a", style: "short", body: "broad" },
 ];
+const COP: Look = { skin: "#d2a58a", hair: "#151010", top: "#1d2a44", topStyle: "jacket", trim: "#c9c2b3", pants: "#1d2a44", style: "short", hat: "cap", hatColor: "#141c30", hatShade: "#0d1220", body: "broad" };
 const CHAMP: Look = { skin: "#7a4a32", hair: "#0d0a08", top: "#d0a020", topStyle: "jersey", trim: "#111216", pants: "#111216", style: "bald", body: "broad", neck: "chain", neckColor: "#f0c850" };
 const pickLook = (xs: Look[]) => xs[Math.floor(Math.random() * xs.length)];
 const LOOK_OF: Partial<Record<FoeKind, () => Look>> = {
@@ -134,6 +161,7 @@ const LOOK_OF: Partial<Record<FoeKind, () => Look>> = {
   robber: () => pickLook(ROBBERS),
   boxer: () => pickLook(BOXERS),
   champ: () => CHAMP,
+  cop: () => COP,
 };
 const PURSE: Record<FoeKind, () => number> = {
   drunk: () => 6 + Math.floor(Math.random() * 8),
@@ -144,6 +172,7 @@ const PURSE: Record<FoeKind, () => number> = {
   gang: () => 30 + Math.floor(Math.random() * 30),
   suit: () => 80 + Math.floor(Math.random() * 80),
   boxer: () => 0,
+  cop: () => 0,
   rook: () => 400,
   kade: () => 1500,
   champ: () => 0,
@@ -156,6 +185,8 @@ export function makeFoe(kind: FoeKind, place: Actor["place"], x: number, y: numb
   const s = { ...STATS[kind] };
   s.hp = s.maxHp = Math.round(s.hp * TUNING[difficulty].hp);
   s.windup *= TUNING[difficulty].windup;
+  let roll = Math.random();
+  const arm = ARMED[kind]?.find(([, p]) => (roll -= p) < 0)?.[0];
   return {
     id: `foe-${kind}-${seq++}`,
     kind: "person",
@@ -181,6 +212,7 @@ export function makeFoe(kind: FoeKind, place: Actor["place"], x: number, y: numb
       purse: PURSE[kind](),
       guard: 0,
       stunned: 0,
+      arm,
     },
   };
 }
@@ -249,9 +281,10 @@ export function updateFoes(foes: Actor[], me: Me, dt: number, scene: Scene, diff
           move(a, a.x + (ex / d) * sp * dt, a.y + (ey / d) * sp * dt + weave * dt, scene);
           a.walking = true;
         }
-        if (Math.abs(dx) < f.reach + 3 && Math.abs(dy) < 7 && f.cd <= 0) {
+        const reach = f.reach + (f.arm ? ARMS[f.arm].reach : 0);
+        if (f.kind !== "cop" && Math.abs(dx) < reach + 3 && Math.abs(dy) < 7 && f.cd <= 0) {
           f.state = "windup";
-          f.timer = f.windup;
+          f.timer = f.windup * (f.arm ? ARMS[f.arm].windup : 1);
           a.dir = dx > 0 ? "right" : "left";
         } else if (f.kind === "drunk" && Math.random() < dt * 0.12) {
           f.state = "stagger";
@@ -265,9 +298,9 @@ export function updateFoes(foes: Actor[], me: Me, dt: number, scene: Scene, diff
           f.state = "strike";
           f.timer = 0.12;
           const facing = a.dir === "right" ? 1 : -1;
-          const inFront = dx * facing > -2 && Math.abs(dx) < f.reach + 5 && Math.abs(dy) < 9;
+          const inFront = dx * facing > -2 && Math.abs(dx) < f.reach + (f.arm ? ARMS[f.arm].reach : 0) + 5 && Math.abs(dy) < 9;
           if (inFront && me.iframes <= 0 && me.dodge <= 0) {
-            const dmg = Math.round(f.dmg * TUNING[difficulty].dmg * (0.85 + Math.random() * 0.3));
+            const dmg = Math.round(f.dmg * TUNING[difficulty].dmg * (0.85 + Math.random() * 0.3) * (f.arm ? ARMS[f.arm].dmg : 1));
             me.hp = Math.max(0, me.hp - dmg);
             me.iframes = 0.55;
             me.flash = 0.18;
@@ -310,9 +343,11 @@ export function updateFoes(foes: Actor[], me: Me, dt: number, scene: Scene, diff
 }
 
 /** Your swing. Returns the foes it landed on (and knocks the downed ones out). */
-export function swing(foes: Actor[], me: Me, w: Weapon, ev: FightEvents): { hits: Actor[]; downed: Actor[] } {
+export function swing(foes: Actor[], me: Me, w: Weapon, ev: FightEvents, opts: { heavy?: boolean; combo?: boolean } = {}): { hits: Actor[]; downed: Actor[]; disarmed: Actor[] } {
   const hits: Actor[] = [];
   const downed: Actor[] = [];
+  const disarmed: Actor[] = [];
+  const power = (opts.heavy ? HEAVY.dmg : 1) * (opts.combo ? COMBO.mult : 1);
   const fx = me.dir === "left" ? -1 : me.dir === "right" ? 1 : 0;
   const fy = me.dir === "up" ? -1 : me.dir === "down" ? 1 : 0;
   const cands = foes
@@ -331,11 +366,17 @@ export function swing(foes: Actor[], me: Me, w: Weapon, ev: FightEvents): { hits
     const crit = Math.random() < 0.15;
     // catching them mid wind-up knocks the swing out of them
     const interrupt = f.state === "windup";
-    const dmg = Math.round(w.dmg * (0.9 + Math.random() * 0.2) * (crit ? 1.5 : 1) * (interrupt ? 1.2 : 1));
+    const dmg = Math.round(w.dmg * (0.9 + Math.random() * 0.2) * (crit ? 1.5 : 1) * (interrupt ? 1.2 : 1) * power);
     f.hp = Math.max(0, f.hp - dmg);
     f.flash = 0.14;
-    // while they're shrugging hits off, they barely move
-    const k = w.knock * (isBig(f.kind) ? 0.35 : 1) * (f.guard > 0 && !crit ? 0.35 : 1);
+    // a heavy hit knocks what they're holding out of their hand
+    if (opts.heavy && f.arm) {
+      f.arm = undefined;
+      disarmed.push(a);
+    }
+    // while they're shrugging hits off, they barely move (a heavy hit or a combo goes through that)
+    const through = opts.heavy || opts.combo;
+    const k = w.knock * (isBig(f.kind) ? 0.35 : 1) * (f.guard > 0 && !crit && !through ? 0.35 : 1) * (opts.heavy ? HEAVY.knock : 1);
     f.kvx = (fx || Math.sign(a.x - me.x) || 1) * k;
     f.kvy = fy * k;
     if (f.hp <= 0) {
@@ -349,7 +390,7 @@ export function swing(foes: Actor[], me: Me, w: Weapon, ev: FightEvents): { hits
       f.timer = w.stun * (isBig(f.kind) ? 0.5 : 1);
       f.stunned = f.timer + 2.5;
       f.guard = f.timer + 0.4;
-    } else if (crit || (f.guard <= 0 && (interrupt || !isBig(f.kind)))) {
+    } else if (crit || through || (f.guard <= 0 && (interrupt || !isBig(f.kind)))) {
       // a stagger, then a moment where hits land but don't stop them
       f.state = "stagger";
       f.timer = interrupt ? 0.55 : 0.25;
@@ -358,15 +399,17 @@ export function swing(foes: Actor[], me: Me, w: Weapon, ev: FightEvents): { hits
     hits.push(a);
   }
   if (hits.length) {
-    ev.hit(w.dmg >= 16);
-    ev.shake(w.dmg >= 16 ? 2.5 : 1.5);
+    ev.hit(w.dmg >= 16 || power > 1);
+    ev.shake(w.dmg >= 16 || power > 1 ? 2.5 : 1.5);
   } else ev.whoosh();
-  return { hits, downed };
+  return { hits, downed, disarmed };
 }
 
 /** Move you by your dodge and any shove; returns true while dashing. */
 export function moveMe(me: Me, dt: number, scene: Scene) {
   me.atk = Math.max(0, me.atk - dt);
+  me.comboT = Math.max(0, me.comboT - dt);
+  if (me.comboT <= 0) me.combo = 0;
   me.atkCd = Math.max(0, me.atkCd - dt);
   me.dodgeCd = Math.max(0, me.dodgeCd - dt);
   me.iframes = Math.max(0, me.iframes - dt);

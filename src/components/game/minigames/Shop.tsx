@@ -4,19 +4,21 @@ import { ITEMS, type Item } from "../character";
 import { fmtFans } from "../career";
 import type { SaveData } from "../save";
 import { CONSUMABLES, FOR_SALE } from "../weapons";
+import { UPGRADES } from "../career";
 import Frame, { miniBtn } from "./Frame";
 
 // Buying things: clothes at the thrift shop, designer at Maison, food at
 // the corner store, drinks at the club's bar, and whatever Smokey's got
 // under his coat in the alley.
 
-export type ShopKind = "thrift" | "store" | "bar" | "maison" | "smokey";
+export type ShopKind = "thrift" | "store" | "bar" | "maison" | "smokey" | "upgrades";
 const TITLES: Record<ShopKind, [string, string]> = {
   thrift: ["Second hand", "everything's been worn once"],
   store: ["The counter", "noodles, drinks, plasters"],
   bar: ["The bar", "the purple stuff, mostly"],
   maison: ["Maison", "designer. no refunds. no photos."],
   smokey: ["Smokey's coat", "no questions, no receipts"],
+  upgrades: ["Shop online", "for your room, your studio, your ride"],
 };
 
 type Priced = Item & { unlock: { kind: "buy" | "designer"; price: number; fans?: number } };
@@ -78,6 +80,20 @@ export default function Shop({ kind, save, onBuy, onClose }: { kind: ShopKind; s
               </li>
             );
           })}
+        {kind === "upgrades" &&
+          UPGRADES.map((u) => {
+            const owned = save.upgrades.includes(u.id);
+            return (
+              <li key={u.id} className="flex items-center gap-3" data-testid={`buy-${u.id}`}>
+                <span className="min-w-0 flex-1 leading-tight">
+                  {u.name} <span className="text-[16px] text-[#8a8170]">{u.what}</span>
+                </span>
+                <button className={miniBtn} disabled={owned || cash < u.price} onClick={() => onBuy(u.id, u.price)} aria-label={owned ? `${u.name}: yours` : `$${u.price}: buy ${u.name}`}>
+                  {owned ? "yours" : `$${u.price}`}
+                </button>
+              </li>
+            );
+          })}
         {(kind === "store" || kind === "bar") &&
           food.map((c) => (
             <li key={c.id} className="flex items-center gap-3">
@@ -93,6 +109,7 @@ export default function Shop({ kind, save, onBuy, onClose }: { kind: ShopKind; s
       {kind === "thrift" && <p className="mt-3 text-[16px] text-[#8a8170]">Bought clothes go in your wardrobe (the mirror, or M). Some things aren’t for sale: they’re earned.</p>}
       {kind === "maison" && <p className="mt-3 text-[16px] text-[#8a8170]">The more it cost, the more people look. Not all of them nicely.</p>}
       {kind === "smokey" && <p className="mt-3 text-[16px] text-[#8a8170]">Pick what you hold in the menu, under fight.</p>}
+      {kind === "upgrades" && <p className="mt-3 text-[16px] text-[#8a8170]">It turns up while you’re out. You’ll see it where it goes.</p>}
     </Frame>
   );
 }

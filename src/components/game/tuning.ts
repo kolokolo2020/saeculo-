@@ -51,7 +51,7 @@ export const carrying = (v: SaveData) => v.job?.stage === "carry";
  * people know your face (or someone's after you) anywhere outside but your
  * own roof.
  */
-export const troubleHere = (place: Place, v: SaveData) => ROUGH[place] !== undefined || (place !== "rooftop" && !!SCENES[place].outdoors && (tierOf(v.fans) >= 2 || !!huntedBy(v)));
+export const troubleHere = (place: Place, v: SaveData) => ROUGH[place] !== undefined || (place !== "rooftop" && !!SCENES[place].outdoors && (tierOf(v.fans) >= 2 || !!huntedBy(v) || v.heat >= 2));
 /** How likely trouble is to be waiting when you walk in. */
 export const ambushOdds = (place: Place, v: SaveData) => {
   if (!troubleHere(place, v)) return 0;
@@ -60,7 +60,7 @@ export const ambushOdds = (place: Place, v: SaveData) => {
   return Math.min(hunted ? 0.65 : 0.45, ((ROUGH[place] ?? 0) + fame) * (carrying(v) ? CARRY_ODDS : 1) * shelterOf(v) + hunted);
 };
 /** How much sooner trouble comes round, as things stand (the tape on you, your face, who's after you, who you pay). */
-export const troublePace = (v: SaveData) => (carrying(v) ? CARRY_SOONER : 1) * (1 + tierOf(v.fans) * 0.12) * (huntedBy(v) ? 2.4 : 1) * (shelterOf(v) < 1 ? 0.6 : 1);
+export const troublePace = (v: SaveData) => (carrying(v) ? CARRY_SOONER : 1) * (1 + tierOf(v.fans) * 0.12) * (huntedBy(v) ? 2.4 : 1) * (shelterOf(v) < 1 ? 0.6 : 1) * (1 + Math.floor(v.heat) * 0.15);
 /** What they say when they've seen the tape on you. */
 const TAPE_LINES = [
   ["One of them nods at your pocket.", "\u201cWhat's on the tape?\u201d"],

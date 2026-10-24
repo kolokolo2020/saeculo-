@@ -1,5 +1,5 @@
 import { blingOf, styleOf } from "./character";
-import { ARTISTS, artistPrice, fameMult, fmtFans, priceOf, saleFans, tierOf, type Artist, type PostKind } from "./career";
+import { ARTISTS, artistPrice, beatBoost, fameMult, fmtFans, priceOf, saleFans, tierOf, type Artist, type PostKind, type Venue } from "./career";
 import type { Actor } from "./life";
 import type { MenuTab } from "./Menu";
 import { BATTLE_BEATS, type RhythmMode } from "./minigames/Rhythm";
@@ -18,13 +18,17 @@ export interface Choice {
   run: () => void;
 }
 export type Mini =
-  | { kind: "rhythm"; mode: RhythmMode; rival?: { name: string; score: number; stake: number; beat: string } }
+  | { kind: "rhythm"; mode: RhythmMode; rival?: { name: string; score: number; stake: number; beat: string }; venue?: Venue }
   | { kind: "dice" }
   | { kind: "crates" }
   | { kind: "hoops" }
   | { kind: "tag" }
   | { kind: "shop"; shop: ShopKind }
   | { kind: "session"; artist: string }
+  | { kind: "taxi" }
+  | { kind: "freestyle"; opponent: string }
+  | { kind: "pool" }
+  | { kind: "delivery" }
   | { kind: "monte" };
 
 export interface Api {
@@ -112,7 +116,7 @@ function sellTape(api: Api, who: "dre" | "owner") {
     return;
   }
   // a name of your own makes a beat worth more, even to Dre (he only goes so far)
-  const price = Math.round(priceOf(tape) * (who === "dre" ? 1 : 0.7) * Math.min(2.5, fameMult(api.save().fans)));
+  const price = Math.round(priceOf(tape) * (who === "dre" ? 1 : 0.7) * Math.min(2.5, fameMult(api.save().fans)) * beatBoost(api.save()));
   api.say(who === "dre" ? [`You hand Dre ‘${tape.name}’. He puts one earbud in.`, "He listens to the whole loop twice. Doesn't say anything.", `“$${price}. That's the price.”`] : [`The owner puts ‘${tape.name}’ on the shop turntable and turns it up.`, `A kid by the bins looks round. “$${price}, for a shop copy.”`], [
     {
       label: `Sell it for $${price}`,
@@ -183,6 +187,8 @@ export function promptFor(id: string, api: Api): string | null | undefined {
       return "look at the pieces";
     case "plinth":
       return "the piece on the plinth";
+    case "pool":
+      return "the pool table (Big Lou)";
   }
   return undefined;
 }
@@ -309,6 +315,12 @@ export function operate(id: string, api: Api): boolean {
     case "maison-counter":
       api.open({ kind: "shop", shop: "maison" });
       return true;
+    case "pool":
+      api.say(["Big Lou's leaning on the table like it's his. It might be.", "“Three in six. You or me paying.”"], [
+        { label: "Play pool", run: () => api.open({ kind: "pool" }) },
+        { label: "Watch", run: api.close },
+      ]);
+      return true;
     case "plinth":
       api.say([Math.random() < 0.5 ? "A cuban link on a velvet neck. It's heavier than it looks, apparently. You're not allowed to touch it." : "An iced-out chain under its own little light. The light's the only thing in here you could afford."], [
         { label: "Ask about it", run: () => api.open({ kind: "shop", shop: "maison" }) },
@@ -331,7 +343,7 @@ function artistTalk(a: Artist, api: Api) {
   const rel = s.rel[a.id] ?? 0;
   const bought = !!tape && (s.leases[a.id] ?? []).includes(tape.name);
   const wait = Math.ceil(((s.cd[`song-${a.id}`] ?? 0) - Date.now()) / 1000);
-  const price = tape ? artistPrice(tape, a, s.fans) : 0;
+  const price = tape ? artistPrice(tape, a, s.fans, s.manager === "hired", beatBoost(s)) : 0;
   const hello = rel ? a.warm[rel % a.warm.length] : [`${a.name}, ${a.kind}. ${["“So you're the producer.”", "“I've heard of you. Go on then.”", "“Took you long enough.”"][tierOf(s.fans) % 3]}`];
   const lines = [...hello, ...(tape && bought ? [`“I've already got ‘${tape.name}’. Make me something new.”`] : [])];
   const choices = [
@@ -383,6 +395,7 @@ function cypher(api: Api) {
   const best = api.save().stats.cypherBest;
   api.say(best ? [`“Producer's back. Last time: ${best}%.”`, "“Go on then.”"] : ["The circle opens up a little. The MC nods at the speaker.", "“You make beats? Then keep this one going. We'll do the rest.”"], [
     { label: "Play the beat", run: () => api.open({ kind: "rhythm", mode: "cypher" }) },
+    { label: "Freestyle battle", run: () => api.open({ kind: "freestyle", opponent: ["Riz", "Lady Tempo", "Big Mouth Dee"][Math.floor(api.t()) % 3] }) },
     { label: "Just listen", run: () => api.say(["You stand at the edge of the circle. Nobody minds."]) },
   ]);
 }

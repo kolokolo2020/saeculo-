@@ -97,6 +97,10 @@ function Clock({ onReplayIntro }: { onReplayIntro: () => void }) {
   }, [open]);
 
   const time = now ? now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+  // on a phone the AM/PM goes (it's in the label): "10:22 PM" would push the third window's button out of reach
+  const parts = now ? new Intl.DateTimeFormat([], { hour: "numeric", minute: "2-digit" }).formatToParts(now) : [];
+  const digits = parts.filter((p) => p.type !== "dayPeriod").map((p) => p.value).join("").trim();
+  const period = parts.find((p) => p.type === "dayPeriod")?.value ?? "";
   return (
     <div ref={box} className="relative">
       <button
@@ -108,7 +112,8 @@ function Clock({ onReplayIntro }: { onReplayIntro: () => void }) {
       >
         <ChevronUpGlyph size={13} className={`text-ink-2 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} />
         <span className="font-lcd text-[19px] leading-none" suppressHydrationWarning>
-          {time}
+          {digits}
+          {period && <span className="max-sm:hidden"> {period}</span>}
         </span>
       </button>
       {open && (

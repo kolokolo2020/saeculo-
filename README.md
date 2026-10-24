@@ -198,8 +198,11 @@ follows you about for a while.
 
 **Trouble**: now and then, in the rougher places, a group of drunks walks up
 to you. Fight, pay them off, play them your beat, or walk away. Fights are
-real-time: E/Space swings (watch for the “!”, that's a swing coming),
-Shift dodges, Q eats something. A hit staggers them, but then they shrug
+real-time: E/Space swings (three hits in a row is a combo, the third
+lands harder), R is a heavy hit (slower to come round, through any guard,
+and it knocks a knife or a bat out of their hand), Shift dodges (watch for
+the “!”, that's a swing coming), Q eats something. Some of them carry
+knives (quicker, nastier) or bats (longer reach). A hit staggers them, but then they shrug
 hits off for a moment and swing back, so mashing alone won't do: dodge the
 “!”. Chill, normal and hard change how hard they hit, how much they take,
 how long they wind up and how soon they come again. Win and they leave cash
@@ -230,6 +233,25 @@ bring in a minute, every song with its streams, your contacts, protection).
   song pays something up front, brings their fans to you, and keeps earning
   while you walk about, fading but never to nothing. Going up a level brings
   messages from the next artists, and brand deals at 10K and 50K.
+- **The charts** (phone → charts): a city top 10, a new week every three
+  minutes of play. Your songs go in by what they earn and how good they are
+  (the session, and how full the beat was); the higher up, the more they
+  play (number one pays two and a half times as much). Vee's songs are on
+  it too, and she keeps pace with your best, less so with every battle you
+  win. When she's charting she messages you; **answer with a diss** (a
+  session on your own) that lands and she drops off the chart, or falls
+  flat and costs you followers.
+- **Shows**: venues message you a booking at 1,000 followers (the club),
+  5,000 (the underpass) and 20,000 (your roof). Say yes, walk in, and play
+  your show (the rhythm game, longer, on the venue's beat). Door money goes
+  by the crowd (a share of your followers, as many as the place holds) and
+  how well you played; more bookings come round after.
+- **Mixtapes** (phone → money): five songs not on a tape go out together:
+  money up front, a crowd of new followers, the songs earn more for longer,
+  and a listening party on your roof next time you go up.
+- **A manager**: at 2,000 followers Dee Mills offers to manage you. 10% of
+  your music money, for artists paying more, shows paying more and brands
+  calling every few weeks. Let them go (or call back) on your phone.
 - **Being known**: from 500 followers people know your face anywhere outside
   (not on your own roof), and some of the trouble is people after what
   you've got on (the more it cost, the more often). Take a picture with them
@@ -254,13 +276,41 @@ bring in a minute, every song with its streams, your contacts, protection).
   mask, bandanas, grillz, an iced watch, a crossbody bag, and round your
   neck (its own slot now) a cuban link and an iced-out chain. Some of it is
   only sold to people with a following.
-- **The cups**: Slick outside the laundromat; find the ball, even money,
-  faster hands the more you bet.
+- **Police heat** (blue stars up top): fights get noticed, more so with a
+  weapon in your hand, with the mobs, or in front of a police car. It cools
+  off by itself (much faster at home; sleeping clears it). Two stars or more
+  and an officer on foot can stop you on your street, the avenue, in the
+  park or the subway: pay the fine, sign something for his kid (it works
+  more the more famous you are), or run. Caught: a bigger fine, and they
+  keep the weapon if you bought it or took it off someone.
+- **Turf jobs**: once you pay the Kings (or have beaten them), and while the
+  Syndicate aren't yours, Rook messages you corners to clear: the
+  Syndicate's men are waiting there; run them off for the money.
+- **Shop online** (phone): acoustic panels and a vocal booth for the studio
+  (better sessions; the booth gets artists back twice as fast), proper
+  monitors (every beat's worth 15% more), a neon sign over your bed (fit
+  pics do better), a scooter (the taxi's free). Each shows up where it goes,
+  and your number ones and mixtapes hang as plaques on your wall.
+- **Taxi** (phone): $12 to anywhere outside you've already been; free with
+  the scooter.
+- **Freestyle battle** at the cypher: four rounds; they spit a bar, you pick
+  the comeback (1 2 3) before the beat comes round. The one that rhymes and
+  flips it takes the crowd.
+- **Pool** with Big Lou at the back of the club: three in six shots.
+- **Delivery runs** for the corner store, on the shop's bike: three lanes,
+  bags to grab, cars and puddles to miss.
+- **The cups**: Slick outside the laundromat; find the ball (click, or 1 2
+  3), even money, faster hands the more you bet.
 
 **The menu** (M, or the button up top): you, your wardrobe (48 pieces,
-most bought or earned), weapons and food, goals (32, each pays out),
+most bought or earned), weapons and food, goals (41, each pays out),
 settings (sound and music levels, fight difficulty, shake, hints, start
-over). Cash, respect, health and everything else save in the browser.
+over). Cash, respect, health and everything else save in the browser by
+themselves, the moment they change: a small "saved ✓" shows under the top
+bar, the menu has a **Save** button, and the mirror's button is "Save and
+start". If the browser won't keep it (a private window, storage blocked) the
+game says so once. Saves belong to that browser at that address, so another
+device or a preview link starts fresh.
 
 Sound: footsteps change with what's underfoot (wood, tiles, wet road,
 grit in the alley, the ridged strip on the platform, the club floor,

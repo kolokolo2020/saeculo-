@@ -200,6 +200,21 @@ function paintClub(g: G, s: Scene) {
   r(g, 4 * TILE, TILE + 2, 22, 22, "#05060f");
   for (let k = 0; k < 5; k++) r(g, 4 * TILE + 3 + k * 3.5, TILE + 14 - (k % 3) * 2, 2, 4 + (k % 3) * 2, ["#2fe6ff", "#7f96ff", "#c77dff"][k % 3]);
   r(g, 11 * TILE, 12 * TILE, 2 * TILE, TILE, "#1a1424");
+  // the pool table in the back corner, under its own lamp
+  r(g, 20 * TILE - 2, 9.6 * TILE - 2, 2.6 * TILE + 4, 1.3 * TILE + 4, "#3a2416");
+  r(g, 20 * TILE + 1, 9.6 * TILE + 1, 2.6 * TILE - 2, 1.3 * TILE - 2, "#1f5a3a");
+  for (const [px, py] of [
+    [20, 9.6],
+    [21.3, 9.6],
+    [22.6, 9.6],
+    [20, 10.9],
+    [21.3, 10.9],
+    [22.6, 10.9],
+  ])
+    r(g, px * TILE - 2, py * TILE - 2, 4, 4, "#0b0b0d");
+  r(g, 20.6 * TILE, 10.1 * TILE, 3, 3, "#f4f1ea");
+  r(g, 21.8 * TILE, 10.2 * TILE, 3, 3, "#b33a3a");
+  r(g, 22 * TILE, 10 * TILE, 3, 3, "#d0a020");
 }
 
 function fxClub(g: G, f: Fx) {
@@ -271,12 +286,14 @@ export const CLUB: Scene = {
     { id: "speaker-r", body: { x: 15.2 * TILE, y: 3 * TILE, w: 26, h: 6 } },
     { id: "bar", body: T(19, 4, 1, 5), zone: T(18, 4.5, 1, 4) },
     { id: "couch", body: T(1, 9, 4, 2) },
+    { id: "pool", body: { x: 20 * TILE, y: 9.6 * TILE, w: 2.6 * TILE, h: 1.3 * TILE }, zone: T(19.8, 8.6, 3, 1) },
   ],
   doors: [{ zone: T(11, 12, 2, 1), to: "avenue", label: "↓ the avenue", spawn: { x: 35.5 * TILE, y: 3.7 * TILE, dir: "down" } }],
   lights: [
     { x: 12 * TILE, y: 3.5 * TILE, r: 70, color: "rgba(170,90,255,0.4)", kind: "screen" },
     { x: 20.5 * TILE, y: 3 * TILE, r: 70, color: "rgba(255,170,90,0.35)" },
     { x: 3 * TILE, y: 10 * TILE, r: 50, color: "rgba(255,60,200,0.3)" },
+    { x: 21.3 * TILE, y: 10 * TILE, r: 44, color: "rgba(255,230,170,0.4)" },
   ],
   darkness: 0.68,
   paint: paintClub,

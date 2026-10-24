@@ -5,11 +5,15 @@ import { usePlayerStore } from "@/components/player/playerStore";
 import { useSiteStore } from "@/components/site/siteStore";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { blingOf, DEFAULT_PROFILE, ITEMS, itemById, lookOf, randomProfile, styleOf, takeable, type Profile } from "./character";
-import { accrue, ARTISTS, artistById, cutOf, fanDm, fmtFans, huntedBy, makePost, makeSong, MOB_IDS, MOBS, mobDue, now, priceOf, recognised, roll, tierOf, TIERS, type MobId, type Msg, type PostKind } from "./career";
-import { faceOff, foeLines, freshMe, isUp, makeFoe, moveMe, robberLines, standDown, startDodge, swing, updateFoes, type FightEvents, type FoeKind, type Me } from "./combat";
+import { accrue, ARTISTS, artistById, beatBoost, has, sessionBonus, TAXI, UPGRADES, chartWeek, cutOf, fanDm, fmtFans, huntedBy, looseSongs, makePost, makeSong, MANAGER, MOB_IDS, MOBS, mobDue, now, priceOf, recognised, roll, showPay, TAPE_SIZE, tierOf, TIERS, VENUE_IDS, VENUES, type MobId, type Msg, type PostKind, type Venue } from "./career";
+import { COMBO, faceOff, foeLines, freshMe, HEAVY, isUp, makeFoe, moveMe, robberLines, standDown, startDodge, swing, updateFoes, type FightEvents, type FoeKind, type Me } from "./combat";
 import Phone, { type PhoneTab } from "./Phone";
 import Monte from "./minigames/Monte";
 import Session from "./minigames/Session";
+import Taxi from "./minigames/Taxi";
+import Freestyle from "./minigames/Freestyle";
+import Pool from "./minigames/Pool";
+import Delivery from "./minigames/Delivery";
 import { newlyDone } from "./goals";
 import Menu, { type MenuTab } from "./Menu";
 import Crates, { type DigResult } from "./minigames/Crates";
@@ -52,8 +56,10 @@ type Phase = "closing" | "play" | "leaving";
  * from your page, a crew from whoever you said no to, the one sent to ask for
  * a cut, the heavy who comes once you've seen off enough of them, Tank's ring.
  */
-type Crew = "drunks" | "robbers" | "gang" | "suits" | "envoy-kings" | "envoy-syndicate" | "heavy-kings" | "heavy-syndicate" | "ring" | "tank";
+type Crew = "drunks" | "robbers" | "gang" | "suits" | "envoy-kings" | "envoy-syndicate" | "heavy-kings" | "heavy-syndicate" | "ring" | "tank" | "cops" | "turf";
 const mobOf = (c: Crew): MobId | null => (c === "gang" || c.endsWith("kings") ? "kings" : c === "suits" || c.endsWith("syndicate") ? "syndicate" : null);
+/** Where an officer on foot might stop you (not the alley or under the bridge: they don't go there). */
+const PATROLLED: Place[] = ["street", "avenue", "park", "subway"];
 
 export default function Game({ onExit }: { onExit: () => void }) {
   const [phase, setPhase] = useState<Phase>("closing");
@@ -171,6 +177,24 @@ export default function Game({ onExit }: { onExit: () => void }) {
     ui.current = { dialog, studio, help, phase, menu, mini, ko, phone };
   }, [dialog, studio, help, phase, menu, mini, ko, phone]);
 
+  // a small "saved" in the top bar whenever something you did is kept (not for the money that ticks in by itself)
+  const [saved, setSaved] = useState<"" | "saved" | "failed">("");
+  const quiet = useRef(false);
+  const savedTimer = useRef(0);
+  const warnedSave = useRef(false);
+  const noteSaved = useCallback((ok: boolean) => {
+    if (ok && quiet.current) return;
+    window.clearTimeout(savedTimer.current);
+    setSaved(ok ? "saved" : "failed");
+    if (ok) savedTimer.current = window.setTimeout(() => setSaved(""), 1800);
+    if (!ok && !warnedSave.current) {
+      warnedSave.current = true;
+      window.setTimeout(() => {
+        setToast("This browser isn't keeping your save (a private window, or storage turned off). Your character lasts until you close the page.");
+        window.setTimeout(() => setToast(null), 7000);
+      }, 0);
+    }
+  }, []);
   const updateSave = useCallback((fn: (s: SaveData) => SaveData) => {
     let next = fn(saveRef.current);
     // goals reached by this change pay out once
@@ -201,9 +225,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
       }, reached.length ? 5200 : 0);
     }
     saveRef.current = next;
-    writeSave(next);
+    noteSaved(writeSave(next));
     setSaveState(next);
-  }, []);
+  }, [noteSaved]);
 
   // ------------------------------------------------------------ money, respect, health
 
@@ -272,6 +296,17 @@ export default function Game({ onExit }: { onExit: () => void }) {
       markSeen(`sponsor-${fans}`);
       message({ id: `sponsor-${fans}`, from: brand.replace(/ /g, "."), kind: "offer", text: `we love what you're doing. $${pay} for one post with our stuff in it. interested?`, read: false, act: { type: "sponsor", pay } });
     }
+    // someone who'd like to run your career for you
+    if (v.fans >= MANAGER.fans && v.manager === "none") {
+      updateSave((x) => ({ ...x, manager: "offered" }));
+      message({ id: "manager", from: MANAGER.handle, kind: "offer", text: `${MANAGER.name}, management. I've watched your numbers for a month. I take ${Math.round(MANAGER.cut * 100)}% and you get better deals, better money for shows, brands calling. Yes?`, read: false, act: { type: "manager" } });
+    }
+    // the first booking at each venue, as soon as you're big enough for it
+    for (const id of VENUE_IDS) {
+      if (v.fans < VENUES[id].fans || v.seen.includes(`show-offer-${id}`)) continue;
+      markSeen(`show-offer-${id}`);
+      offerShow(id);
+    }
     // someone's noticed you're getting money
     const due = mobDue(v);
     if (due && v.mob[due].stage === "none") {
@@ -282,9 +317,59 @@ export default function Game({ onExit }: { onExit: () => void }) {
     }
   };
 
+  /** A booking: headline a venue (the show waits for you there). */
+  const offerShow = (id: Venue) => {
+    const ven = VENUES[id];
+    message({ id: `show-${id}-${now()}`, from: id === "underpass" ? "saintojay" : id === "club" ? "afterhours.club" : MANAGER.handle, kind: "offer", text: id === "rooftop" ? "your roof, your show, your crowd. say the word and I'll sort the speakers." : `${ven.host} wants you headlining ${ven.name}. Door money's yours. In?`, read: false, act: { type: "show", venue: id } });
+  };
+
+  /** A new week on the charts: where your songs landed, and what that brings. */
+  const chartTick = () => {
+    const v = saveRef.current;
+    if (!v.collabs.length) return;
+    const chart = chartWeek(v, roll);
+    const top = chart.entries.findIndex((e) => e.mine);
+    const entry = chart.entries[top];
+    const one = top === 0;
+    updateSave((x) => ({ ...x, chart, stats: { ...x.stats, number1s: x.stats.number1s + (one ? 1 : 0) } }));
+    if (entry) {
+      const move = entry.last ? (entry.last > top + 1 ? ` (up ${entry.last - top - 1})` : entry.last < top + 1 ? ` (down ${top + 1 - entry.last})` : " (same)") : " (new)";
+      showToast(`Charts, week ${chart.week}: “${entry.title}” is #${top + 1}${move}. ${one ? "Number one." : ""}`, 4600);
+      if (one) addFans(Math.round(150 + v.fans * 0.05), { kind: "news", text: `“${entry.title}” is number one 🥇` });
+    } else if (chart.yours) showToast(`Charts, week ${chart.week}: “${chart.yours.title}” is #${chart.yours.pos}, outside the top 10. Bigger artists, better sessions.`, 4200);
+    // Vee doesn't like being under you (or loves being over you)
+    const vee = chart.entries.findIndex((e) => e.artist === "Vee");
+    if (vee >= 0 && (now() > (v.cd.diss ?? 0)) && v.stats.battleWins + v.stats.battleLosses > 0) {
+      updateSave((x) => ({ ...x, cd: { ...x.cd, diss: now() + 6 * 60_000 } }));
+      message({ id: `diss-${now()}`, from: "vee.makes.beats", kind: "artist", text: top >= 0 && top < vee ? "enjoy it while it lasts. I'm coming for that spot" : "heard your little songs. cute. try harder", read: false, act: { type: "diss" } });
+    }
+    // with a manager, the brands call more
+    if (v.manager === "hired" && roll() < 0.5) message({ id: `sponsor-m-${now()}`, from: MANAGER.handle, kind: "offer", text: "brand deal came in. one post. easy money.", read: false, act: { type: "sponsor", pay: Math.max(300, Math.round(v.fans * 0.06)) } });
+    // the Kings, once you're with them (or square with them), have corners that need clearing
+    const kingsOk = v.mob.kings.stage === "paying" || v.mob.kings.stage === "done";
+    const synOk = v.mob.syndicate.stage !== "paying" && v.mob.syndicate.stage !== "done";
+    if (kingsOk && synOk && !v.turf && roll() < 0.35) {
+      const where = (["avenue", "underpass", "subway", "park"] as Place[])[Math.floor(roll() * 4)];
+      message({ id: `turf-${now()}`, from: "rook.kings", kind: "mob", text: `syndicate boys on our corner at the ${PLACE_NAMES[where].toLowerCase()}. run them off and it's ${120 + tierOf(v.fans) * 80}`, read: false, act: { type: "turf", place: where } });
+    }
+    // and venues want you back
+    const open = VENUE_IDS.filter((id) => v.fans >= VENUES[id].fans);
+    if (!v.show && open.length && now() > (v.cd.show ?? 0) && roll() < 0.5) offerShow(open[Math.floor(roll() * open.length)]);
+  };
+
   /** Some minutes of your songs and beat store earning (and fans writing in). */
   const payOut = (minutes: number) => {
+    quiet.current = true;
+    try {
+      payOutNow(minutes);
+    } finally {
+      quiet.current = false;
+    }
+  };
+  const payOutNow = (minutes: number) => {
     const s = st.current;
+    // the police forget, slowly (quicker if you're at home)
+    if (saveRef.current.heat > 0 && !s.fight) updateSave((x) => ({ ...x, heat: Math.max(0, x.heat - minutes * (s.place === "bedroom" ? 4 : 0.8)) }));
     const v = saveRef.current;
     const { songs, songCash, storeCash } = accrue(v, minutes);
     const total = songCash + storeCash;
@@ -293,6 +378,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
       s.paidSince += earnMusic(total);
     }
     s.payTicks++;
+    // every three minutes, a new week on the charts
+    if (s.payTicks % 6 === 0) chartTick();
     // a note every couple of minutes, not every half a minute
     if (s.payTicks % 4 === 0 && s.paidSince >= 1) {
       showToast(`Streams and leases: +$${Math.floor(s.paidSince)}${cutOf(v) ? " (after the cut)" : ""}`, 3000);
@@ -319,7 +406,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const tape = latestTape();
     if (!tape || v.posted.includes(tape.name) || (v.cd.post ?? 0) > now()) return;
     const viral = roll() < 0.08 + Math.min(0.1, priceOf(tape) / 900);
-    const gain = Math.round((6 + priceOf(tape) / 2) * (1 + Math.sqrt(v.fans) / 12) * (viral ? 5 : 1));
+    const gain = Math.round((6 + (priceOf(tape) * beatBoost(v)) / 2) * (1 + Math.sqrt(v.fans) / 12) * (viral ? 5 : 1));
     updateSave((x) => ({ ...x, posted: [...x.posted, tape.name], cd: { ...x.cd, post: now() + 90_000 } }));
     addFans(gain, { kind: "beat", text: viral ? `“${tape.name}” 🔥 (it's everywhere)` : `new beat: “${tape.name}”` });
     sfx.select();
@@ -329,7 +416,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const v = saveRef.current;
     if (!v.profile || (v.cd.fit ?? 0) > now()) return;
     const style = styleOf(v.profile);
-    const gain = Math.round((2 + style * 1.5) * (1 + Math.sqrt(v.fans) / 20) * (1 + blingOf(v.profile) / 3000));
+    const gain = Math.round((2 + style * 1.5) * (1 + Math.sqrt(v.fans) / 20) * (1 + blingOf(v.profile) / 3000) * (has(v, "neon") ? 1.25 : 1));
     updateSave((x) => ({ ...x, cd: { ...x.cd, fit: Date.now() + 120_000 } }));
     addFans(gain, { kind: "fit", text: style >= 15 ? `fit check. no notes. (style ${style})` : `fit check (style ${style})` });
     sfx.select();
@@ -352,7 +439,69 @@ export default function Game({ onExit }: { onExit: () => void }) {
       addFans(Math.round(pay / 4), { kind: "news", text: "#ad (they sent a lot of free stuff)" });
       sfx.coins();
       showToast(`+$${pay}. The free stuff arrives in a very big box.`, 3600);
+    } else if (m.act.type === "show") {
+      const id = m.act.venue;
+      updateSave((x) => ({ ...x, show: id }));
+      showToast(`Booked: you're headlining ${VENUES[id].name}. Go there when you're ready.`, 4600);
+    } else if (m.act.type === "manager") {
+      updateSave((x) => ({ ...x, manager: "hired" }));
+      showToast(`${MANAGER.name} is your manager now: ${Math.round(MANAGER.cut * 100)}% of your music money, better deals, more bookings.`, 4600);
+    } else if (m.act.type === "turf") {
+      const where = m.act.place;
+      updateSave((x) => ({ ...x, turf: where }));
+      showToast(`Job: clear the Syndicate off the Kings' corner at ${PLACE_NAMES[where].toLowerCase()}. They'll be waiting.`, 4600);
+    } else if (m.act.type === "diss") {
+      setPhone(null);
+      setMini({ kind: "session", artist: "diss" });
     }
+  };
+  const managerCall = (what: "fire" | "hire") => {
+    updateSave((x) => ({ ...x, manager: what === "fire" ? "fired" : "hired" }));
+    showToast(what === "fire" ? `You let ${MANAGER.name} go. “You'll call me.”` : `${MANAGER.name}'s back. “Knew you'd call.”`, 3600);
+  };
+
+  /** Five songs not on a tape yet: put them out together. */
+  const releaseTape = () => {
+    const v = saveRef.current;
+    const loose = looseSongs(v).slice(0, TAPE_SIZE);
+    if (loose.length < TAPE_SIZE) return;
+    const name = `${v.profile?.name || "untitled"} tape vol. ${v.mixtapes.length + 1}`;
+    const titles = loose.map((x) => x.title);
+    // a tape brings the songs back round: more plays, for longer
+    updateSave((x) => ({ ...x, mixtapes: [...x.mixtapes, { name, songs: titles }], collabs: x.collabs.map((c) => (titles.includes(c.title) ? { ...c, rate: c.rate * 1.6 + 2, floor: c.floor * 1.5 } : c)) }));
+    const advance = earnMusic(Math.round(loose.reduce((n, c) => n + c.rate, 0) * 20));
+    const gain = Math.round(200 + loose.reduce((n, c) => n + (artistById(c.artist)?.reach ?? 0), 0) * 1.5);
+    addFans(gain, { kind: "song", text: `${name} out now 📼 (${titles.length} songs)` });
+    sfx.coins();
+    showToast(`${name} is out: +$${advance}, +${fmtFans(gain)} followers. Your roof's having a listening party.`, 5600);
+  };
+
+  /** The diss track: just you on the mic, Vee's name in it. */
+  const dissDone = (raw: number) => {
+    const v = saveRef.current;
+    const q = Math.min(100, raw + sessionBonus(v));
+    if (q >= 60) {
+      updateSave((x) => ({ ...x, stats: { ...x.stats, disses: x.stats.disses + 1 }, chart: { ...x.chart, entries: x.chart.entries.filter((e) => e.artist !== "Vee") } }));
+      addFans(Math.round(120 + v.fans * 0.08), { kind: "song", text: "“Sampler Under Your Arm” (for Vee) 🔥" });
+      showToast("The diss lands. The whole city's quoting it. Vee's song drops off the chart.", 4800);
+    } else {
+      const lost = Math.round(v.fans * 0.04);
+      updateSave((x) => ({ ...x, fans: Math.max(0, x.fans - lost) }));
+      addFans(0, { kind: "news", text: "Vee clowned the diss. the comments are rough" });
+      showToast(`It's flat, and Vee says so, at length. (−${fmtFans(lost)} followers)`, 4200);
+    }
+  };
+
+  /** Your show: door money (the cut comes out of it), followers, a post. */
+  const showDone = (id: Venue, score: number) => {
+    const v = saveRef.current;
+    const { crowd, cash, gain } = showPay(id, v.fans, score, v.manager === "hired");
+    const kept = earnMusic(cash);
+    updateSave((x) => ({ ...x, show: null, stats: { ...x.stats, shows: x.stats.shows + 1 }, cd: { ...x.cd, show: now() + 5 * 60_000 } }));
+    addFans(gain, { kind: "show", text: `${crowd === VENUES[id].cap ? "sold out" : `${crowd} people`} at ${VENUES[id].name}: ${score}%` });
+    addRep(Math.round(score / 10));
+    if (score >= 50) sfx.cheer();
+    showToast(`${crowd} through the door${crowd === VENUES[id].cap ? " (sold out)" : ""}: +$${kept}, +${fmtFans(gain)} followers.`, 5200);
   };
   const mobCall = (id: MobId, what: "stop" | "peace") => {
     const v = saveRef.current;
@@ -369,6 +518,23 @@ export default function Game({ onExit }: { onExit: () => void }) {
     }
   };
 
+  // ------------------------------------------------------------ getting about
+
+  /** A cab (or your scooter) to somewhere outside: a quick fade, and you're there. */
+  const taxiTo = (to: Place) => {
+    const s = st.current;
+    const v = saveRef.current;
+    const spot = TAXI.find((t) => t.place === to);
+    if (!spot || s.place === to || (s.fight && !s.fight.outcome)) return;
+    if (!has(v, "scooter") && !spend(12)) return;
+    setMini(null);
+    if (s.place === "bedroom") stopTape();
+    sfx.door();
+    s.trans = { door: { zone: { x: 0, y: 0, w: 0, h: 0 }, to, label: "", spawn: { x: spot.x * TILE, y: spot.y * TILE, dir: "down" } }, t: 0, swapped: false };
+    showToast(has(v, "scooter") ? `You scoot over to ${spot.name}.` : `The cab drops you at ${spot.name}. ($12)`, 2600);
+    root.current?.focus();
+  };
+
   // ------------------------------------------------------------ a song with someone
 
   const sessionDone = (artistId: string, q: number) => {
@@ -376,12 +542,15 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const tape = latestTape();
     const v = saveRef.current;
     if (!a || !tape) return;
-    const { song, upfront, gain } = makeSong(a, tape, q, v.fans);
-    updateSave((x) => ({ ...x, collabs: [song, ...x.collabs].slice(0, 40), rel: { ...x.rel, [a.id]: (x.rel[a.id] ?? 0) + 1 }, stats: { ...x.stats, songs: x.stats.songs + 1 }, cd: { ...x.cd, [`song-${a.id}`]: Date.now() + 4 * 60_000 } }));
+    // your studio lifts the session; a booth gets artists back sooner
+    const { song, upfront, gain } = makeSong(a, tape, Math.min(100, q + sessionBonus(v)), v.fans, v.collabs.map((x) => x.title), v.manager === "hired", beatBoost(v));
+    updateSave((x) => ({ ...x, collabs: [song, ...x.collabs].slice(0, 40), rel: { ...x.rel, [a.id]: (x.rel[a.id] ?? 0) + 1 }, stats: { ...x.stats, songs: x.stats.songs + 1 }, cd: { ...x.cd, [`song-${a.id}`]: now() + (has(x, "booth") ? 2 : 4) * 60_000 } }));
     const kept = earnMusic(upfront);
     addFans(gain, { kind: "song", text: `“${song.title}” ft. ${a.name}, out now` });
     sfx.coins();
     showToast(`“${song.title}” with ${a.name} is out: +$${kept}, +${fmtFans(gain)} followers. It keeps earning (phone → money).`, 5600);
+    // your first song puts you on the charts straight away
+    if (!saveRef.current.chart.week) window.setTimeout(chartTick, 6000);
   };
   const heal = (n: number) => {
     const f = st.current.fight;
@@ -550,18 +719,25 @@ export default function Game({ onExit }: { onExit: () => void }) {
   const startFight = (foes: Actor[], boss = false, crew: Crew = st.current.pendingCrew) => {
     const s = st.current;
     s.pending = null;
-    for (const f of foes) Object.assign(f.fighter!, { state: "approach", cd: 0.25 + Math.random() * 0.6 });
+    for (const f of foes) Object.assign(f.fighter!, { state: "approach", cd: 0.25 + roll() * 0.6 });
     s.fight = { foes, me: freshMe(s.x, s.y, s.dir, saveRef.current.hp), boss, over: 0, outcome: "", crew };
     s.sitting = false;
     keys.current = [];
     setFighting(true);
-    showToast(window.matchMedia("(pointer: coarse)").matches ? "A: swing · B: dodge · watch for the “!”" : "E / Space: swing · Shift: dodge · Q: eat · watch for the “!”", 3400);
+    // a fight in front of a police car is a fight they saw
+    if (crew !== "ring" && crew !== "tank" && life.current.some((a) => a.cop && a.place === s.place && Math.abs(a.x - s.x) < 170)) {
+      addHeat(1);
+      showToast("A police car slows down to watch. (heat up)", 2600);
+    }
+    showToast(window.matchMedia("(pointer: coarse)").matches ? "A: swing · H: heavy · B: dodge · watch for the “!”" : "E / Space: swing · R: heavy · Shift: dodge · Q: eat · watch for the “!”", 3400);
   };
 
   /** Who comes for you, as things stand. */
   const pickCrew = (): Crew => {
     const s = st.current;
     const v = saveRef.current;
+    // hot enough and somewhere they walk: it's the police
+    if (v.heat >= 2 && PATROLLED.includes(s.place) && Math.random() < 0.12 * v.heat) return "cops";
     const asked = MOB_IDS.find((id) => v.mob[id].stage === "asked");
     if (asked && s.t - (s.fx.envoyAt ?? -1e9) > 90) return `envoy-${asked}`;
     const hunted = huntedBy(v);
@@ -582,7 +758,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const crew = want ?? pickCrew();
     const diff = v.settings.difficulty;
     const kinds: FoeKind[] =
-      crew === "robbers"
+      crew === "cops"
+        ? ["cop"]
+        : crew === "turf"
+          ? ["suit", "suit", "suit"]
+          : crew === "robbers"
         ? tierOf(v.fans) >= 4 ? ["robber", "robber", "robber"] : ["robber", "robber"]
         : crew === "gang"
           ? ["gang", "gang", "gang"]
@@ -690,6 +870,21 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const mob = mobId ? MOBS[mobId] : null;
     const setStage = (id: MobId, stage: SaveData["mob"]["kings"]["stage"]) => updateSave((x) => ({ ...x, mob: { ...x.mob, [id]: { ...x.mob[id], stage } } }));
     const fight = () => startFight(foes, crew.startsWith("envoy") || crew.startsWith("heavy"), crew);
+    if (crew === "cops") return stopped(foes);
+    if (crew === "turf") {
+      say(["Three of the Syndicate's, leaning on a car on the Kings' corner like they own it.", "“You lost? This corner's spoken for.”"], [
+        { label: "Run them off", run: fight },
+        {
+          label: "Not worth it",
+          run: () => {
+            walkOff(foes);
+            updateSave((x) => ({ ...x, turf: null }));
+            say(["You walk on. Rook's going to hear about that."]);
+          },
+        },
+      ]);
+      return;
+    }
     if (crew === "robbers") {
       const item = v.profile ? takeable(v.profile) : null;
       const toll = Math.max(20, Math.floor(v.cash * 0.3));
@@ -817,13 +1012,75 @@ export default function Game({ onExit }: { onExit: () => void }) {
     if (s.pendingCrew.startsWith("envoy")) {
       walkOff(foes);
       say(["“Think quick.” They go, and you can feel them watching all the way down the block."]);
-    } else if (s.pendingCrew === "drunks" && Math.random() < 0.5) {
+    } else if (s.pendingCrew === "drunks" && roll() < 0.5) {
       walkOff(foes);
       say(["You keep walking. They laugh, but they don't follow."]);
     } else {
       say(["You try to walk off. One of them steps in front of you.", "No getting out of this one."]);
       startFight(foes, s.pendingCrew.startsWith("heavy"), s.pendingCrew);
     }
+  };
+
+  /** The police noticing you (0..5); it cools off by itself, faster at home. */
+  const addHeat = (n: number) => {
+    const before = Math.floor(saveRef.current.heat);
+    updateSave((x) => ({ ...x, heat: Math.max(0, Math.min(5, x.heat + n)) }));
+    const after = Math.floor(saveRef.current.heat);
+    if (after > before && after >= 2) showToast(after >= 4 ? "Heat: the police are looking for you. Get home, lie low." : "Heat: the police have noticed you. Keep your head down for a bit.", 3600);
+  };
+
+  /** An officer on foot: a fine, a run, or a famous face. */
+  const stopped = (foes: Actor[]) => {
+    const v = saveRef.current;
+    const stars = Math.max(1, Math.floor(v.heat));
+    const fine = 40 * stars;
+    const famous = Math.min(0.75, 0.15 + tierOf(v.fans) * 0.1);
+    const w = weaponById(v.weapon);
+    const hot = "buy" in w.unlock || "beat" in w.unlock;
+    const caught = () => {
+      const total = Math.min(Math.floor(saveRef.current.cash), fine * 2);
+      updateSave((x) => ({ ...x, cash: x.cash - total, heat: 0, stats: { ...x.stats, arrests: x.stats.arrests + 1 }, ...(hot ? { weapons: x.weapons.filter((id) => id !== w.id), weapon: "fists" } : {}) }));
+      walkOff(foes);
+      say(["He has you against the wall before you're three steps away.", `A night's worth of paperwork later: a $${total} fine${hot ? `, and they keep the ${w.name}` : ""}.`, "(heat gone)"]);
+    };
+    say(["An officer steps out in front of you, hand up.", stars >= 4 ? "“You match a description. Several, actually.”" : "“Been some trouble round here. You know anything about that?”"], [
+      {
+        label: `Pay the fine ($${fine})`,
+        run: () => {
+          if (!spend(fine)) return caught();
+          updateSave((x) => ({ ...x, heat: 0 }));
+          walkOff(foes);
+          say(["He writes it out slowly, so you know he's enjoying it.", "“Stay out of trouble.” (heat gone)"]);
+        },
+      },
+      ...(tierOf(v.fans) >= 1
+        ? [
+            {
+              label: "Sign something for his kid",
+              run: () => {
+                if (Math.random() < famous) {
+                  updateSave((x) => ({ ...x, heat: Math.max(0, x.heat - 2) }));
+                  walkOff(foes);
+                  say(["He looks at you properly. “Wait. You're the producer. My daughter plays your stuff all day.”", "You sign the back of his notebook. He forgets what he stopped you for. (heat down)"]);
+                } else {
+                  say(["“Nice try.”"]);
+                  caught();
+                }
+              },
+            },
+          ]
+        : []),
+      {
+        label: "Run",
+        run: () => {
+          if (Math.random() < 0.45) {
+            updateSave((x) => ({ ...x, heat: Math.min(5, x.heat + 1) }));
+            walkOff(foes);
+            say(["You're round the corner before he's got his radio up. He'll remember your face. (heat up)"]);
+          } else caught();
+        },
+      },
+    ]);
   };
 
   /** Something you had on, gone (unequipped, out of your wardrobe). */
@@ -909,6 +1166,16 @@ export default function Game({ onExit }: { onExit: () => void }) {
       addFans(150 + tierOf(v.fans) * 60, { kind: "fight", text: "fight night champion 🏆" });
       sfx.coins();
       window.setTimeout(() => say(["The champ stays down. The whole underpass loses it.", "Tank lifts your arm. “Fight night. Yours.”", "(+$150, +15 respect, and somebody got it all on video)"]), 500);
+      return;
+    }
+    // people get hurt, people call it in: more so with something in your hand, and with the mobs
+    if (crew !== "tank") addHeat(0.5 + (v.weapon !== "fists" ? 0.5 : 0) + (mobOf(crew) || crew === "turf" ? 0.5 : 0));
+    // a corner cleared for the Kings
+    if (crew === "turf") {
+      const pay = 120 + tierOf(v.fans) * 80;
+      updateSave((x) => ({ ...x, turf: null, cash: x.cash + pay, rep: x.rep + 10, stats: { ...x.stats, turfWins: x.stats.turfWins + 1, wins: x.stats.wins + 1, earned: x.stats.earned + pay } }));
+      sfx.coins();
+      window.setTimeout(() => say(["The last of them gets back in the car and it pulls away fast.", `Your phone buzzes before you've caught your breath. Rook: “clean. $${pay}.” (+10 respect)`]), 500);
       return;
     }
     const mobId = mobOf(crew);
@@ -1037,15 +1304,24 @@ export default function Game({ onExit }: { onExit: () => void }) {
     showToast("You got away.", 2400);
   };
 
-  const attack = () => {
+  /** A swing; a heavy one (R, or H on the pad) is slower to come round but goes through anything. Three hits in a row: a combo. */
+  const attack = (heavy = false) => {
     const s = st.current;
     const f = s.fight;
     if (!f || f.outcome || f.me.atkCd > 0) return;
     const w = weaponById(saveRef.current.weapon);
-    f.me.atk = 0.18;
-    f.me.atkCd = w.cooldown;
-    f.me.dir = s.dir;
-    swing(f.foes, f.me, w, fightEv);
+    const me = f.me;
+    me.atk = heavy ? 0.26 : 0.18;
+    me.heavy = heavy;
+    me.atkCd = w.cooldown * (heavy ? HEAVY.cooldown : 1);
+    me.dir = s.dir;
+    const combo = !heavy && me.combo % COMBO.hits === COMBO.hits - 1;
+    const { hits, disarmed } = swing(f.foes, me, w, fightEv, { heavy, combo });
+    if (hits.length) {
+      me.combo = heavy ? 0 : me.combo + 1;
+      me.comboT = COMBO.window;
+    } else me.combo = 0;
+    if (disarmed.length) showToast(disarmed.length > 1 ? "You knock the weapons out of their hands." : "You knock it out of their hand. It skids off down the pavement.", 2400);
   };
 
   const dodge = () => {
@@ -1173,6 +1449,35 @@ export default function Game({ onExit }: { onExit: () => void }) {
     const bouncer = life.current.find((a) => a.id === "bouncer");
     if (to === "avenue" && bouncer) bouncer.x = (clubOk(v) ? 36.9 : 35.5) * TILE;
     if (to === "club" && !v.places.includes("club")) window.setTimeout(() => showToast("The bass is in your chest before the door shuts.", 3600), 300);
+    // a show you're booked for: the crowd's already in
+    if (v.show && VENUES[v.show].place === to) {
+      const id = v.show;
+      window.setTimeout(() => {
+        if (st.current.place !== to || ui.current.dialog || ui.current.mini) return;
+        say([`${VENUES[id].name[0].toUpperCase()}${VENUES[id].name.slice(1)}'s full. They're chanting something. It's your name.`, `(about ${showPay(id, saveRef.current.fans, 70, false).crowd} people)`], [
+          { label: "Go on", run: () => setMini({ kind: "rhythm", mode: "show", venue: id }) },
+          { label: "Not yet", run: () => say(["“Don't make them wait too long.”"]) },
+        ]);
+      }, 800);
+    }
+    // a corner you said you'd clear: they're there
+    if (v.turf === to) {
+      window.setTimeout(() => {
+        const s2 = st.current;
+        if (s2.place !== to || s2.fight || s2.pending) return;
+        s2.lastTrouble = -1e9;
+        spawnTrouble("turf");
+      }, 2500);
+    }
+    // a tape just out: half the block's on your roof
+    const party = v.mixtapes.length && !v.seen.includes(`party-${v.mixtapes.length}`);
+    if (to === "rooftop" && party) {
+      markSeen(`party-${v.mixtapes.length}`);
+      window.setTimeout(() => {
+        addFans(60 + Math.round(v.fans * 0.02), { kind: "news", text: "listening party on the roof 📼" });
+        say(["The roof's full. Someone's brought a speaker the size of a fridge. Your tape's on.", "People you've never met are telling you which song's their favourite. They're all different songs."]);
+      }, 700);
+    }
   };
 
   const arriveRef = useRef(arriveAt);
@@ -1507,7 +1812,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
               {
                 label: "Sleep it off",
                 run: () => {
-                  updateSave((v) => ({ ...v, hp: MAX_HP }));
+                  updateSave((v) => ({ ...v, hp: MAX_HP, heat: 0 }));
                   sfx.gulp();
                   say(["You lie down in your clothes. When you open your eyes it's still night. It's always still night.", "(health back to full)"]);
                 },
@@ -1588,6 +1893,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
             { label: "Just water", run: bottle },
             { label: "Turn the radio up", run: radio },
             { label: "Something to eat", run: () => setMini({ kind: "shop", shop: "store" }) },
+            { label: "Any work going?", run: () => say(["“Deliveries. The bike's out back. Bags on the road, six a bag, ten more if you bring the bike back in one piece.”"], [
+              { label: "Take the bike", run: () => setMini({ kind: "delivery" }) },
+              { label: "Not now", run: () => setDialog(null) },
+            ]) },
           ]);
           break;
         }
@@ -1713,9 +2022,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
   // ------------------------------------------------------------ input
 
   // the fight's actions, for handlers made once
-  const actions = useRef({ attack, dodge, eat: () => eatSomething(), turnAway });
+  const actions = useRef({ attack, heavy: () => attack(true), dodge, eat: () => eatSomething(), turnAway });
   useLayoutEffect(() => {
-    actions.current = { attack, dodge, eat: () => eatSomething(), turnAway };
+    actions.current = { attack, heavy: () => attack(true), dodge, eat: () => eatSomething(), turnAway };
   });
 
   const tryInteract = useCallback(() => {
@@ -1762,6 +2071,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
       if (fighting && (e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyK" || e.code === "KeyL")) {
         e.preventDefault();
         actions.current.dodge();
+        return;
+      }
+      if (fighting && e.code === "KeyR" && !e.repeat) {
+        e.preventDefault();
+        actions.current.heavy();
         return;
       }
       if (e.code === "KeyQ" && !u.dialog && !e.repeat) {
@@ -1964,8 +2278,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
       pending: () => st.current.pending?.length ?? 0,
       fight: () => {
         const f = st.current.fight;
-        return f ? { outcome: f.outcome, hp: f.me.hp, boss: f.boss, foes: f.foes.map((a) => ({ id: a.id, hp: a.fighter!.hp, state: a.fighter!.state, x: a.x, y: a.y })) } : null;
+        return f ? { outcome: f.outcome, hp: f.me.hp, boss: f.boss, combo: f.me.combo, foes: f.foes.map((a) => ({ id: a.id, hp: a.fighter!.hp, state: a.fighter!.state, x: a.x, y: a.y, arm: a.fighter!.arm ?? null })) } : null;
       },
+      /** Put a knife (or a bat) in every foe's hand. */
+      armFoes: (arm: "knife" | "bat") => st.current.fight?.foes.forEach((a) => a.fighter && (a.fighter.arm = arm)),
       /** Leave every foe on one hit. */
       weaken: () => st.current.fight?.foes.forEach((a) => a.fighter && (a.fighter.hp = 1)),
       give: (patch: Partial<SaveData>) => updateSave((v) => ({ ...v, ...patch })),
@@ -2001,7 +2317,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
       /** The career as things stand. */
       career: () => {
         const v = saveRef.current;
-        return { fans: v.fans, tier: tierOf(v.fans), posts: v.posts.length, inbox: v.inbox.map((m) => ({ id: m.id, kind: m.kind, act: m.act?.type ?? null, done: !!m.done })), contacts: v.contacts, rel: v.rel, leases: v.leases, collabs: v.collabs, posted: v.posted, mob: v.mob, cut: cutOf(v), royalties: v.stats.royalties };
+        return { chart: v.chart, show: v.show, mixtapes: v.mixtapes, manager: v.manager, stats: v.stats, fans: v.fans, tier: tierOf(v.fans), posts: v.posts.length, inbox: v.inbox.map((m) => ({ id: m.id, kind: m.kind, act: m.act?.type ?? null, done: !!m.done })), contacts: v.contacts, rel: v.rel, leases: v.leases, collabs: v.collabs, posted: v.posted, mob: v.mob, cut: cutOf(v), royalties: v.stats.royalties };
       },
       /** Followers, as if they'd just come in (with a post, so the level-ups and messages happen). */
       fans: (n: number) => addFans(n, { kind: "news", text: "test" }),
@@ -2015,6 +2331,10 @@ export default function Game({ onExit }: { onExit: () => void }) {
         spawnTrouble(c);
       },
       crewNow: () => st.current.pendingCrew,
+      chartTick: () => chartTick(),
+      showDone: (id: Venue, score: number) => showDone(id, score),
+      releaseTape: () => releaseTape(),
+      dissDone: (q: number) => dissDone(q),
       ring: () => ringStart(),
       ringRound: () => st.current.ring,
       phone: (tab: PhoneTab | null) => setPhone(tab),
@@ -2116,7 +2436,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
             }
           }
           // a police car rolling past: they think better of it
-          const cops = life.current.some((a) => a.cop && a.place === s.place && Math.abs(a.x - s.x) < 110);
+          const cops = s.pendingCrew !== "cops" && life.current.some((a) => a.cop && a.place === s.place && Math.abs(a.x - s.x) < 110);
           if (cops) {
             walkOff(s.pending);
             showToast("They see the police car and think better of it.", 3200);
@@ -2306,6 +2626,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
         hp: s.fight ? s.fight.me.hp : saveRef.current.hp,
         maxHp: MAX_HP,
         tag: saveRef.current.tag ? { name: saveRef.current.profile?.name || "you", color: saveRef.current.tag.color } : null,
+        upgrades: saveRef.current.upgrades,
+        plaques: { gold: saveRef.current.stats.number1s, tapes: saveRef.current.mixtapes.length },
         shake: s.shake,
         fx: s.fx,
         lightning: s.bolt,
@@ -2381,7 +2703,11 @@ export default function Game({ onExit }: { onExit: () => void }) {
     sfx.coins();
     const food = consumableById(id);
     const weapon = WEAPONS.find((w) => w.id === id && "buy" in w.unlock);
-    if (food) updateSave((v) => ({ ...v, items: { ...v.items, [id]: (v.items[id] ?? 0) + 1 } }));
+    const upgrade = UPGRADES.find((u) => u.id === id);
+    if (upgrade) {
+      updateSave((v) => ({ ...v, upgrades: [...v.upgrades, id] }));
+      showToast(`${upgrade.name[0].toUpperCase()}${upgrade.name.slice(1)}: ordered. It'll be ${upgrade.where === "street" ? "outside your door" : upgrade.where === "bedroom" ? "in your room" : "in the studio"}. (${upgrade.what})`, 4600);
+    } else if (food) updateSave((v) => ({ ...v, items: { ...v.items, [id]: (v.items[id] ?? 0) + 1 } }));
     else if (weapon) {
       updateSave((v) => ({ ...v, weapons: [...v.weapons, id], weapon: id }));
       showToast(`Smokey wraps the ${weapon.name} in a newspaper. “You didn't get it from me.” (in your hand now; the menu swaps it)`, 4200);
@@ -2425,6 +2751,8 @@ export default function Game({ onExit }: { onExit: () => void }) {
         rep={save.rep}
         fans={save.fans}
         unread={save.inbox.filter((m) => !m.read).length}
+        saved={saved}
+        heat={save.heat}
         found={foundCount}
         studio={studio}
         fighting={fighting}
@@ -2470,7 +2798,7 @@ export default function Game({ onExit }: { onExit: () => void }) {
 
         {/* touch controls */}
         {touch && phase === "play" && !studio && (
-          <TouchPad down={down} fighting={fighting} talking={!!dialog} prompt={prompt} onPress={press} onRelease={release} onEat={() => eatSomething()} onDodge={dodge} onUse={tryInteract} />
+          <TouchPad down={down} fighting={fighting} talking={!!dialog} prompt={prompt} onPress={press} onRelease={release} onEat={() => eatSomething()} onDodge={dodge} onHeavy={() => attack(true)} onUse={tryInteract} />
         )}
 
         {menu && (
@@ -2496,8 +2824,16 @@ export default function Game({ onExit }: { onExit: () => void }) {
               setMenu({ tab: "you", creator: true });
               setHelp(true);
             }}
+            onSave={() => {
+              const ok = writeSave(saveRef.current);
+              noteSaved(ok);
+              if (ok) showToast("Saved. (The game also saves by itself, every time something changes, in this browser.)", 3600);
+            }}
             onClose={() => {
-              if (menu.creator) updateSave((v) => ({ ...v, profile: v.profile && { ...v.profile, name: v.profile.name.trim() || "anon" } }));
+              if (menu.creator) {
+                updateSave((v) => ({ ...v, profile: v.profile && { ...v.profile, name: v.profile.name.trim() || "anon" } }));
+                noteSaved(writeSave(saveRef.current));
+              }
               setMenu(null);
               root.current?.focus();
             }}
@@ -2510,7 +2846,9 @@ export default function Game({ onExit }: { onExit: () => void }) {
             rival={mini.rival}
             volume={save.settings.music}
             touch={touch}
-            onFinish={(score) => (mini.mode === "battle" && mini.rival ? battleDone(score, mini.rival) : mini.mode !== "battle" && rhythmDone(mini.mode, score))}
+            pick={mini.venue ? VENUES[mini.venue].beat : undefined}
+            venue={mini.venue ? VENUES[mini.venue].name : undefined}
+            onFinish={(score) => (mini.mode === "battle" && mini.rival ? battleDone(score, mini.rival) : mini.mode === "show" && mini.venue ? showDone(mini.venue, score) : (mini.mode === "cypher" || mini.mode === "dj") && rhythmDone(mini.mode, score))}
             onClose={closeMini}
           />
         )}
@@ -2571,14 +2909,58 @@ export default function Game({ onExit }: { onExit: () => void }) {
             onClose={closeMini}
           />
         )}
+        {mini?.kind === "freestyle" && (
+          <Freestyle
+            opponent={mini.opponent}
+            reduced={reduced}
+            onFinish={(won, score) => {
+              const v = saveRef.current;
+              if (won) {
+                updateSave((x) => ({ ...x, stats: { ...x.stats, freestyleWins: x.stats.freestyleWins + 1 } }));
+                earn(30);
+                addRep(6);
+                addFans(20 + tierOf(v.fans) * 20, { kind: "show", text: `won a freestyle battle under the bridge (${score} pts)` });
+                sfx.cheer();
+                cheerFor(life.current, (a) => a.place === "underpass" && a.id.startsWith("mc-"));
+              } else addRep(1);
+            }}
+            onClose={closeMini}
+          />
+        )}
+        {mini?.kind === "pool" && (
+          <Pool
+            cash={save.cash}
+            onSettle={(d) => {
+              earn(d);
+              if (d > 0) {
+                sfx.coins();
+                updateSave((v) => ({ ...v, stats: { ...v.stats, poolWins: v.stats.poolWins + 1 } }));
+              }
+            }}
+            onClose={closeMini}
+          />
+        )}
+        {mini?.kind === "delivery" && (
+          <Delivery
+            reduced={reduced}
+            onFinish={(bags, made) => {
+              const pay = bags * 6 + (made ? 10 : 0);
+              if (pay) earn(pay);
+              if (made) updateSave((v) => ({ ...v, stats: { ...v.stats, deliveries: v.stats.deliveries + 1 } }));
+              if (pay) sfx.coins();
+            }}
+            onClose={closeMini}
+          />
+        )}
+        {mini?.kind === "taxi" && <Taxi cash={save.cash} scooter={has(save, "scooter")} here={place} visited={save.places as Place[]} onGo={taxiTo} onClose={closeMini} />}
         {mini?.kind === "session" && (
           <Session
-            artist={artistById(mini.artist)?.name ?? "them"}
-            line={artistById(mini.artist)?.session ?? ""}
+            artist={mini.artist === "diss" ? "Vee (she's not here)" : artistById(mini.artist)?.name ?? "them"}
+            line={mini.artist === "diss" ? "Just you in the booth, Vee's name, and sixteen bars. Make them count." : artistById(mini.artist)?.session ?? ""}
             tape={sessionTape}
             volume={save.settings.music}
             reduced={reduced}
-            onFinish={(q) => sessionDone(mini.artist, q)}
+            onFinish={(q) => (mini.artist === "diss" ? dissDone(q) : sessionDone(mini.artist, q))}
             onClose={closeMini}
           />
         )}
@@ -2596,6 +2978,12 @@ export default function Game({ onExit }: { onExit: () => void }) {
             onPostFit={postFit}
             onAct={answer}
             onMob={mobCall}
+            onTape={releaseTape}
+            onApp={(app) => {
+              setPhone(null);
+              setMini(app === "taxi" ? { kind: "taxi" } : { kind: "shop", shop: "upgrades" });
+            }}
+            onManager={managerCall}
             onClose={() => {
               setPhone(null);
               root.current?.focus();

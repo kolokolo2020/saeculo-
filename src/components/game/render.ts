@@ -98,6 +98,10 @@ export interface View {
   hudX?: number;
   /** Your name on the alley wall. */
   tag: { name: string; color: string } | null;
+  /** What you've bought for your room, studio and ride (they show up there). */
+  upgrades: string[];
+  /** Plaques on your bedroom wall: number ones, mixtapes. */
+  plaques: { gold: number; tapes: number };
   /** Camera shake, in pixels. */
   shake: number;
   /** What the place's own animation keeps track of. */
@@ -195,6 +199,72 @@ export function draw(g: G, v: View) {
       g.fillStyle = "rgba(170,190,235,0.25)";
       g.fillRect(7 * TILE - 2, 2 * TILE + 10, 3 * TILE + 4, 2);
     }
+  }
+  if (v.place === "bedroom") {
+    // what you've earned, framed between the shelf and the bed
+    const frames = [...Array(Math.min(4, v.plaques.gold)).fill("#f0c850"), ...Array(Math.min(4, v.plaques.tapes)).fill("#d9d9d9")].slice(0, 6);
+    frames.forEach((c, i) => {
+      const x = 13 * TILE + 1 + (i % 2) * 15;
+      const y = TILE + 2 + Math.floor(i / 2) * 9;
+      g.fillStyle = "#1c140f";
+      g.fillRect(x, y, 13, 8);
+      g.fillStyle = c;
+      g.fillRect(x + 4, y + 2, 5, 4);
+    });
+    if (v.upgrades.includes("neon")) {
+      // a neon sign over the bed, buzzing (steady with reduced motion)
+      const on = v.reduced || v.t % 7 > 0.15;
+      g.globalAlpha = on ? 1 : 0.4;
+      sign(g, "ON AIR", 15.4 * TILE, TILE + 6, "#ffd6ff", "rgba(255,60,200,0.75)", 8);
+      g.globalAlpha = 1;
+    }
+  }
+  if (v.place === "studio") {
+    if (v.upgrades.includes("panels")) {
+      // foam on the walls, either side
+      for (const x0 of v.upgrades.includes("booth") ? [1] : [1, 11.5]) for (let k = 0; k < 12; k++) {
+        g.fillStyle = k % 2 ? "#2a2236" : "#3a2e4a";
+        g.fillRect(x0 * TILE + (k % 6) * 9, TILE + 2 + Math.floor(k / 6) * 9, 8, 8);
+      }
+    }
+    if (v.upgrades.includes("monitors")) {
+      // proper monitors on stands, one each side of the desk
+      for (const x of [4 * TILE + 2, 11 * TILE + 2]) {
+        g.fillStyle = "#0b0b0d";
+        g.fillRect(x, 2 * TILE - 6, 12, 18);
+        g.fillStyle = "#2a2a30";
+        g.fillRect(x + 3, 2 * TILE - 2, 6, 6);
+        g.fillRect(x + 4, 2 * TILE + 6, 4, 4);
+        g.fillStyle = v.beat && !v.reduced ? "#f2b45a" : "#5a4a30";
+        g.fillRect(x + 5, 2 * TILE + 7, 2, 2);
+      }
+    }
+    if (v.upgrades.includes("booth")) {
+      // the booth: a lit window in the back wall, a mic behind the glass
+      g.fillStyle = "#14141a";
+      g.fillRect(12.4 * TILE, TILE - 2, 2.6 * TILE, TILE + 10);
+      g.fillStyle = "#2a3850";
+      g.fillRect(12.4 * TILE + 3, TILE + 1, 2.6 * TILE - 6, TILE + 4);
+      g.fillStyle = "#9aa0aa";
+      g.fillRect(13.6 * TILE, TILE + 6, 2, 12);
+      g.fillRect(13.6 * TILE - 2, TILE + 4, 6, 3);
+      sign(g, "BOOTH", 12.6 * TILE, TILE - 9, "#ff7a6a", "rgba(255,60,40,0.6)", 6);
+    }
+  }
+  if (v.place === "street" && v.upgrades.includes("scooter")) {
+    // your scooter, parked outside your door
+    const x = 5.4 * TILE;
+    const y = 3.6 * TILE;
+    g.fillStyle = "rgba(0,0,0,0.35)";
+    g.fillRect(x - 1, y + 8, 20, 2);
+    g.fillStyle = "#b33a3a";
+    g.fillRect(x + 4, y + 2, 12, 5);
+    g.fillRect(x + 14, y - 4, 2, 7);
+    g.fillStyle = "#e8e0cf";
+    g.fillRect(x + 12, y - 5, 6, 2);
+    g.fillStyle = "#111216";
+    g.fillRect(x + 1, y + 5, 5, 5);
+    g.fillRect(x + 14, y + 5, 5, 5);
   }
   if (v.place === "store" && clerk) g.drawImage(clerk, 10 * TILE + 2, 3 * TILE + 3);
   if (v.place === "street") {

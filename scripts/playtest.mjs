@@ -180,12 +180,18 @@ for (const [dev, opts] of [["desk", { viewport: { width: 1366, height: 800 } }],
   await g("fans", 2400);
   await page.waitForTimeout(300);
   await g("payOut", 3);
-  for (const t of ["page", "dms", "money"]) {
+  await g("chartTick");
+  await g("give", { show: "club" });
+  for (const t of ["page", "dms", "charts", "money"]) {
     await g("phone", t);
     await page.waitForTimeout(300);
     await snap(`phone-${t}`);
   }
   await g("phone", null);
+  await g("mini", { kind: "rhythm", mode: "show", venue: "underpass" });
+  await page.waitForTimeout(400);
+  await snap("mini-show");
+  await g("mini", null);
   await g("mini", { kind: "session", artist: "kaya" });
   await page.waitForTimeout(300);
   await page.getByTestId("session-start").click();
@@ -227,6 +233,34 @@ for (const [dev, opts] of [["desk", { viewport: { width: 1366, height: 800 } }],
   await clear();
   await page.waitForTimeout(1200);
   await snap("career-4-ring");
+  await clear();
+  // round three: upgrades where they go, the police, the new games
+  await g("give", { upgrades: ["panels", "monitors", "booth", "neon", "scooter"], stats: { number1s: 2, shows: 1 }, heat: 3 });
+  for (const [p, x, y] of [["bedroom", 14, 5], ["studio", 8, 5], ["street", 7, 5]]) {
+    await g("teleport", p, x, y, "up");
+    await page.waitForTimeout(500);
+    await snap(`up-${p}`);
+  }
+  await g("teleport", "avenue", 20, 4.6, "down");
+  await page.waitForTimeout(300);
+  await g("crew", "cops");
+  for (let i = 0; i < 30 && !(await dialog.count()); i++) await page.waitForTimeout(200);
+  for (let i = 0; i < 2; i++) {
+    await page.keyboard.press("e");
+    await page.waitForTimeout(150);
+  }
+  await snap("police");
+  await clear();
+  for (const [name, m] of [["freestyle", { kind: "freestyle", opponent: "Riz" }], ["pool", { kind: "pool" }], ["delivery", { kind: "delivery" }], ["taxi", { kind: "taxi" }]]) {
+    await g("mini", m);
+    await page.waitForTimeout(400);
+    const start = page.getByTestId(`${name}-start`);
+    if (await start.count()) await start.click();
+    await page.waitForTimeout(name === "delivery" ? 3000 : 600);
+    await snap(`mini-${name}`);
+    await g("mini", null);
+    await page.waitForTimeout(200);
+  }
   await ctx.close();
 }
 await browser.close();
