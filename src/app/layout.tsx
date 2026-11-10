@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Jersey_10, VT323 } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import { PROFILE } from "@/data/profile";
 import { ALBUM, TRACKS } from "@/data/tracks";
 import { SITE_URL } from "@/lib/siteUrl";
@@ -75,6 +76,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             in the Vercel project; it records nothing in development) */}
         <Analytics />
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
