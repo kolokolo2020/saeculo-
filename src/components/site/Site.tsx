@@ -6,6 +6,7 @@ import AudioEngine from "@/components/player/AudioEngine";
 import { readPosition, usePlayerStore } from "@/components/player/playerStore";
 import BeatsWindow from "@/components/beats/BeatsWindow";
 import { TRACKS } from "@/data/tracks";
+import { statPlay, visitSource } from "@/lib/stats";
 import { trackIndexFromHash } from "@/lib/trackLink";
 import ContactWindow from "./ContactWindow";
 import { BeatsIcon, ContactIcon, GameIcon, SocialsIcon } from "./Icons";
@@ -57,6 +58,17 @@ export default function Site({ initialTrackId }: { initialTrackId?: string } = {
     () => true,
     () => false,
   );
+
+  // where this visit came from (?ref=…), and each beat's first play
+  useEffect(() => {
+    visitSource();
+    return usePlayerStore.subscribe((s, prev) => {
+      if (s.playing && !(prev.playing && prev.trackIndex === s.trackIndex)) {
+        const t = TRACKS[s.trackIndex];
+        if (t) statPlay(t.id);
+      }
+    });
+  }, []);
 
   // first paint: intro for first-time visitors, straight in for everyone else
   useEffect(() => {

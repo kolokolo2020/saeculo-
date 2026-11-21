@@ -1922,6 +1922,45 @@ try {
     await ctx.close();
   }
 
+  // ---------------------------------------------------------------- where visits come from, and what they do
+  {
+    const { ctx, page } = await open({ path: "/beat/care4me?ref=YT" });
+    const stats = () => page.evaluate(() => window.__stats ?? []);
+    const named = async (n) => (await stats()).filter((s) => s.name === n);
+    check("stats: ?ref= is the visit's source", (await page.evaluate(() => sessionStorage.getItem("saeculo-from"))) === "yt");
+    await page.getByRole("button", { name: /^play$/i }).first().click();
+    await page.waitForTimeout(600);
+    await page.getByRole("button", { name: /^pause$/i }).first().click();
+    await page.getByRole("button", { name: /^play$/i }).first().click();
+    await page.waitForTimeout(400);
+    const plays = await named("play");
+    check("stats: a play, counted once per beat, with its source", plays.length === 1 && plays[0].data.beat === "care4me" && plays[0].data.from === "yt", JSON.stringify(plays));
+    await ctx.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.getByRole("button", { name: "copy link" }).click();
+    await page.waitForTimeout(200);
+    check("stats: copy link is a share of that beat", (await named("share")).some((s) => s.data.beat === "care4me"));
+    await page.getByTestId("lease-this").click();
+    check("stats: lease this is counted, with the beat", (await named("lease")).some((s) => s.data.beat === "care4me" && s.data.from === "yt"));
+    await page.evaluate(() => document.addEventListener("click", (e) => e.target.closest?.("a[href^='mailto:']") && e.preventDefault(), true));
+    const win = page.getByTestId("window-contact");
+    await win.getByLabel(/name/i).fill("Test Artist");
+    await win.getByLabel(/message/i).fill("For a single, out next month.");
+    await page.getByTestId("contact-send").click();
+    check("stats: a lease email opened is counted, with the beat", (await named("contact")).some((s) => s.data.beat === "care4me"));
+    // a second page in the same tab keeps the source
+    await page.goto(BASE + "/", { waitUntil: "networkidle" });
+    await page.waitForTimeout(400);
+    await page.getByTestId("icon-socials").click();
+    const socials = page.locator("[data-testid=window-socials] a").first();
+    await socials.evaluate((a) => a.addEventListener("click", (e) => e.preventDefault()));
+    await socials.click();
+    check("stats: the source lasts the visit; a socials click is counted", (await named("social")).some((s) => s.data.link === "Instagram" && s.data.from === "yt"));
+    await ctx.close();
+    const { ctx: c2, page: p2 } = await open({ path: "/?ref=<b>bad" });
+    check("stats: no ref (or a bad one) is direct", (await p2.evaluate(() => sessionStorage.getItem("saeculo-from"))) === "direct");
+    await c2.close();
+  }
+
   // ---------------------------------------------------------------- accessibility
   if (axeSource) {
     const { ctx, page } = await open();

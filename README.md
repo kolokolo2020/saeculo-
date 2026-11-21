@@ -395,6 +395,27 @@ land on. It uses no cookies. It only records once Web Analytics is switched
 on for the project in the Vercel dashboard (saeculo → Analytics → Enable),
 and never in development.
 
+**Where visits come from, and what they lead to** (`src/lib/stats.ts`).
+Put `?ref=<code>` on every link you post, one short code per place:
+
+| Where | Link |
+| --- | --- |
+| YouTube description | `saeculobeats.com/beat/care4me?ref=yt` |
+| Instagram bio | `saeculobeats.com/?ref=ig` |
+| TikTok bio | `saeculobeats.com/?ref=tt` |
+| A DM to an artist | `saeculobeats.com/beat/care4me?ref=dm` |
+| BeatStars profile | `saeculobeats.com/?ref=bs` |
+
+(`utm_source=` works too.) The code is kept for the visit (this tab only, no
+cookies); without one it's the site that linked here, or `direct`. Five
+events go to Web Analytics → Events, each with `from` (that source):
+`play` (beat, once per beat per visit), `lease` ("lease this", with the
+beat), `contact` (the email app opened: the beat, or `general`), `share`
+("copy link", with the beat) and `social` (which link). So you can see, for
+example, how many `lease` clicks came from `yt` against `dm`. Custom events
+need a Vercel Pro plan; on Hobby, page views (with the `?ref=` in the URL)
+still record.
+
 ## Project structure
 
 - `src/app/`: layout (fonts, and a tiny script that decides before the
