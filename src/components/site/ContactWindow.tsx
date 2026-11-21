@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import { PROFILE } from "@/data/profile";
+import { TRACKS } from "@/data/tracks";
+import { stat } from "@/lib/stats";
 import { useSiteStore } from "./siteStore";
 import { LIMITS, mailtoFor, validateContact, type ContactErrors, type ContactInput } from "@/lib/contact";
 
@@ -42,6 +44,7 @@ export default function ContactWindow() {
     document.body.appendChild(a);
     a.click();
     a.remove();
+    stat("contact", { beat: TRACKS.find((t) => t.title === form.beat)?.id ?? "general" });
     setOpened(true);
   };
 

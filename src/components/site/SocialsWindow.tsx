@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PROFILE } from "@/data/profile";
+import { stat } from "@/lib/stats";
 
 // The links, with room to breathe, and (if one is set in profile.ts) a
 // single video that loads only when someone asks for it.
@@ -45,6 +46,7 @@ export default function SocialsWindow() {
               href={s.url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => stat("social", { link: s.label })}
               className="group my-0.5 flex items-baseline justify-between gap-4 rounded-[8px] px-3 py-3 hover:bg-cream-2 focus-visible:bg-cream-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-dusk"
             >
               <span className="text-[16px] text-ink group-hover:underline group-hover:decoration-1 group-hover:underline-offset-4">{s.label}</span>

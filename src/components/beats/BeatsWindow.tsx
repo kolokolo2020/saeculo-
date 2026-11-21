@@ -8,6 +8,7 @@ import { NextGlyph, PauseGlyph, PlayGlyph, PrevGlyph, RepeatGlyph, ShuffleGlyph,
 import { ALBUM, TRACKS, isNew } from "@/data/tracks";
 import analysis from "@/data/trackAnalysis.json";
 import { formatTime } from "@/lib/audio";
+import { stat } from "@/lib/stats";
 import { trackUrl } from "@/lib/trackLink";
 import WaveformSeek from "./WaveformSeek";
 
@@ -237,6 +238,7 @@ export default function BeatsWindow() {
     if (!track) return;
     try {
       await navigator.clipboard.writeText(trackUrl(track.id));
+      stat("share", { beat: track.id });
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -303,7 +305,10 @@ export default function BeatsWindow() {
             </button>
             <button
               className="mp-link"
-              onClick={() => useSiteStore.getState().askAbout(track.title)}
+              onClick={() => {
+                stat("lease", { beat: track.id });
+                useSiteStore.getState().askAbout(track.title);
+              }}
               title="Write to saeculo about leasing this beat"
               data-testid="lease-this"
             >
